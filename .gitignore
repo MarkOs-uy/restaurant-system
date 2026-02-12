@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual env
+venv/
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+postgres_data/
+backups/
+
+# Alembic cache
+*.log
+
+# Testing
+.coverage
+htmlcov/
+
+# Misc
+*.sqlite3
+
+# Backups
+backups/
