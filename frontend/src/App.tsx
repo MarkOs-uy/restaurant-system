@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react"
 import TableCard from "./components/TableCard"
-import { API_URL } from "./api.ts"
+import { API_URL } from "./api"
 
-type Table = {
+interface Table {
   id: number
   number: number
-  status: "libre" | "ocupada"
-  order_id: number | null
-  order_status: string | null
+  occupied: boolean
+  order_id?: number | null
+  order_status?: string | null
 }
 
 function App() {
@@ -27,38 +27,52 @@ function App() {
       })
   }, [])
 
-  if (loading) return <h2 style={{ padding: 20 }}>Cargando mesas...</h2>
+  const touchTable = async (tableId: number) => {
+    try {
+      const res = await fetch(`${API_URL}/tables/${tableId}/touch`, {
+        method: "POST"
+      })
 
-return (
-  <div
-    style={{
-      maxWidth: 1200,
-      margin: "0 auto",
-      padding: 40,
-    }}
-  >
-    <h1 style={{ marginBottom: 30 }}>Salón</h1>
+      const data = await res.json()
 
+      setTables(prev =>
+        prev.map(t =>
+          t.id === tableId
+            ? {
+                ...t,
+                occupied: true,
+                order_id: data.order_id,
+                order_status: data.status
+              }
+            : t
+        )
+      )
+    } catch (err) {
+      console.error("Error tocando mesa:", err)
+    }
+  }
+
+  if (loading) return <h2>Cargando mesas...</h2>
+
+  return (
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+        gridTemplateColumns: "repeat(4, 1fr)",
         gap: 20,
+        padding: 20
       }}
     >
-      {tables.map((t: any) => (
+      {tables.map(t => (
         <TableCard
           key={t.id}
           number={t.number}
-          status={t.status}
-          orderStatus={t.order_status}
+          occupied={t.occupied}
+          onClick={() => touchTable(t.id)}
         />
       ))}
     </div>
-  </div>
-)
-
+  )
 }
 
 export default App
-

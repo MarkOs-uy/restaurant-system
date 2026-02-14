@@ -32,6 +32,7 @@ def touch_table(table_id: int, db: Session = Depends(get_db)):
     if not order:
         order = Order(
             table_id=table_id,
+            restaurant_id=table.restaurant_id,
             status=OrderStatus.OPEN  # 🟢 AGREGADO explícito
         )
         db.add(order)

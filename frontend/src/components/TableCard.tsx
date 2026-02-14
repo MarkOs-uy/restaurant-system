@@ -1,46 +1,24 @@
-type Props = {
+interface Props {
   number: number
-  status: "libre" | "ocupada"
-  orderStatus: string | null
+  occupied: boolean
+  onClick: () => void
 }
 
-export default function TableCard({ number, status, orderStatus }: Props) {
-
-  const getColor = () => {
-    if (status === "libre") return "#2ecc71" // verde
-
-    switch (orderStatus) {
-      case "OPEN":
-        return "#f1c40f"
-      case "SENT":
-        return "#3498db"
-      case "IN_PROGRESS":
-        return "#e67e22"
-      case "READY":
-        return "#9b59b6"
-      default:
-        return "#e74c3c"
-    }
-  }
-
+export default function TableCard({ number, occupied, onClick }: Props) {
   return (
     <div
+      onClick={onClick}
       style={{
-        backgroundColor: getColor(),
-        borderRadius: 12,
-        padding: 20,
-        color: "white",
-        fontSize: 22,
-        fontWeight: "bold",
-        textAlign: "center",
         cursor: "pointer",
-        transition: "0.2s"
+        backgroundColor: occupied ? "#ff6b6b" : "#51cf66",
+        padding: 20,
+        borderRadius: 12,
+        textAlign: "center",
+        fontSize: 20,
+        fontWeight: "bold"
       }}
     >
       Mesa {number}
-      <div style={{ fontSize: 14, marginTop: 10 }}>
-        {status === "libre" ? "Libre" : orderStatus}
-      </div>
     </div>
   )
 }
