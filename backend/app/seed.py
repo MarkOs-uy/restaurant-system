@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from app.db.session import SessionLocal
 from app.models.table import Table
 from app.seed_restaurant import seed_restaurant
 
@@ -7,9 +8,7 @@ def seed_tables(db: Session):
 
     restaurant = seed_restaurant(db)
 
-    existing_tables = db.query(Table).count()
-
-    if existing_tables > 0:
+    if db.query(Table).first():
         print("Seed ya ejecutado. No se crean mesas.")
         return
 
@@ -24,3 +23,14 @@ def seed_tables(db: Session):
     db.commit()
 
     print("Mesas creadas.")
+
+def run():
+    db = SessionLocal()
+    try:
+        seed_tables(db)
+    finally:
+        db.close()
+
+
+if __name__ == "__main__":
+    run()
