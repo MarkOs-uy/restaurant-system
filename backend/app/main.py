@@ -2,7 +2,6 @@ from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
-from fastapi import FastAPI
 from app.db.base import Base
 from app.db.session import engine
 
@@ -10,37 +9,32 @@ from contextlib import asynccontextmanager
 from app.db.session import SessionLocal
 from app.seed import seed_tables
 
-# IMPORTANTE: importar modelos
 from app import models
 
 from app.routers import tables, orders, products, cash_register
 
+from fastapi.middleware.cors import CORSMiddleware
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-
-    print("Iniciando aplicación...")
-
-    db = SessionLocal()
-
-    try:
-        #seed_tables(db)
-        print("Iniciando aplicación...")
-    finally:
-        db.close()
-
+    print("Backend arrancando...")
     yield
-
-    print("Apagando aplicación...")
+    print("Backend apagándose...")
 
 app = FastAPI(lifespan=lifespan)
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],   # luego lo restringimos
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(tables.router)
 app.include_router(orders.router)
 app.include_router(products.router)
 app.include_router(cash_register.router)
-
-#Base.metadata.create_all(bind=engine)
 
 @app.get("/")
 def root():
