@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.models.table import Table
 from app.seed_restaurant import seed_restaurant
+from app.seed_products import seed_products
 
 
 def seed_tables(db: Session):
@@ -28,6 +29,7 @@ def run():
     db = SessionLocal()
     try:
         seed_tables(db)
+        seed_products(db)
     finally:
         db.close()
 

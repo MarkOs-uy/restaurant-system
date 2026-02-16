@@ -22,3 +22,7 @@ def create_product(
     db.refresh(db_product)
 
     return db_product
+
+@router.get("/")
+def list_products(db: Session = Depends(get_db)):
+    return db.query(Product).filter(Product.active == True).all()

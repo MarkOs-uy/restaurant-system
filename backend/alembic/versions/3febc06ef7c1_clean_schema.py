@@ -1,8 +1,8 @@
-"""init
+"""clean schema
 
-Revision ID: 964fecf0e3f4
+Revision ID: 3febc06ef7c1
 Revises: 
-Create Date: 2026-02-11 23:15:06.295784
+Create Date: 2026-02-16 02:34:53.836111
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '964fecf0e3f4'
+revision: str = '3febc06ef7c1'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -85,18 +85,15 @@ def upgrade() -> None:
     op.create_index(op.f('ix_orders_restaurant_id'), 'orders', ['restaurant_id'], unique=False)
     op.create_table('order_items',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('restaurant_id', sa.Integer(), nullable=False),
     sa.Column('order_id', sa.Integer(), nullable=False),
     sa.Column('product_id', sa.Integer(), nullable=False),
     sa.Column('quantity', sa.Integer(), nullable=False),
     sa.Column('unit_price', sa.Numeric(precision=10, scale=2), nullable=False),
     sa.ForeignKeyConstraint(['order_id'], ['orders.id'], ),
     sa.ForeignKeyConstraint(['product_id'], ['products.id'], ),
-    sa.ForeignKeyConstraint(['restaurant_id'], ['restaurants.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_order_items_id'), 'order_items', ['id'], unique=False)
-    op.create_index(op.f('ix_order_items_restaurant_id'), 'order_items', ['restaurant_id'], unique=False)
     op.create_table('payments',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('restaurant_id', sa.Integer(), nullable=False),
@@ -121,7 +118,6 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_payments_restaurant_id'), table_name='payments')
     op.drop_index(op.f('ix_payments_id'), table_name='payments')
     op.drop_table('payments')
-    op.drop_index(op.f('ix_order_items_restaurant_id'), table_name='order_items')
     op.drop_index(op.f('ix_order_items_id'), table_name='order_items')
     op.drop_table('order_items')
     op.drop_index(op.f('ix_orders_restaurant_id'), table_name='orders')

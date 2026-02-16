@@ -29,10 +29,8 @@ class Restaurant(Base):
         default=lambda: str(uuid.uuid4())
     )
 
-
     tables = relationship("Table", back_populates="restaurant")
     products = relationship("Product", back_populates="restaurant")
     payments = relationship("Payment", back_populates="restaurant")
     orders = relationship("Order", back_populates="restaurant")
-    order_items = relationship("OrderItem", back_populates="restaurant")
     cash_registers = relationship("CashRegister", back_populates="restaurant")

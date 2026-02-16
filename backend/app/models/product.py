@@ -6,7 +6,6 @@ class Product(Base):
     __tablename__ = "products"
 
     id = Column(Integer, primary_key=True, index=True)
-    id = Column(Integer, primary_key=True, index=True)
     restaurant_id = Column(
         Integer,
         ForeignKey("restaurants.id"),
