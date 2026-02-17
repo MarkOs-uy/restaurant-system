@@ -5,7 +5,7 @@ from sqlalchemy.orm import relationship
 class Product(Base):
     __tablename__ = "products"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     restaurant_id = Column(
         Integer,
         ForeignKey("restaurants.id"),
@@ -15,5 +15,8 @@ class Product(Base):
     name = Column(String, nullable=False)
     price = Column(Numeric(10, 2), nullable=False)
     active = Column(Boolean, default=True)
+    station_id = Column(ForeignKey("production_stations.id"))
+    
+    station = relationship("ProductionStation", back_populates="products")
     restaurant = relationship("Restaurant", back_populates="products")
 

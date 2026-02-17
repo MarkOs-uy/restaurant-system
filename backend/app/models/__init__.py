@@ -5,3 +5,4 @@ from .order_item import OrderItem
 from .payment import Payment
 from .cash_register import CashRegister
 from .restaurant import Restaurant
+from .production_station import ProductionStation

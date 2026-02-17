@@ -15,12 +15,12 @@ def seed_products(db: Session):
     print("Creando productos iniciales...")
 
     products = [
-        Product(name="Coca Cola", price=120, restaurant_id=restaurant.id),
-        Product(name="Agua", price=90, restaurant_id=restaurant.id),
-        Product(name="Cerveza", price=180, restaurant_id=restaurant.id),
-        Product(name="Hamburguesa", price=450, restaurant_id=restaurant.id),
-        Product(name="Pizza Muzza", price=520, restaurant_id=restaurant.id),
-        Product(name="Papas Fritas", price=250, restaurant_id=restaurant.id),
+        Product(name="Coca Cola", price=120, restaurant_id=restaurant.id, station_id=2 ),
+        Product(name="Agua", price=90, restaurant_id=restaurant.id, station_id=2),
+        Product(name="Cerveza", price=180, restaurant_id=restaurant.id, station_id=2),
+        Product(name="Hamburguesa", price=450, restaurant_id=restaurant.id, station_id=1),
+        Product(name="Pizza Muzza", price=520, restaurant_id=restaurant.id, station_id=1),
+        Product(name="Papas Fritas", price=250, restaurant_id=restaurant.id, station_id=1),
     ]
 
     db.add_all(products)

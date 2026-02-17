@@ -34,3 +34,4 @@ class Restaurant(Base):
     payments = relationship("Payment", back_populates="restaurant")
     orders = relationship("Order", back_populates="restaurant")
     cash_registers = relationship("CashRegister", back_populates="restaurant")
+    stations = relationship("ProductionStation", back_populates="restaurant")

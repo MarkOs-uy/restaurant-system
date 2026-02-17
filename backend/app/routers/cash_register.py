@@ -15,17 +15,22 @@ router = APIRouter(
 )
 
 @router.post("/open")
-def open_cash_register(data: CashRegisterOpen, db: Session = Depends(get_db)):
-
+def open_cash_register(
+    restaurant_id: int,
+    opening_amount: float,
+    db: Session = Depends(get_db)
+):
     existing = db.query(CashRegister).filter(
-        CashRegister.closed_at == None
+        CashRegister.closed_at == None,
+        CashRegister.restaurant_id == restaurant_id
     ).first()
 
     if existing:
-        raise HTTPException(400, "Cash register already open")
+        raise HTTPException(400, "Ya hay una caja abierta")
 
     register = CashRegister(
-        opening_amount=data.opening_amount
+        restaurant_id=restaurant_id,
+        opening_amount=opening_amount
     )
 
     db.add(register)
@@ -33,6 +38,7 @@ def open_cash_register(data: CashRegisterOpen, db: Session = Depends(get_db)):
     db.refresh(register)
 
     return register
+
 
 @router.post("/close")
 def close_cash_register(db: Session = Depends(get_db)):
