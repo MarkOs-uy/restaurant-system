@@ -11,9 +11,16 @@ ALLOWED_TRANSITIONS = {
 }
 
 class OrderItemOut(BaseModel):
+    id: int
     product_name: str
     quantity: int
-    unit_price: Decimal
+    unit_price: float
+    subtotal: float
+    status: str
+#class OrderItemOut(BaseModel):
+#    product_name: str
+#    quantity: int
+#    unit_price: Decimal
 
 class OrderOut(BaseModel):
     order_id: int

@@ -1,8 +1,8 @@
-"""clean schema
+"""initial
 
-Revision ID: 57f58a59e3d8
+Revision ID: 5ca3137cd70a
 Revises: 
-Create Date: 2026-02-16 21:15:05.027171
+Create Date: 2026-02-19 18:58:03.653609
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '57f58a59e3d8'
+revision: str = '5ca3137cd70a'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -44,6 +44,13 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_cash_registers_id'), 'cash_registers', ['id'], unique=False)
     op.create_index(op.f('ix_cash_registers_restaurant_id'), 'cash_registers', ['restaurant_id'], unique=False)
+    op.create_table('categories',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('name', sa.String(), nullable=False),
+    sa.Column('restaurant_id', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['restaurant_id'], ['restaurants.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
     op.create_table('production_stations',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('restaurant_id', sa.Integer(), nullable=False),
@@ -87,6 +94,8 @@ def upgrade() -> None:
     sa.Column('price', sa.Numeric(precision=10, scale=2), nullable=False),
     sa.Column('active', sa.Boolean(), nullable=True),
     sa.Column('station_id', sa.Integer(), nullable=True),
+    sa.Column('category_id', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['category_id'], ['categories.id'], ),
     sa.ForeignKeyConstraint(['restaurant_id'], ['restaurants.id'], ),
     sa.ForeignKeyConstraint(['station_id'], ['production_stations.id'], ),
     sa.PrimaryKeyConstraint('id')
@@ -114,8 +123,7 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['cash_register_id'], ['cash_registers.id'], ),
     sa.ForeignKeyConstraint(['order_id'], ['orders.id'], ),
     sa.ForeignKeyConstraint(['restaurant_id'], ['restaurants.id'], ),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('order_id')
+    sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_payments_restaurant_id'), 'payments', ['restaurant_id'], unique=False)
     # ### end Alembic commands ###
@@ -138,6 +146,7 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_tables_external_id'), table_name='tables')
     op.drop_table('tables')
     op.drop_table('production_stations')
+    op.drop_table('categories')
     op.drop_index(op.f('ix_cash_registers_restaurant_id'), table_name='cash_registers')
     op.drop_index(op.f('ix_cash_registers_id'), table_name='cash_registers')
     op.drop_table('cash_registers')

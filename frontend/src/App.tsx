@@ -1,6 +1,5 @@
 import { Routes, Route } from "react-router-dom"
 import TablesPage from "./pages/TablesPage"
-import OrderPage from "./pages/OrderPage"
 import OrderDetail from "./pages/OrderDetail"
 
 function App() {

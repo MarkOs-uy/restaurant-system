@@ -11,7 +11,7 @@ from app.seed import seed_tables
 
 from app import models
 
-from app.routers import tables, orders, products, cash_register
+from app.routers import tables, orders, products, cash_register, category, order_items, stations
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -36,6 +36,7 @@ app.include_router(tables.router)
 app.include_router(orders.router)
 app.include_router(products.router)
 app.include_router(cash_register.router)
+app.include_router(category.router)
 
 @app.get("/")
 def root():

@@ -35,3 +35,4 @@ class Restaurant(Base):
     orders = relationship("Order", back_populates="restaurant")
     cash_registers = relationship("CashRegister", back_populates="restaurant")
     stations = relationship("ProductionStation", back_populates="restaurant")
+    categories = relationship("Category", back_populates="restaurant")

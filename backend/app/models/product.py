@@ -16,7 +16,9 @@ class Product(Base):
     price = Column(Numeric(10, 2), nullable=False)
     active = Column(Boolean, default=True)
     station_id = Column(ForeignKey("production_stations.id"))
+    category_id = Column(Integer, ForeignKey("categories.id"))
     
+    category = relationship("Category", back_populates="products")
     station = relationship("ProductionStation", back_populates="products")
     restaurant = relationship("Restaurant", back_populates="products")
 

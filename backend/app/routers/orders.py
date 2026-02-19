@@ -9,6 +9,7 @@ from app.models.product import Product
 from app.models.order_item import OrderItem
 from app.models.payment import Payment
 from app.models.cash_register import CashRegister
+from app.models.order_item import OrderItemStatus
 
 
 from app.schemas.order_item import OrderItemCreate
@@ -24,13 +25,13 @@ def add_item_to_order(
     item: OrderItemCreate,
     db: Session = Depends(get_db)
 ):
-    order = db.query(Order).filter(
-        Order.id == order_id,
-        Order.status != OrderStatus.CLOSED
-    ).first()
+    order = db.query(Order).filter(Order.id == order_id).first()
 
     if not order:
-        raise HTTPException(status_code=404, detail="Pedido no encontrado o cerrado")
+        raise HTTPException(404, "Order not found")
+
+    if order.status == OrderStatus.CLOSED:
+        raise HTTPException(400, "Order already closed")
 
     product = db.query(Product).filter(
         Product.id == item.product_id,
@@ -108,13 +109,6 @@ def add_payment(
     )
 
     db.add(payment_record)
-
-    new_remaining = remaining - payment.amount
-
-    if new_remaining == 0:
-        order.status = OrderStatus.CLOSED
-        order.closed_at = func.now()
-
     db.commit()
 
     return {"remaining": remaining - payment.amount}
@@ -154,10 +148,8 @@ def close_order(order_id: int, db: Session = Depends(get_db)):
         "status": order.status
     }
 
-
-
-@router.post("/{order_id}/force-close")
-def force_close_order(
+@router.post("/{order_id}/send-to-kitchen")
+def send_to_kitchen(
     order_id: int,
     db: Session = Depends(get_db)
 ):
@@ -167,35 +159,22 @@ def force_close_order(
         raise HTTPException(404, "Order not found")
 
     if order.status == OrderStatus.CLOSED:
-        raise HTTPException(400, "Order already closed")
+        raise HTTPException(400, "Order is closed")
 
-    total_order = sum(
-        item.quantity * item.unit_price
-        for item in order.items
-    )
+    pending_items = [
+        item for item in order.items
+        if item.status == OrderItemStatus.PENDING
+    ]
 
-    total_paid = sum(
-        payment.amount for payment in order.payments
-    )
+    if not pending_items:
+        raise HTTPException(400, "No pending items to send")
 
-    remaining = total_order - total_paid
-
-    if remaining > 0:
-        raise HTTPException(
-            400,
-            f"No se puede cerrar. Faltan pagar {remaining}"
-        )
-
-    order.status = OrderStatus.CLOSED
-    order.closed_at = func.now()
+    for item in pending_items:
+        item.status = OrderItemStatus.SENT
 
     db.commit()
-    db.refresh(order)
 
-    return {
-        "order_id": order.id,
-        "status": order.status
-    }
+    return {"message": f"{len(pending_items)} items sent to kitchen"}
 
 
 
@@ -220,7 +199,8 @@ def get_order(order_id: int, db: Session = Depends(get_db)):
             "product_name": item.product.name,
             "quantity": item.quantity,
             "unit_price": float(item.unit_price),
-            "subtotal": float(subtotal)
+            "subtotal": float(subtotal),
+            "status": item.status.value
         })
 
     # 2️⃣ Pagos
