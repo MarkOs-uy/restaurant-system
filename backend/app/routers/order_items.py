@@ -1,14 +1,33 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-
 from app.db.session import get_db
-from app.models.production_station import ProductionStation
 from app.models.order_item import OrderItem, OrderItemStatus
 from app.schemas.order_item import OrderItemStatusUpdate
 
-router = APIRouter(prefix="/order_items", tags=["order_items"])
+router = APIRouter(prefix="/order-items", tags=["order-items"])
 
-@router.patch("/order-items/{item_id}/status")
+ALLOWED_ITEM_TRANSITIONS = {
+    OrderItemStatus.PENDING: [
+        OrderItemStatus.SENT,
+        OrderItemStatus.CANCELLED
+    ],
+    OrderItemStatus.SENT: [
+        OrderItemStatus.IN_PROGRESS,
+        OrderItemStatus.CANCELLED
+    ],
+    OrderItemStatus.IN_PROGRESS: [
+        OrderItemStatus.READY,
+        OrderItemStatus.CANCELLED
+    ],
+    OrderItemStatus.READY: [
+        OrderItemStatus.DELIVERED
+    ],
+    OrderItemStatus.DELIVERED: [],
+    OrderItemStatus.CANCELLED: []
+}
+
+
+@router.patch("/{item_id}/status")
 def update_item_status(
     item_id: int,
     data: OrderItemStatusUpdate,
@@ -19,8 +38,17 @@ def update_item_status(
     if not item:
         raise HTTPException(404, "Item not found")
 
+    if data.status not in ALLOWED_ITEM_TRANSITIONS[item.status]:
+        raise HTTPException(
+            400,
+            f"Invalid transition from {item.status} to {data.status}"
+        )
+
     item.status = data.status
     db.commit()
     db.refresh(item)
 
-    return {"id": item.id, "new_status": item.status}
+    return {
+        "item_id": item.id,
+        "new_status": item.status
+    }

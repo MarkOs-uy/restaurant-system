@@ -114,6 +114,8 @@ def add_payment(
     return {"remaining": remaining - payment.amount}
 
 
+from sqlalchemy import func
+
 @router.post("/{order_id}/close")
 def close_order(order_id: int, db: Session = Depends(get_db)):
 
@@ -121,6 +123,9 @@ def close_order(order_id: int, db: Session = Depends(get_db)):
 
     if not order:
         raise HTTPException(404, "Order not found")
+
+    if order.status == OrderStatus.CLOSED:
+        raise HTTPException(400, "Order already closed")
 
     total_order = sum(
         item.quantity * item.unit_price
@@ -137,16 +142,29 @@ def close_order(order_id: int, db: Session = Depends(get_db)):
             f"Order not fully paid. Remaining: {remaining}"
         )
 
-    if order.status != OrderStatus.CLOSED:
-        order.status = OrderStatus.CLOSED
-        order.closed_at = func.now()
-        db.commit()
-        db.refresh(order)
+    # 🔥 NUEVA REGLA
+    not_delivered = [
+        item for item in order.items
+        if item.status != OrderItemStatus.DELIVERED
+    ]
+
+    if not_delivered:
+        raise HTTPException(
+            400,
+            "All items must be DELIVERED before closing order"
+        )
+
+    order.status = OrderStatus.CLOSED
+    order.closed_at = func.now()
+
+    db.commit()
+    db.refresh(order)
 
     return {
         "order_id": order.id,
         "status": order.status
     }
+
 
 @router.post("/{order_id}/send-to-kitchen")
 def send_to_kitchen(
@@ -172,11 +190,43 @@ def send_to_kitchen(
     for item in pending_items:
         item.status = OrderItemStatus.SENT
 
+    # si estaba OPEN pasa a SENT
+    if order.status == OrderStatus.OPEN:
+        order.status = OrderStatus.SENT
+
     db.commit()
 
-    return {"message": f"{len(pending_items)} items sent to kitchen"}
+    return {
+        "message": f"{len(pending_items)} items sent to kitchen"
+    }
 
+@router.get("/active")
+def get_active_orders(db: Session = Depends(get_db)):
 
+    orders = db.query(Order).filter(
+        Order.status != OrderStatus.CLOSED
+    ).all()
+
+    result = []
+
+    for order in orders:
+        items = []
+        for item in order.items:
+            items.append({
+                "id": item.id,
+                "product_name": item.product.name,
+                "quantity": item.quantity,
+                "status": item.status.value
+            })
+
+        result.append({
+            "order_id": order.id,
+            "table_number": order.table.number,
+            "status": order.status.value,
+            "items": items
+        })
+
+    return result
 
 @router.get("/{order_id}", response_model=OrderOut)
 @router.get("/{order_id}")
@@ -228,7 +278,6 @@ def get_order(order_id: int, db: Session = Depends(get_db)):
         "total_paid": float(total_paid),
         "remaining": float(remaining)
     }
-
 
 
 @router.patch("/{order_id}/status")

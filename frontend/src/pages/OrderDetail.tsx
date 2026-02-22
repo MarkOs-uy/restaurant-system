@@ -38,14 +38,11 @@ interface Product {
   price: number
 }
 
-
-
 export default function OrderDetail() {
   const { orderId } = useParams()
   const id = Number(orderId)
 
   const [order, setOrder] = useState<Order | null>(null)
-  /*const [products, setProducts] = useState<Product[]>([])*/
   const [categories, setCategories] = useState<Category[]>([])
   const [openCategory, setOpenCategory] = useState<number | null>(null)
   const [paymentAmount, setPaymentAmount] = useState("")
@@ -58,18 +55,10 @@ export default function OrderDetail() {
   }, [])
 
   const fetchOrder = async () => {
-    console.log("Fetching order...")
     const res = await fetch(`${API_URL}/orders/${id}`)
     const data = await res.json()
-    console.log("Order received:", data)
     setOrder(data)
   }
-
-  /*const fetchProducts = async () => {
-    const res = await fetch(`${API_URL}/products/`)
-    const data = await res.json()
-    setProducts(data)
-  }*/
 
   const fetchCategories = async () => {
     const res = await fetch(`${API_URL}/categories/with-products`)
@@ -94,7 +83,6 @@ export default function OrderDetail() {
     fetchOrder()
   }
 
-
   const registerPayment = async () => {
     if (!paymentAmount) return
 
@@ -118,28 +106,17 @@ export default function OrderDetail() {
   }
 
   const closeOrder = async () => {
-    await fetch(`${API_URL}/orders/${id}/close`, {
+    const res = await fetch(`${API_URL}/orders/${id}/close`, {
       method: "POST"
     })
 
-    fetchOrder()
-  }
-
-  if (!order) return <p>Cargando...</p>
-
-  console.log("ORDER:", order)
-  console.log("REMAINING:", order.remaining)  
-  
-  const getStatusColor = () => {
-    switch (order.status) {
-      case "OPEN": return "green"
-      case "SENT": return "orange"
-      case "IN_PROGRESS": return "blue"
-      case "READY": return "purple"
-      case "CLOSED": return "gray"
-      case "CANCELLED": return "red"
-      default: return "black"
+    if (!res.ok) {
+      const error = await res.json()
+      alert(error.detail)
+      return
     }
+
+    fetchOrder()
   }
 
   const sendToKitchen = async () => {
@@ -156,6 +133,31 @@ export default function OrderDetail() {
     fetchOrder()
   }
 
+  if (!order) return <p>Cargando...</p>
+
+  const allDelivered =
+    order.items.length > 0 &&
+    order.items.every(i => i.status === "DELIVERED")
+
+  const canClose =
+    order.remaining === 0 &&
+    allDelivered &&
+    order.status !== "CLOSED"
+
+  const hasPendingItems =
+    order.items.some(i => i.status === "PENDING")
+
+  const getStatusColor = () => {
+    switch (order.status) {
+      case "OPEN": return "green"
+      case "SENT": return "orange"
+      case "IN_PROGRESS": return "blue"
+      case "READY": return "purple"
+      case "CLOSED": return "gray"
+      case "CANCELLED": return "red"
+      default: return "black"
+    }
+  }
 
   return (
     <div style={{ padding: 40, maxWidth: 900 }}>
@@ -174,7 +176,8 @@ export default function OrderDetail() {
         {order.items.map((item, index) => (
           <li key={index}>
             {item.product_name} x {item.quantity} — $
-            {(item.quantity * item.unit_price).toFixed(2)}
+            {(item.quantity * item.unit_price).toFixed(2)} —{" "}
+            <strong>{item.status}</strong>
           </li>
         ))}
       </ul>
@@ -183,7 +186,8 @@ export default function OrderDetail() {
 
       <hr />
 
-      {order.status !== "CLOSED" && order.items.some(i => i.status === "PENDING") && (
+      {/* ENVIAR A COCINA */}
+      {order.status !== "CLOSED" && hasPendingItems && (
         <div style={{ marginTop: 20 }}>
           <button
             onClick={sendToKitchen}
@@ -198,6 +202,8 @@ export default function OrderDetail() {
           </button>
         </div>
       )}
+
+      <hr />
 
       {/* PAGOS */}
       <h2>Pagos</h2>
@@ -218,7 +224,6 @@ export default function OrderDetail() {
       {/* FORMULARIO DE PAGO */}
       {order.status !== "CLOSED" && (
         <div style={{ marginTop: 20 }}>
-          
           <h3>Registrar Pago</h3>
 
           <input
@@ -251,13 +256,11 @@ export default function OrderDetail() {
         </div>
       )}
 
-      {/* CERRAR ORDEN MANUAL */}
-      {order.total > 0 &&
-      order.remaining === 0 &&
-      order.status !== "CLOSED" && (
+      {/* CERRAR ORDEN SOLO SI CUMPLE REGLAS */}
+      {canClose && (
         <div style={{ marginTop: 20 }}>
           <p style={{ color: "green", fontWeight: "bold" }}>
-            ✔ Orden saldada. Puede cerrarse.
+            ✔ Orden pagada y entregada. Puede cerrarse.
           </p>
 
           <button
@@ -274,14 +277,13 @@ export default function OrderDetail() {
         </div>
       )}
 
-
+      <hr />
 
       {/* PRODUCTOS */}
       <h2>Agregar Productos</h2>
 
       {categories.map(category => (
         <div key={category.id} style={{ marginBottom: 15 }}>
-          
           <div
             onClick={() =>
               setOpenCategory(
@@ -303,7 +305,6 @@ export default function OrderDetail() {
             <div style={{ padding: 10 }}>
               {category.products.map(p => (
                 <div key={p.id} style={{ marginBottom: 8 }}>
-                  
                   <input
                     type="number"
                     min="1"
@@ -327,14 +328,13 @@ export default function OrderDetail() {
                   >
                     {p.name} - ${p.price}
                   </button>
-
                 </div>
               ))}
             </div>
           )}
         </div>
       ))}
-
     </div>
   )
 }
+
