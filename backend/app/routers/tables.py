@@ -4,15 +4,19 @@ from sqlalchemy.orm import Session, joinedload  # 🟢 AGREGADO
 from app.db.session import get_db
 from app.models import Table
 from app.models.order import Order, OrderStatus
+from app.models.restaurant import Restaurant
+
+from app.core.dependencies import get_current_restaurant
 
 router = APIRouter(prefix="/tables", tags=["tables"])
 
 
 @router.post("/{table_id}/touch")
-def touch_table(table_id: int, db: Session = Depends(get_db)):
+def touch_table(table_id: int, restaurant: Restaurant = Depends(get_current_restaurant), db: Session = Depends(get_db)):
 
     table = db.query(Table).filter(
         Table.id == table_id,
+        Table.restaurant_id == restaurant.id,
         Table.active == True
     ).first()
 
@@ -48,12 +52,18 @@ def touch_table(table_id: int, db: Session = Depends(get_db)):
 
 # 🔥 ESTE ES EL ENDPOINT IMPORTANTE
 @router.get("/")
-def list_tables(db: Session = Depends(get_db)):
+def list_tables(
+    db: Session = Depends(get_db),
+    restaurant: Restaurant = Depends(get_current_restaurant)
+):
 
     tables = (
         db.query(Table)
         .options(joinedload(Table.orders))
-        .filter(Table.active == True)
+        .filter(
+            Table.active == True,
+            Table.restaurant_id == restaurant.id
+        )
         .order_by(Table.number)
         .all()
     )

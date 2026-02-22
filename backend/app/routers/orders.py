@@ -10,7 +10,9 @@ from app.models.order_item import OrderItem
 from app.models.payment import Payment
 from app.models.cash_register import CashRegister
 from app.models.order_item import OrderItemStatus
+from app.models.restaurant import Restaurant
 
+from app.core.dependencies import get_current_restaurant
 
 from app.schemas.order_item import OrderItemCreate
 from app.schemas.order import OrderOut, OrderStatusUpdate, ALLOWED_TRANSITIONS
@@ -23,9 +25,13 @@ router = APIRouter(prefix="/orders", tags=["orders"])
 def add_item_to_order(
     order_id: int,
     item: OrderItemCreate,
+    restaurant: Restaurant = Depends(get_current_restaurant),
     db: Session = Depends(get_db)
 ):
-    order = db.query(Order).filter(Order.id == order_id).first()
+    order = db.query(Order).filter(
+        Order.id == order_id,
+        Order.restaurant_id == restaurant.id
+    ).first()
 
     if not order:
         raise HTTPException(404, "Order not found")
@@ -49,11 +55,13 @@ def add_item_to_order(
         )
 
     order_item = OrderItem(
+        restaurant_id=order.restaurant_id,
         order_id=order.id,
         product_id=product.id,
         quantity=item.quantity,
         unit_price=product.price
     )
+
 
     db.add(order_item)
     db.commit()
@@ -70,9 +78,14 @@ def add_item_to_order(
 def add_payment(
     order_id: int,
     payment: PaymentCreate,
+    restaurant: Restaurant = Depends(get_current_restaurant),    
     db: Session = Depends(get_db)
 ):
-    order = db.query(Order).filter(Order.id == order_id).first()
+    order = db.query(Order).filter(
+        Order.id == order_id,
+        Order.restaurant_id == restaurant.id
+    ).first()
+
 
     if not order:
         raise HTTPException(404, "Order not found")
@@ -117,9 +130,16 @@ def add_payment(
 from sqlalchemy import func
 
 @router.post("/{order_id}/close")
-def close_order(order_id: int, db: Session = Depends(get_db)):
+def close_order(
+    order_id: int,
+    restaurant: Restaurant = Depends(get_current_restaurant),
+    db: Session = Depends(get_db)
+):
 
-    order = db.query(Order).filter(Order.id == order_id).first()
+    order = db.query(Order).filter(
+        Order.id == order_id,
+        Order.restaurant_id == restaurant.id
+    ).first()
 
     if not order:
         raise HTTPException(404, "Order not found")
@@ -169,9 +189,13 @@ def close_order(order_id: int, db: Session = Depends(get_db)):
 @router.post("/{order_id}/send-to-kitchen")
 def send_to_kitchen(
     order_id: int,
+    restaurant: Restaurant = Depends(get_current_restaurant),
     db: Session = Depends(get_db)
 ):
-    order = db.query(Order).filter(Order.id == order_id).first()
+    order = db.query(Order).filter(
+        Order.id == order_id,
+        Order.restaurant_id == restaurant.id
+    ).first()
 
     if not order:
         raise HTTPException(404, "Order not found")
@@ -201,9 +225,13 @@ def send_to_kitchen(
     }
 
 @router.get("/active")
-def get_active_orders(db: Session = Depends(get_db)):
+def get_active_orders(
+    restaurant: Restaurant = Depends(get_current_restaurant),
+    db: Session = Depends(get_db)
+):
 
     orders = db.query(Order).filter(
+        Order.restaurant_id == restaurant.id,
         Order.status != OrderStatus.CLOSED
     ).all()
 
@@ -230,9 +258,16 @@ def get_active_orders(db: Session = Depends(get_db)):
 
 @router.get("/{order_id}", response_model=OrderOut)
 @router.get("/{order_id}")
-def get_order(order_id: int, db: Session = Depends(get_db)):
+def get_order(
+    order_id: int,
+    restaurant: Restaurant = Depends(get_current_restaurant),
+    db: Session = Depends(get_db)
+):
 
-    order = db.query(Order).filter(Order.id == order_id).first()
+    order = db.query(Order).filter(
+        Order.id == order_id,
+        Order.restaurant_id == restaurant.id
+    ).first()
 
     if not order:
         raise HTTPException(404, "Order not found")

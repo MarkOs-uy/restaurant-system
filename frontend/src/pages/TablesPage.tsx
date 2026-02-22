@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import TableCard from "../components/TableCard"
-import { API_URL } from "../api"
+import { API_URL, API_HEADERS } from "../api"
 
 interface Table {
   id: number
@@ -18,7 +18,7 @@ export default function TablesPage() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    fetch(`${API_URL}/tables/`)
+    fetch(`${API_URL}/tables/`,{headers: API_HEADERS})
       .then(res => res.json())
       .then(data => {
         setTables(data)
@@ -34,6 +34,7 @@ const touchTable = async (tableId: number) => {
   try {
     const res = await fetch(`${API_URL}/tables/${tableId}/touch`, {
       method: "POST",
+      headers: API_HEADERS
     })
 
     if (!res.ok) {

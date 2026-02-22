@@ -1,9 +1,9 @@
 from sqlalchemy import Column, Integer, String, DateTime, Boolean
-import uuid
 from sqlalchemy.orm import relationship
-from datetime import datetime
-from app.db.base_class import Base
 from datetime import datetime, timezone
+import uuid
+
+from app.db.base_class import Base
 
 
 class Restaurant(Base):
@@ -15,24 +15,31 @@ class Restaurant(Base):
 
     created_at = Column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc)
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
     )
 
-    active = Column(Boolean, default=True)
+    active = Column(Boolean, default=True, nullable=False)
 
-    plan = Column(String, default="basic")  
+    plan = Column(String, default="basic", nullable=False)
 
     external_id = Column(
         String,
         unique=True,
         index=True,
+        nullable=False,
         default=lambda: str(uuid.uuid4())
     )
 
-    tables = relationship("Table", back_populates="restaurant")
-    products = relationship("Product", back_populates="restaurant")
-    payments = relationship("Payment", back_populates="restaurant")
-    orders = relationship("Order", back_populates="restaurant")
-    cash_registers = relationship("CashRegister", back_populates="restaurant")
-    stations = relationship("ProductionStation", back_populates="restaurant")
-    categories = relationship("Category", back_populates="restaurant")
+    # Relaciones
+    tables = relationship("Table", back_populates="restaurant", cascade="all, delete")
+    products = relationship("Product", back_populates="restaurant", cascade="all, delete")
+    payments = relationship("Payment", back_populates="restaurant", cascade="all, delete")
+    orders = relationship("Order", back_populates="restaurant", cascade="all, delete")
+    cash_registers = relationship("CashRegister", back_populates="restaurant", cascade="all, delete")
+    stations = relationship("ProductionStation", back_populates="restaurant", cascade="all, delete")
+    categories = relationship("Category", back_populates="restaurant", cascade="all, delete")
+    order_items = relationship("OrderItem", back_populates="restaurant", cascade="all, delete")
+    users = relationship("User", back_populates="restaurant")
+
+

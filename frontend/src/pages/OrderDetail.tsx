@@ -1,6 +1,6 @@
 import { useParams } from "react-router-dom"
 import { useEffect, useState } from "react"
-import { API_URL } from "../api"
+import { API_URL, API_HEADERS } from "../api"
 
 interface Item {
   product_name: string
@@ -55,13 +55,13 @@ export default function OrderDetail() {
   }, [])
 
   const fetchOrder = async () => {
-    const res = await fetch(`${API_URL}/orders/${id}`)
+    const res = await fetch(`${API_URL}/orders/${id}`, {headers: API_HEADERS})
     const data = await res.json()
     setOrder(data)
   }
 
   const fetchCategories = async () => {
-    const res = await fetch(`${API_URL}/categories/with-products`)
+    const res = await fetch(`${API_URL}/categories/with-products`, {headers: API_HEADERS})
     const data = await res.json()
     setCategories(data)
   }
@@ -73,7 +73,7 @@ export default function OrderDetail() {
 
     await fetch(`${API_URL}/orders/${id}/items`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: API_HEADERS,
       body: JSON.stringify({
         product_id: productId,
         quantity: quantity
@@ -88,7 +88,7 @@ export default function OrderDetail() {
 
     const res = await fetch(`${API_URL}/orders/${id}/payments`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: API_HEADERS,
       body: JSON.stringify({
         amount: Number(paymentAmount),
         method: paymentMethod
@@ -107,7 +107,8 @@ export default function OrderDetail() {
 
   const closeOrder = async () => {
     const res = await fetch(`${API_URL}/orders/${id}/close`, {
-      method: "POST"
+      method: "POST",
+      headers: API_HEADERS
     })
 
     if (!res.ok) {
@@ -121,7 +122,8 @@ export default function OrderDetail() {
 
   const sendToKitchen = async () => {
     const res = await fetch(`${API_URL}/orders/${id}/send-to-kitchen`, {
-      method: "POST"
+      method: "POST",
+      headers: API_HEADERS
     })
 
     if (!res.ok) {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { API_URL } from "../api"
+import { API_URL, API_HEADERS } from "../api"
 
 interface Item {
   id: number
@@ -23,7 +23,7 @@ export default function Waiter() {
   }, [])
 
   const fetchOrders = async () => {
-    const res = await fetch(`${API_URL}/orders/active`)
+    const res = await fetch(`${API_URL}/orders/active`, {headers: API_HEADERS})
     const data = await res.json()
     setOrders(data)
   }
@@ -33,7 +33,7 @@ export default function Waiter() {
       `${API_URL}/order-items/${itemId}/status`,
       {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: API_HEADERS,
         body: JSON.stringify({ status: "DELIVERED" })
       }
     )

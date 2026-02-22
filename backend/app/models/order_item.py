@@ -1,7 +1,13 @@
-import enum
 from sqlalchemy import Column, Integer, ForeignKey, Numeric, String, Enum
 from sqlalchemy.orm import relationship
+import enum
+
 from app.db.base_class import Base
+
+from app.core.auth import get_current_user
+from app.models.user import User, UserRole
+
+
 
 class OrderItemStatus(str, enum.Enum):
     PENDING = "PENDING"
@@ -11,19 +17,45 @@ class OrderItemStatus(str, enum.Enum):
     DELIVERED = "DELIVERED"
     CANCELLED = "CANCELLED"
 
+
 class OrderItem(Base):
     __tablename__ = "order_items"
 
     id = Column(Integer, primary_key=True)
 
-    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
-    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    # 🔥 MULTI-TENANT
+    restaurant_id = Column(
+        Integer,
+        ForeignKey("restaurants.id"),
+        nullable=False,
+        index=True
+    )
+
+    order_id = Column(
+        Integer,
+        ForeignKey("orders.id"),
+        nullable=False
+    )
+
+    product_id = Column(
+        Integer,
+        ForeignKey("products.id"),
+        nullable=False
+    )
 
     quantity = Column(Integer, nullable=False)
-    unit_price = Column(Numeric(10,2), nullable=False)
 
-    status = Column(Enum(OrderItemStatus), default=OrderItemStatus.PENDING, nullable=False)
+    unit_price = Column(Numeric(10, 2), nullable=False)
+
+    status = Column(
+        Enum(OrderItemStatus),
+        default=OrderItemStatus.PENDING,
+        nullable=False
+    )
+
     notes = Column(String, nullable=True)
 
+    # Relaciones
     order = relationship("Order", back_populates="items")
     product = relationship("Product")
+    restaurant = relationship("Restaurant", back_populates="order_items")

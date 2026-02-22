@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { API_URL } from "../api"
+import { API_URL, API_HEADERS } from "../api"
 
 interface Order {
   order_id: number
@@ -21,13 +21,23 @@ export default function CashierPage() {
   }, [])
 
   const fetchActiveOrders = async () => {
-    const res = await fetch(`${API_URL}/orders/active`)
+    const res = await fetch(`${API_URL}/orders/active`, {
+      headers: API_HEADERS
+    })
+
+    if (!res.ok) return
+
     const data = await res.json()
     setOrders(data)
   }
 
   const selectOrder = async (orderId: number) => {
-    const res = await fetch(`${API_URL}/orders/${orderId}`)
+    const res = await fetch(`${API_URL}/orders/${orderId}`, {
+      headers: API_HEADERS
+    })
+
+    if (!res.ok) return
+
     const data = await res.json()
     setSelectedOrder(data)
   }
@@ -39,7 +49,7 @@ export default function CashierPage() {
       `${API_URL}/orders/${selectedOrder.order_id}/payments`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: API_HEADERS,
         body: JSON.stringify({
           amount: Number(paymentAmount),
           method: paymentMethod
@@ -54,8 +64,8 @@ export default function CashierPage() {
     }
 
     setPaymentAmount("")
-    selectOrder(selectedOrder.order_id)
-    fetchActiveOrders()
+    await selectOrder(selectedOrder.order_id)
+    await fetchActiveOrders()
   }
 
   const closeOrder = async () => {
@@ -63,7 +73,10 @@ export default function CashierPage() {
 
     const res = await fetch(
       `${API_URL}/orders/${selectedOrder.order_id}/close`,
-      { method: "POST" }
+      {
+        method: "POST",
+        headers: API_HEADERS
+      }
     )
 
     if (!res.ok) {

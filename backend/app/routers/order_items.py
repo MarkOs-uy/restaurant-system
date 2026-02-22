@@ -2,7 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.order_item import OrderItem, OrderItemStatus
+from app.models.restaurant import Restaurant
+from app.models.user import User, UserRole
 from app.schemas.order_item import OrderItemStatusUpdate
+from app.core.auth import get_current_user
+from app.core.dependencies import get_current_restaurant
 
 router = APIRouter(prefix="/order-items", tags=["order-items"])
 
@@ -31,12 +35,29 @@ ALLOWED_ITEM_TRANSITIONS = {
 def update_item_status(
     item_id: int,
     data: OrderItemStatusUpdate,
+    user: User = Depends(get_current_user),
+    restaurant: Restaurant = Depends(get_current_restaurant),
     db: Session = Depends(get_db)
 ):
-    item = db.query(OrderItem).filter(OrderItem.id == item_id).first()
+    item = db.query(OrderItem).filter(
+        OrderItem.id == item_id,
+        OrderItem.restaurant_id == restaurant.id
+    ).first()
 
     if not item:
         raise HTTPException(404, "Item not found")
+
+    # 🔐 CONTROL POR ROL
+
+    if data.status == OrderItemStatus.IN_PROGRESS and user.role != UserRole.KITCHEN:
+        raise HTTPException(403, "Only kitchen can start items")
+
+    if data.status == OrderItemStatus.READY and user.role != UserRole.KITCHEN:
+        raise HTTPException(403, "Only kitchen can mark ready")
+
+    if data.status == OrderItemStatus.DELIVERED and user.role != UserRole.WAITER:
+        raise HTTPException(403, "Only waiter can deliver")
+
 
     if data.status not in ALLOWED_ITEM_TRANSITIONS[item.status]:
         raise HTTPException(

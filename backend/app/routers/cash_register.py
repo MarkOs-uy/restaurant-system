@@ -4,10 +4,12 @@ from decimal import Decimal
 
 from sqlalchemy import func
 from app.models.payment import Payment
+from app.core.dependencies import get_current_restaurant
 
 from app.db.session import get_db
 from app.models.cash_register import CashRegister
-from app.schemas.cash_register import CashRegisterOpen
+
+from app.models.restaurant import Restaurant
 
 router = APIRouter(
     prefix="/cash-register",
@@ -16,20 +18,20 @@ router = APIRouter(
 
 @router.post("/open")
 def open_cash_register(
-    restaurant_id: int,
     opening_amount: float,
+    restaurant: Restaurant = Depends(get_current_restaurant),
     db: Session = Depends(get_db)
 ):
     existing = db.query(CashRegister).filter(
         CashRegister.closed_at == None,
-        CashRegister.restaurant_id == restaurant_id
+        CashRegister.restaurant_id == restaurant.id
     ).first()
 
     if existing:
         raise HTTPException(400, "Ya hay una caja abierta")
 
     register = CashRegister(
-        restaurant_id=restaurant_id,
+        restaurant_id=restaurant.id,
         opening_amount=opening_amount
     )
 
@@ -41,17 +43,20 @@ def open_cash_register(
 
 
 @router.post("/close")
-def close_cash_register(db: Session = Depends(get_db)):
-
+def close_cash_register(
+    restaurant: Restaurant = Depends(get_current_restaurant),
+    db: Session = Depends(get_db)
+):
     cash_register = db.query(CashRegister).filter(
-        CashRegister.closed_at == None
+        CashRegister.closed_at == None,
+        CashRegister.restaurant_id == restaurant.id
     ).first()
 
     if not cash_register:
         raise HTTPException(400, "No hay caja abierta")
 
     total = db.query(
-        func.coalesce(func.sum(Payment.total), 0)
+        func.coalesce(func.sum(Payment.amount), 0)
     ).filter(
         Payment.cash_register_id == cash_register.id
     ).scalar()
@@ -64,21 +69,25 @@ def close_cash_register(db: Session = Depends(get_db)):
 
     return {
         "message": "Caja cerrada",
-        "total_vendido": total
+        "total_vendido": float(total)
     }
 
-@router.get("/current")
-def current_cash_register(db: Session = Depends(get_db)):
 
+@router.get("/current")
+def current_cash_register(
+    restaurant: Restaurant = Depends(get_current_restaurant),
+    db: Session = Depends(get_db)
+):
     cash_register = db.query(CashRegister).filter(
-        CashRegister.closed_at == None
+        CashRegister.closed_at == None,
+        CashRegister.restaurant_id == restaurant.id
     ).first()
-    
+
     if not cash_register:
         raise HTTPException(400, "No hay caja abierta")
 
     total_sales = db.query(
-        func.coalesce(func.sum(Payment.total), 0)
+        func.coalesce(func.sum(Payment.amount), 0)
     ).filter(
         Payment.cash_register_id == cash_register.id
     ).scalar()
@@ -87,28 +96,24 @@ def current_cash_register(db: Session = Depends(get_db)):
         Payment.cash_register_id == cash_register.id
     ).scalar()
 
-    average_ticket = 0
-    if orders_count > 0:
-        average_ticket = total_sales / orders_count
+    average_ticket = float(total_sales / orders_count) if orders_count else 0
 
     rows = db.query(
         Payment.method,
-        func.sum(Payment.total)
+        func.sum(Payment.amount)
     ).filter(
         Payment.cash_register_id == cash_register.id
     ).group_by(
         Payment.method
     ).all()
 
-    by_method = {method: float(amount) for method, amount in rows}
+    by_method = {method.value: float(amount) for method, amount in rows}
 
     return {
         "cash_register_id": cash_register.id,
         "opened_at": cash_register.opened_at,
-        "total_sales": total_sales,
+        "total_sales": float(total_sales),
         "orders_count": orders_count,
         "average_ticket": average_ticket,
         "by_method": by_method
     }
-
-
