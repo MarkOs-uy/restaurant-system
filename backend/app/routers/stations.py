@@ -8,13 +8,15 @@ from app.models.product import Product
 from app.models.restaurant import Restaurant
 
 from app.core.dependencies import get_current_restaurant
+from app.models.user import User
+from app.dependencies.auth import get_current_user
 
 router = APIRouter(prefix="/stations", tags=["stations"])
 
 @router.get("/stations/{station_id}/items")
 def get_station_items(
     station_id: int,
-    restaurant: Restaurant = Depends(get_current_restaurant),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     items = (
@@ -22,7 +24,7 @@ def get_station_items(
         .join(Product)
         .filter(
             Product.station_id == station_id,
-            ProductionStation.restaurant_id == restaurant.id,
+            ProductionStation.restaurant_id == user.restaurant_id,
             OrderItem.status.in_([
                 OrderItemStatus.SENT,
                 OrderItemStatus.IN_PROGRESS

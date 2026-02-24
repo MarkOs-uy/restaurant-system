@@ -10,6 +10,8 @@ from app.db.session import get_db
 from app.models.cash_register import CashRegister
 
 from app.models.restaurant import Restaurant
+from app.models.user import User
+from app.dependencies.auth import get_current_user
 
 router = APIRouter(
     prefix="/cash-register",
@@ -19,19 +21,19 @@ router = APIRouter(
 @router.post("/open")
 def open_cash_register(
     opening_amount: float,
-    restaurant: Restaurant = Depends(get_current_restaurant),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     existing = db.query(CashRegister).filter(
         CashRegister.closed_at == None,
-        CashRegister.restaurant_id == restaurant.id
+        CashRegister.restaurant_id == user.restaurant_id
     ).first()
 
     if existing:
         raise HTTPException(400, "Ya hay una caja abierta")
 
     register = CashRegister(
-        restaurant_id=restaurant.id,
+        restaurant_id=user.restaurant_id,
         opening_amount=opening_amount
     )
 
@@ -44,12 +46,12 @@ def open_cash_register(
 
 @router.post("/close")
 def close_cash_register(
-    restaurant: Restaurant = Depends(get_current_restaurant),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     cash_register = db.query(CashRegister).filter(
         CashRegister.closed_at == None,
-        CashRegister.restaurant_id == restaurant.id
+        CashRegister.restaurant_id == user.restaurant_id
     ).first()
 
     if not cash_register:
@@ -75,12 +77,12 @@ def close_cash_register(
 
 @router.get("/current")
 def current_cash_register(
-    restaurant: Restaurant = Depends(get_current_restaurant),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     cash_register = db.query(CashRegister).filter(
         CashRegister.closed_at == None,
-        CashRegister.restaurant_id == restaurant.id
+        CashRegister.restaurant_id == user.restaurant_id
     ).first()
 
     if not cash_register:

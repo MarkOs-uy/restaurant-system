@@ -13,6 +13,8 @@ from app.models.order_item import OrderItemStatus
 from app.models.restaurant import Restaurant
 
 from app.core.dependencies import get_current_restaurant
+from app.models.user import User
+from app.dependencies.auth import get_current_user
 
 from app.schemas.order_item import OrderItemCreate
 from app.schemas.order import OrderOut, OrderStatusUpdate, ALLOWED_TRANSITIONS
@@ -25,12 +27,12 @@ router = APIRouter(prefix="/orders", tags=["orders"])
 def add_item_to_order(
     order_id: int,
     item: OrderItemCreate,
-    restaurant: Restaurant = Depends(get_current_restaurant),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     order = db.query(Order).filter(
         Order.id == order_id,
-        Order.restaurant_id == restaurant.id
+        Order.restaurant_id == user.restaurant_id
     ).first()
 
     if not order:
@@ -78,12 +80,12 @@ def add_item_to_order(
 def add_payment(
     order_id: int,
     payment: PaymentCreate,
-    restaurant: Restaurant = Depends(get_current_restaurant),    
+    user: User = Depends(get_current_user),    
     db: Session = Depends(get_db)
 ):
     order = db.query(Order).filter(
         Order.id == order_id,
-        Order.restaurant_id == restaurant.id
+        Order.restaurant_id == user.restaurant_id
     ).first()
 
 
@@ -132,13 +134,13 @@ from sqlalchemy import func
 @router.post("/{order_id}/close")
 def close_order(
     order_id: int,
-    restaurant: Restaurant = Depends(get_current_restaurant),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
 
     order = db.query(Order).filter(
         Order.id == order_id,
-        Order.restaurant_id == restaurant.id
+        Order.restaurant_id == user.restaurant_id
     ).first()
 
     if not order:
@@ -189,12 +191,12 @@ def close_order(
 @router.post("/{order_id}/send-to-kitchen")
 def send_to_kitchen(
     order_id: int,
-    restaurant: Restaurant = Depends(get_current_restaurant),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     order = db.query(Order).filter(
         Order.id == order_id,
-        Order.restaurant_id == restaurant.id
+        Order.restaurant_id == user.restaurant_id
     ).first()
 
     if not order:
@@ -226,12 +228,12 @@ def send_to_kitchen(
 
 @router.get("/active")
 def get_active_orders(
-    restaurant: Restaurant = Depends(get_current_restaurant),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
 
     orders = db.query(Order).filter(
-        Order.restaurant_id == restaurant.id,
+        Order.restaurant_id == user.restaurant_id,
         Order.status != OrderStatus.CLOSED
     ).all()
 
@@ -260,13 +262,13 @@ def get_active_orders(
 @router.get("/{order_id}")
 def get_order(
     order_id: int,
-    restaurant: Restaurant = Depends(get_current_restaurant),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
 
     order = db.query(Order).filter(
         Order.id == order_id,
-        Order.restaurant_id == restaurant.id
+        Order.restaurant_id == user.restaurant_id
     ).first()
 
     if not order:

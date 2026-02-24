@@ -8,6 +8,8 @@ from app.models.order import Order, OrderStatus
 from app.models.product import Product
 from app.models.table import Table
 from app.models.restaurant import Restaurant
+from app.models.user import User
+from app.dependencies.auth import get_current_user
 
 from app.core.dependencies import get_current_restaurant
 
@@ -17,7 +19,7 @@ router = APIRouter(prefix="/kitchen", tags=["kitchen"])
 @router.get("/stations/{station_id}/items")
 def list_station_items(
     station_id: int,
-    restaurant: Restaurant = Depends(get_current_restaurant),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     items = (
@@ -27,7 +29,7 @@ def list_station_items(
         .join(Table)
         .filter(
             Product.station_id == station_id,
-            Order.restaurant_id == restaurant.id,
+            Order.restaurant_id == user.restaurant_id,
             Order.status != OrderStatus.CLOSED,
             OrderItem.status.in_([
                 OrderItemStatus.SENT,

@@ -27,6 +27,8 @@ class User(Base):
 
     role = Column(Enum(UserRole), nullable=False)
 
+    password_hash = Column(String, nullable=False)
+
     active = Column(Boolean, default=True)
 
     restaurant = relationship("Restaurant", back_populates="users")

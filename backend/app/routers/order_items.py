@@ -5,7 +5,7 @@ from app.models.order_item import OrderItem, OrderItemStatus
 from app.models.restaurant import Restaurant
 from app.models.user import User, UserRole
 from app.schemas.order_item import OrderItemStatusUpdate
-from app.core.auth import get_current_user
+from app.dependencies.auth import get_current_user
 from app.core.dependencies import get_current_restaurant
 
 router = APIRouter(prefix="/order-items", tags=["order-items"])
@@ -41,7 +41,7 @@ def update_item_status(
 ):
     item = db.query(OrderItem).filter(
         OrderItem.id == item_id,
-        OrderItem.restaurant_id == restaurant.id
+        OrderItem.restaurant_id == user.restaurant_id
     ).first()
 
     if not item:

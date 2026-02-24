@@ -7,16 +7,22 @@ from app.models.order import Order, OrderStatus
 from app.models.restaurant import Restaurant
 
 from app.core.dependencies import get_current_restaurant
+from app.models.user import User
+from app.dependencies.auth import get_current_user
 
 router = APIRouter(prefix="/tables", tags=["tables"])
 
 
 @router.post("/{table_id}/touch")
-def touch_table(table_id: int, restaurant: Restaurant = Depends(get_current_restaurant), db: Session = Depends(get_db)):
+def touch_table(
+    table_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
 
     table = db.query(Table).filter(
         Table.id == table_id,
-        Table.restaurant_id == restaurant.id,
+        Table.restaurant_id == user.restaurant_id,
         Table.active == True
     ).first()
 
@@ -54,7 +60,7 @@ def touch_table(table_id: int, restaurant: Restaurant = Depends(get_current_rest
 @router.get("/")
 def list_tables(
     db: Session = Depends(get_db),
-    restaurant: Restaurant = Depends(get_current_restaurant)
+    user: User = Depends(get_current_user)
 ):
 
     tables = (
@@ -62,7 +68,7 @@ def list_tables(
         .options(joinedload(Table.orders))
         .filter(
             Table.active == True,
-            Table.restaurant_id == restaurant.id
+            Table.restaurant_id == user.restaurant_id
         )
         .order_by(Table.number)
         .all()
