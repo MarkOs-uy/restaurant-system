@@ -10,9 +10,7 @@ from app.models.order_item import OrderItem
 from app.models.payment import Payment
 from app.models.cash_register import CashRegister
 from app.models.order_item import OrderItemStatus
-from app.models.restaurant import Restaurant
 
-from app.core.dependencies import get_current_restaurant
 from app.models.user import User
 from app.dependencies.auth import get_current_user
 
@@ -240,20 +238,26 @@ def get_active_orders(
     result = []
 
     for order in orders:
-        items = []
-        for item in order.items:
-            items.append({
-                "id": item.id,
-                "product_name": item.product.name,
-                "quantity": item.quantity,
-                "status": item.status.value
-            })
+
+        total_order = sum(
+            item.quantity * item.unit_price
+            for item in order.items
+        )
+
+        total_paid = sum(
+            payment.amount
+            for payment in order.payments
+        )
+
+        remaining = total_order - total_paid
 
         result.append({
             "order_id": order.id,
             "table_number": order.table.number,
             "status": order.status.value,
-            "items": items
+            "total": float(total_order),
+            "total_paid": float(total_paid),
+            "remaining": float(remaining)
         })
 
     return result

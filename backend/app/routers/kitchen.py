@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
 
 from app.db.session import get_db
 from app.models.order_item import OrderItem, OrderItemStatus
@@ -10,8 +9,6 @@ from app.models.table import Table
 from app.models.restaurant import Restaurant
 from app.models.user import User
 from app.dependencies.auth import get_current_user
-
-from app.core.dependencies import get_current_restaurant
 
 router = APIRouter(prefix="/kitchen", tags=["kitchen"])
 

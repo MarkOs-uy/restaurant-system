@@ -4,9 +4,7 @@ from sqlalchemy.orm import Session, joinedload  # 🟢 AGREGADO
 from app.db.session import get_db
 from app.models import Table
 from app.models.order import Order, OrderStatus
-from app.models.restaurant import Restaurant
 
-from app.core.dependencies import get_current_restaurant
 from app.models.user import User
 from app.dependencies.auth import get_current_user
 

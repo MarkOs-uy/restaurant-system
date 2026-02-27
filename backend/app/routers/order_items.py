@@ -2,11 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.order_item import OrderItem, OrderItemStatus
-from app.models.restaurant import Restaurant
 from app.models.user import User, UserRole
 from app.schemas.order_item import OrderItemStatusUpdate
 from app.dependencies.auth import get_current_user
-from app.core.dependencies import get_current_restaurant
 
 router = APIRouter(prefix="/order-items", tags=["order-items"])
 
@@ -36,9 +34,9 @@ def update_item_status(
     item_id: int,
     data: OrderItemStatusUpdate,
     user: User = Depends(get_current_user),
-    restaurant: Restaurant = Depends(get_current_restaurant),
     db: Session = Depends(get_db)
 ):
+    
     item = db.query(OrderItem).filter(
         OrderItem.id == item_id,
         OrderItem.restaurant_id == user.restaurant_id

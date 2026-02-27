@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import TableCard from "../components/TableCard"
+import TableCard from "../components/TableCard.tsx"
 import { API_URL, API_HEADERS } from "../api"
 
 interface Table {

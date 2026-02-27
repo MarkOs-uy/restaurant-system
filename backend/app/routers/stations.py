@@ -6,9 +6,8 @@ from app.models.production_station import ProductionStation
 from app.models.order_item import OrderItem, OrderItemStatus
 from app.models.product import Product
 from app.models.restaurant import Restaurant
-
-from app.core.dependencies import get_current_restaurant
 from app.models.user import User
+
 from app.dependencies.auth import get_current_user
 
 router = APIRouter(prefix="/stations", tags=["stations"])

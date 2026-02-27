@@ -5,61 +5,111 @@ import Kitchen from "./pages/Kitchen"
 import WaiterPage from "./pages/Waiter"
 import CashierPage from "./pages/CashierPage"
 import LoginPage from "./pages/LoginPage"
-import ProtectedRoute from "./components/ProtectedRoute.tsx"
+import ProtectedRoute from "./components/ProtectedRoute"
 
 function App() {
+  const role = localStorage.getItem("role")
+
+  const logout = () => {
+    localStorage.clear()
+    window.location.href = "/login"
+  }
+
   return (
     <>
-      <nav style={{ padding: 10, background: "#eee" }}>
-        <Link to="/">Mesas</Link> |{" "}
-        <Link to="/waiter">Mozo</Link> |{" "}
-        <Link to="/kitchen/1">Cocina</Link> |{" "}
-        <Link to="/cashier">Caja</Link>
-      </nav>
+      {/* NAVBAR DINÁMICO */}
+      {role && (
+        <nav style={{ padding: 10, background: "#eee" }}>
+          <span style={{ marginRight: 20 }}>
+            Rol: <strong>{role}</strong>
+          </span>
+
+          {(role === "ADMIN" || role === "WAITER") && (
+            <>
+              <Link to="/">Mesas</Link> |{" "}
+            </>
+          )}
+
+          {(role === "ADMIN" || role === "WAITER") && (
+            <>
+              <Link to="/waiter">Mozo</Link> |{" "}
+            </>
+          )}
+
+          {(role === "ADMIN" || role === "KITCHEN") && (
+            <>
+              <Link to="/kitchen/1">Cocina</Link> |{" "}
+            </>
+          )}
+
+          {(role === "ADMIN" || role === "CASHIER") && (
+            <>
+              <Link to="/cashier">Caja</Link> |{" "}
+            </>
+          )}
+
+          <button
+            onClick={logout}
+            style={{
+              marginLeft: 20,
+              padding: "4px 10px",
+              cursor: "pointer"
+            }}
+          >
+            Logout
+          </button>
+        </nav>
+      )}
 
       <Routes>
+        {/* LOGIN libre */}
         <Route path="/login" element={<LoginPage />} />
 
+        {/* MESAS */}
         <Route
           path="/"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={["ADMIN", "WAITER"]}>
               <TablesPage />
             </ProtectedRoute>
           }
         />
 
+        {/* DETALLE ORDEN */}
         <Route
           path="/orders/:orderId"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={["ADMIN", "WAITER"]}>
               <OrderDetail />
             </ProtectedRoute>
           }
         />
 
+        {/* COCINA */}
         <Route
           path="/kitchen/:stationId"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={["ADMIN", "KITCHEN"]}>
               <Kitchen />
             </ProtectedRoute>
           }
         />
 
+        {/* MOZOS */}
         <Route
           path="/waiter"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={["ADMIN", "WAITER"]}>
               <WaiterPage />
             </ProtectedRoute>
           }
         />
 
+        {/* CAJA */}
         <Route
           path="/cashier"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={["ADMIN", "CASHIER"]}>
               <CashierPage />
             </ProtectedRoute>
           }
@@ -70,4 +120,3 @@ function App() {
 }
 
 export default App
-

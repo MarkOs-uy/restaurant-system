@@ -5,7 +5,6 @@ from fastapi.security import OAuth2PasswordRequestForm
 from app.db.session import get_db
 from app.models.user import User
 from app.core.security import create_access_token
-from app.dependencies.auth import get_current_user
 
 from passlib.context import CryptContext
 
@@ -26,7 +25,7 @@ def login(
     if not user:
         raise HTTPException(400, "Invalid credentials")
 
-    if not pwd_context.verify(form_data.password, user.password):
+    if not pwd_context.verify(form_data.password, user.password_hash):
         raise HTTPException(400, "Invalid credentials")
 
     token = create_access_token({

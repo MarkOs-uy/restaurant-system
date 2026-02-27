@@ -4,13 +4,12 @@ from decimal import Decimal
 
 from sqlalchemy import func
 from app.models.payment import Payment
-from app.core.dependencies import get_current_restaurant
-
-from app.db.session import get_db
 from app.models.cash_register import CashRegister
-
 from app.models.restaurant import Restaurant
 from app.models.user import User
+
+from app.db.session import get_db
+
 from app.dependencies.auth import get_current_user
 
 router = APIRouter(
