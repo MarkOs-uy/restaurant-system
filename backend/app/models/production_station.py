@@ -1,6 +1,6 @@
 from app.db.base_class import Base
 from sqlalchemy.orm import relationship
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, UniqueConstraint
 
 class ProductionStation(Base):
     __tablename__ = "production_stations"
@@ -10,5 +10,8 @@ class ProductionStation(Base):
     name = Column(String, nullable=False)
     active = Column(Boolean, default=True)
 
+    __table_args__ = (
+        UniqueConstraint("restaurant_id", "name", name="uq_station_name_per_restaurant"),
+    )
     restaurant = relationship("Restaurant", back_populates="stations")
     products = relationship("Product", back_populates="station")

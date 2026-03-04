@@ -1,6 +1,6 @@
 import { useParams } from "react-router-dom"
 import { useEffect, useState } from "react"
-import { API_URL, API_HEADERS } from "../api"
+import { API_URL, getAuthHeaders } from "../api"
 
 interface Item {
   product_name: string
@@ -55,13 +55,13 @@ export default function OrderDetail() {
   }, [])
 
   const fetchOrder = async () => {
-    const res = await fetch(`${API_URL}/orders/${id}`, {headers: API_HEADERS})
+    const res = await fetch(`${API_URL}/orders/${id}`, {headers: getAuthHeaders()})
     const data = await res.json()
     setOrder(data)
   }
 
   const fetchCategories = async () => {
-    const res = await fetch(`${API_URL}/categories/with-products`, {headers: API_HEADERS})
+    const res = await fetch(`${API_URL}/categories/with-products`, {headers: getAuthHeaders()})
     const data = await res.json()
     setCategories(data)
   }
@@ -73,7 +73,7 @@ export default function OrderDetail() {
 
     await fetch(`${API_URL}/orders/${id}/items`, {
       method: "POST",
-      headers: API_HEADERS,
+      headers: getAuthHeaders(),
       body: JSON.stringify({
         product_id: productId,
         quantity: quantity
@@ -88,7 +88,7 @@ export default function OrderDetail() {
 
     const res = await fetch(`${API_URL}/orders/${id}/payments`, {
       method: "POST",
-      headers: API_HEADERS,
+      headers: getAuthHeaders(),
       body: JSON.stringify({
         amount: Number(paymentAmount),
         method: paymentMethod
@@ -108,7 +108,7 @@ export default function OrderDetail() {
   const closeOrder = async () => {
     const res = await fetch(`${API_URL}/orders/${id}/close`, {
       method: "POST",
-      headers: API_HEADERS
+      headers: getAuthHeaders()
     })
 
     if (!res.ok) {
@@ -123,7 +123,7 @@ export default function OrderDetail() {
   const sendToKitchen = async () => {
     const res = await fetch(`${API_URL}/orders/${id}/send-to-kitchen`, {
       method: "POST",
-      headers: API_HEADERS
+      headers: getAuthHeaders()
     })
 
     if (!res.ok) {

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session, joinedload  # 🟢 AGREGADO
+from sqlalchemy.orm import Session, joinedload
 
 from app.db.session import get_db
 from app.models import Table
@@ -30,6 +30,7 @@ def touch_table(
     # 🔴 MODIFICADO → ahora también excluye CANCELLED
     order = db.query(Order).filter(
         Order.table_id == table_id,
+        Order.restaurant_id == user.restaurant_id,
         Order.status.notin_([
             OrderStatus.CLOSED,
             OrderStatus.CANCELLED

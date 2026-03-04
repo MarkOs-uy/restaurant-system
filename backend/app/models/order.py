@@ -1,6 +1,6 @@
 import enum
 import uuid
-from sqlalchemy import Column, Integer, ForeignKey, String, DateTime, Enum
+from sqlalchemy import Column, Integer, ForeignKey, String, DateTime, Enum, Index
 from sqlalchemy.sql import func
 from app.db.base_class import Base
 from sqlalchemy.orm import relationship
@@ -40,7 +40,9 @@ class Order(Base):
         index=True,
         default=lambda: str(uuid.uuid4())
     )    
-
+    __table_args__ = (
+        Index("ix_orders_restaurant_status", "restaurant_id", "status"),
+    )
     table = relationship("Table", back_populates="orders")
     restaurant = relationship("Restaurant", back_populates="orders")
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")

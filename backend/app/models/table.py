@@ -1,29 +1,65 @@
 import uuid
-from sqlalchemy import Column, Integer, Boolean, ForeignKey, String
-from app.db.base_class import Base
+from sqlalchemy import (
+    Column,
+    Integer,
+    Boolean,
+    ForeignKey,
+    String,
+    UniqueConstraint,
+    Index
+)
 from sqlalchemy.orm import relationship
+from app.db.base_class import Base
 
 
 class Table(Base):
     __tablename__ = "tables"
 
     id = Column(Integer, primary_key=True, index=True)
+
     restaurant_id = Column(
         Integer,
-        ForeignKey("restaurants.id"),
+        ForeignKey("restaurants.id", ondelete="CASCADE"),
         nullable=False,
         index=True
     )
-    number = Column(Integer, unique=True, nullable=False)
-    active = Column(Boolean, default=True)
+
+    number = Column(Integer, nullable=False)
+
+    active = Column(Boolean, default=True, nullable=False)
+
     external_id = Column(
         String,
-        unique=True,
-        index=True,
-        default=lambda: str(uuid.uuid4())
+        default=lambda: str(uuid.uuid4()),
+        nullable=False
     )
-    orders = relationship("Order", back_populates="table")
-    restaurant = relationship("Restaurant", back_populates="tables")
 
+    # 🔐 Multi-tenant constraints correctas
+    __table_args__ = (
+        UniqueConstraint(
+            "restaurant_id",
+            "number",
+            name="uq_table_number_per_restaurant"
+        ),
+        UniqueConstraint(
+            "restaurant_id",
+            "external_id",
+            name="uq_table_external_per_restaurant"
+        ),
+        Index(
+            "ix_table_restaurant_active",
+            "restaurant_id",
+            "active"
+        ),
+    )
 
+    # Relaciones
+    orders = relationship(
+        "Order",
+        back_populates="table"
+    )
 
+    restaurant = relationship(
+        "Restaurant",
+        back_populates="tables"
+    )

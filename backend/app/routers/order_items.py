@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.order_item import OrderItem, OrderItemStatus
 from app.models.user import User, UserRole
-from app.schemas.order_item import OrderItemStatusUpdate
+from app.schemas.order.order_item import OrderItemStatusUpdate
 from app.dependencies.auth import get_current_user
 
 router = APIRouter(prefix="/order-items", tags=["order-items"])

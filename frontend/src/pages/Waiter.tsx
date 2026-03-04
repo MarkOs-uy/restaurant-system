@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { API_URL, API_HEADERS } from "../api"
+import { API_URL, getAuthHeaders } from "../api"
 
 interface Item {
   id: number
@@ -9,7 +9,7 @@ interface Item {
 }
 
 interface Order {
-  order_id: number
+  id: number
   table_number: number
   status: string
   items: Item[]
@@ -23,7 +23,7 @@ export default function Waiter() {
   }, [])
 
   const fetchOrders = async () => {
-    const res = await fetch(`${API_URL}/orders/active`, {headers: API_HEADERS})
+    const res = await fetch(`${API_URL}/orders/active`, {headers: getAuthHeaders()})
     const data = await res.json()
     setOrders(data)
   }
@@ -33,7 +33,7 @@ export default function Waiter() {
       `${API_URL}/order-items/${itemId}/status`,
       {
         method: "PATCH",
-        headers: API_HEADERS,
+        headers: getAuthHeaders(),
         body: JSON.stringify({ status: "DELIVERED" })
       }
     )
@@ -55,7 +55,7 @@ export default function Waiter() {
 
       {orders.map(order => (
         <div
-          key={order.order_id}
+          key={order.id}
           style={{
             border: "1px solid #ccc",
             padding: 20,

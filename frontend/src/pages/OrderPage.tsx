@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useParams } from "react-router-dom"
-import { API_URL, API_HEADERS } from "../api"
+import { API_URL, getAuthHeaders } from "../api"
 
 interface OrderItem {
   product_name: string
@@ -23,7 +23,7 @@ export default function OrderPage() {
   const [order, setOrder] = useState<Order | null>(null)
 
   useEffect(() => {
-    fetch(`${API_URL}/orders/${id}`,{headers: API_HEADERS})
+    fetch(`${API_URL}/orders/${id}`,{headers: getAuthHeaders()})
       .then(res => res.json())
       .then(data => setOrder(data))
       .catch(err => console.error("Error cargando orden:", err))

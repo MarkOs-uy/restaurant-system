@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useParams } from "react-router-dom"
-import { API_URL, API_HEADERS } from "../api"
+import { API_URL, getAuthHeaders } from "../api"
 
 interface KitchenItem {
   item_id: number
@@ -18,13 +18,18 @@ export default function Kitchen() {
 
   const [items, setItems] = useState<KitchenItem[]>([])
 
+  console.log("Calling:", `${API_URL}/kitchen/stations/${station}/items`)
   const fetchItems = async () => {
     const res = await fetch(
       `${API_URL}/kitchen/stations/${station}/items`, {
-      headers: API_HEADERS
+      headers: getAuthHeaders()
     }
     )
     const data = await res.json()
+
+    console.log("Kitchen response:", data)
+    console.log("Is array?", Array.isArray(data))
+
     setItems(data)
   }
 
@@ -48,7 +53,7 @@ export default function Kitchen() {
       `${API_URL}/order-items/${itemId}/status`,
       {
         method: "PATCH",
-        headers: API_HEADERS,
+        headers: getAuthHeaders(),
         body: JSON.stringify({ status: newStatus })
       }
     )

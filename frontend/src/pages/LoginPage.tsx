@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { API_URL } from "../api"
+import { jwtDecode } from "jwt-decode"
 
 export default function LoginPage() {
   const [username, setUsername] = useState("")
@@ -8,33 +9,60 @@ export default function LoginPage() {
   const navigate = useNavigate()
 
   const login = async () => {
-    const formData = new URLSearchParams()
-    formData.append("username", username)
-    formData.append("password", password)
+    try {
+      const formData = new URLSearchParams()
+      formData.append("username", username)
+      formData.append("password", password)
+      formData.append("grant_type", "password")
 
-    const res = await fetch(`${API_URL}/auth/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      body: formData.toString()
-    })
+      const res = await fetch(`${API_URL}/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: formData.toString()
+      })
 
-    if (!res.ok) {
-      alert("Credenciales inválidas")
-      return
+      const data = await res.json()
+
+      if (!res.ok) {
+        alert("Credenciales inválidas")
+        return
+      }
+
+      const token = data.access_token
+      localStorage.setItem("token", token)
+
+      // 🔥 DECODIFICAMOS
+      const decoded: any = jwtDecode(token)
+
+      const role = decoded.role
+      const restaurantId = decoded.restaurant_id
+
+      localStorage.setItem("role", role)
+      localStorage.setItem("restaurant_id", restaurantId)
+
+      // 🔥 REDIRECCIÓN
+      switch (role) {
+        case "ADMIN":
+          navigate("/")
+          break
+        case "WAITER":
+          navigate("/waiter")
+          break
+        case "KITCHEN":
+          navigate("/kitchen/1")
+          break
+        case "CASHIER":
+          navigate("/cashier")
+          break
+        default:
+          navigate("/")
+      }
+
+    } catch (error) {
+      console.error("Error login:", error)
     }
-
-    const data = await res.json()
-
-    localStorage.setItem("token", data.access_token)
-    localStorage.setItem("role", data.role)
-
-    // 🔥 Redirigir según rol
-    if (data.role === "ADMIN") navigate("/")
-    if (data.role === "WAITER") navigate("/waiter")
-    if (data.role === "KITCHEN") navigate("/kitchen/1")
-    if (data.role === "CASHIER") navigate("/cashier")
   }
 
   return (

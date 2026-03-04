@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { API_URL, API_HEADERS, getAuthHeaders } from "../api"
+import { API_URL, getAuthHeaders } from "../api"
 
 interface CashRegister {
   cash_register_id: number
@@ -11,7 +11,7 @@ interface CashRegister {
 }
 
 interface Order {
-  order_id: number
+  id: number
   table_number: number
   status: string
   total: number
@@ -47,14 +47,19 @@ export default function CashierPage() {
 
   const openCashRegister = async () => {
     const res = await fetch(
-      `${API_URL}/cash-register/open?opening_amount=${openingAmount}`,
+      `${API_URL}/cash-register/open`,
       {
         method: "POST",
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          opening_amount: Number(openingAmount)
+        })
       }
     )
 
     if (!res.ok) {
+      const error = await res.json()
+      console.log(error)
       alert("Error abriendo caja")
       return
     }
@@ -96,7 +101,7 @@ export default function CashierPage() {
     if (!selectedOrder || !paymentAmount) return
 
     const res = await fetch(
-      `${API_URL}/orders/${selectedOrder.order_id}/payments`,
+      `${API_URL}/orders/${selectedOrder.id}/payments`,
       {
         method: "POST",
         headers: getAuthHeaders(),
@@ -114,7 +119,7 @@ export default function CashierPage() {
     }
 
     setPaymentAmount("")
-    selectOrder(selectedOrder.order_id)
+    selectOrder(selectedOrder.id)
     fetchActiveOrders()
     checkCashRegister()
   }
@@ -123,7 +128,7 @@ export default function CashierPage() {
     if (!selectedOrder) return
 
     const res = await fetch(
-      `${API_URL}/orders/${selectedOrder.order_id}/close`,
+      `${API_URL}/orders/${selectedOrder.id}/close`,
       {
         method: "POST",
         headers: getAuthHeaders()
@@ -143,6 +148,7 @@ export default function CashierPage() {
   /* =========================
      SI NO HAY CAJA ABIERTA
   ========================== */
+  
   if (!cashRegister) {
     return (
       <div style={{ padding: 40 }}>
@@ -169,9 +175,9 @@ export default function CashierPage() {
     <div style={{ padding: 40 }}>
       <h1>💰 Caja Abierta</h1>
 
-      <p>Total vendido: ${cashRegister.total_sales.toFixed(2)}</p>
+      <p>Total vendido: $ {Number(cashRegister.total_sales).toFixed(2)}</p>
       <p>Órdenes cobradas: {cashRegister.orders_count}</p>
-      <p>Ticket promedio: ${cashRegister.average_ticket.toFixed(2)}</p>
+      <p>Ticket promedio: $ {Number(cashRegister.average_ticket).toFixed(2)}</p>
 
       <button
         onClick={closeCashRegister}
@@ -184,8 +190,8 @@ export default function CashierPage() {
 
       {orders.map(o => (
         <div
-          key={o.order_id}
-          onClick={() => selectOrder(o.order_id)}
+          key={o.id}
+          onClick={() => selectOrder(o.id)}
           style={{
             padding: 10,
             marginBottom: 8,
@@ -199,7 +205,7 @@ export default function CashierPage() {
 
       {selectedOrder && (
         <div style={{ marginTop: 40 }}>
-          <h2>Orden #{selectedOrder.order_id}</h2>
+          <h2>Orden #{selectedOrder.id}</h2>
 
           <p>Total: ${selectedOrder.total.toFixed(2)}</p>
           <p>Total Pagado: ${selectedOrder.total_paid.toFixed(2)}</p>

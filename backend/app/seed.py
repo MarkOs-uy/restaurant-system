@@ -4,6 +4,7 @@ from app.models.table import Table
 from app.seed_restaurant import seed_restaurant
 from app.seed_products import seed_products
 from app.seed_stations import seed_stations
+from app.seed_users import seed_users
 
 
 def seed_tables(db: Session):
@@ -32,6 +33,7 @@ def run():
         seed_tables(db)
         seed_stations(db)
         seed_products(db)
+        seed_users(db)
     finally:
         db.close()
 

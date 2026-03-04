@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, DateTime, Numeric, ForeignKey
+from sqlalchemy import Column, Integer, DateTime, Numeric, ForeignKey, Boolean
 from sqlalchemy.sql import func
 from app.db.base_class import Base
 from sqlalchemy.orm import relationship
@@ -8,13 +8,15 @@ class CashRegister(Base):
 
     id = Column(Integer, primary_key=True)
     
-    id = Column(Integer, primary_key=True, index=True)
     restaurant_id = Column(
         Integer,
         ForeignKey("restaurants.id"),
         nullable=False,
         index=True
     )
+    is_open = Column(Boolean, default=True, nullable=False)
+    opened_by_id = Column(Integer, ForeignKey("users.id"))
+    closed_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     opened_at = Column(DateTime(timezone=True), server_default=func.now())
     closed_at = Column(DateTime(timezone=True), nullable=True)
 

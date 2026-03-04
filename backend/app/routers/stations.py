@@ -2,17 +2,19 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.models.production_station import ProductionStation
 from app.models.order_item import OrderItem, OrderItemStatus
 from app.models.product import Product
-from app.models.restaurant import Restaurant
 from app.models.user import User
+from app.models.order import Order
+
+
+from app.schemas.order.kitchen import KitchenItemOut
 
 from app.dependencies.auth import get_current_user
 
 router = APIRouter(prefix="/stations", tags=["stations"])
 
-@router.get("/stations/{station_id}/items")
+@router.get("/stations/{station_id}/items", response_model=list[KitchenItemOut])
 def get_station_items(
     station_id: int,
     user: User = Depends(get_current_user),
@@ -20,10 +22,13 @@ def get_station_items(
 ):
     items = (
         db.query(OrderItem)
-        .join(Product)
+        .join(OrderItem.product)
+        .join(Product.station)
+        .join(OrderItem.order)
+        .join(Order.table)
         .filter(
             Product.station_id == station_id,
-            ProductionStation.restaurant_id == user.restaurant_id,
+            OrderItem.restaurant_id == user.restaurant_id,
             OrderItem.status.in_([
                 OrderItemStatus.SENT,
                 OrderItemStatus.IN_PROGRESS
@@ -32,4 +37,16 @@ def get_station_items(
         .all()
     )
 
-    return items
+    result = []
+
+    for item in items:
+        result.append({
+            "item_id": item.id,
+            "product_name": item.product.name,
+            "quantity": item.quantity,
+            "status": item.status,
+            "table_number": item.order.table.number,
+            "order_id": item.order.id
+        })
+
+    return result
