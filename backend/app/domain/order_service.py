@@ -170,16 +170,17 @@ class OrderService:
 
     def add_item(self, order, product, quantity: int):
 
-        if order.status != OrderStatus.OPEN:
-            raise OrderDomainError("Cannot add items to a non-open order")
+        if order.status == OrderStatus.CLOSED:
+            raise OrderDomainError("Cannot add items to a closed order")
 
         if quantity <= 0:
             raise OrderDomainError("Quantity must be greater than zero")
 
-        existing_item = next(
-            (item for item in order.items if item.product_id == product.id),
-            None
-        )
+        existing_item = self.db.query(OrderItem).filter(
+            OrderItem.order_id == order.id,
+            OrderItem.product_id == product.id,
+            OrderItem.status == OrderItemStatus.PENDING
+        ).first()
 
         if existing_item:
             existing_item.quantity += quantity

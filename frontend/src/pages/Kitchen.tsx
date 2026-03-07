@@ -27,9 +27,6 @@ export default function Kitchen() {
     )
     const data = await res.json()
 
-    console.log("Kitchen response:", data)
-    console.log("Is array?", Array.isArray(data))
-
     setItems(data)
   }
 

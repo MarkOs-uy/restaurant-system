@@ -4,10 +4,6 @@ import enum
 
 from app.db.base_class import Base
 
-from app.dependencies.auth import get_current_user
-from app.models.user import User, UserRole
-
-
 class OrderItemStatus(str, enum.Enum):
     PENDING = "PENDING"
     SENT = "SENT"

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react"
 import { API_URL, getAuthHeaders } from "../api"
 
 interface Item {
+  id: number
   product_name: string
   quantity: number
   unit_price: number
@@ -161,6 +162,43 @@ export default function OrderDetail() {
     }
   }
 
+  const removeItem = async (itemId: number) => {
+    const res = await fetch(
+      `${API_URL}/orders/order-items/${itemId}`,
+      {
+        method: "DELETE",
+        headers: getAuthHeaders()
+      }
+    )
+
+    if (!res.ok) {
+      const error = await res.json()
+      alert(error.detail)
+      return
+    }
+
+    fetchOrder()
+  }
+
+  const updateQuantity = async (itemId: number, quantity: number) => {
+
+    const res = await fetch(
+      `${API_URL}/orders/order-items/${itemId}?quantity=${quantity}`,
+      {
+        method: "PATCH",
+        headers: getAuthHeaders()
+      }
+    )
+
+    if (!res.ok) {
+      const error = await res.json()
+      alert(error.detail)
+      return
+    }
+
+    fetchOrder()
+  }
+
   return (
     <div style={{ padding: 40, maxWidth: 900 }}>
       <h1>Orden #{order.order_id}</h1>
@@ -174,16 +212,99 @@ export default function OrderDetail() {
 
       {/* ITEMS */}
       <h2>Items</h2>
-      <ul>
-        {order.items.map((item, index) => (
-          <li key={index}>
-            {item.product_name} x {item.quantity} — $
-            {(item.quantity * item.unit_price).toFixed(2)} —{" "}
-            <strong>{item.status}</strong>
+
+      <ul style={{ listStyle: "none", padding: 0 }}>
+        {order.items.map((item) => (
+          <li
+            key={item.id}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              padding: "6px 0",
+              borderBottom: "1px solid #eee"
+            }}
+          >
+            <span style={{ flex: 1 }}>
+              {item.product_name}
+            </span>
+
+            {item.status === "PENDING" && (
+              <>
+                <button
+                  onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: 6,
+                    border: "1px solid #ccc",
+                    background: "white",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 16,
+                    lineHeight: 1,
+                    padding: 0
+                  }}
+                >
+                  −
+                </button>
+
+                <strong>{item.quantity}</strong>
+
+                <button
+                  onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: 6,
+                    border: "1px solid #ccc",
+                    background: "white",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 16,
+                    lineHeight: 1,
+                    padding: 0
+                  }}
+                >
+                  +
+                </button>
+              </>
+            )}
+
+            <span style={{ width: 80, textAlign: "right" }}>
+              ${(item.quantity * item.unit_price).toFixed(2)}
+            </span>
+
+            <strong
+              style={{
+                width: 80,
+                textAlign: "center",
+                color: item.status === "PENDING" ? "#b58900" : "#2a9d8f"
+              }}
+            >
+              {item.status}
+            </strong>
+
+            {item.status === "PENDING" && (
+              <button
+                onClick={() => removeItem(item.id)}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer",
+                  fontSize: 16
+                }}
+              >
+                ❌
+              </button>
+            )}
           </li>
         ))}
       </ul>
-
       <h3>Total: ${order.total.toFixed(2)}</h3>
 
       <hr />
@@ -215,7 +336,7 @@ export default function OrderDetail() {
       <ul>
         {order.payments.map(p => (
           <li key={p.id}>
-            ${p.amount.toFixed(2)} — {p.method}
+            ${Number(p.amount).toFixed(2)} — {p.method}
           </li>
         ))}
       </ul>

@@ -6,17 +6,41 @@ import WaiterPage from "./pages/Waiter"
 import CashierPage from "./pages/CashierPage"
 import LoginPage from "./pages/LoginPage"
 import ProtectedRoute from "./components/ProtectedRoute"
+import { useState, useEffect } from "react"
 
 function App() {
-  const role = localStorage.getItem("role")
-
+  const [role, setRole] = useState<string | null>(null)
+  const isWaiter = role === "ADMIN" || role === "WAITER"
+  const isKitchen = role === "ADMIN" || role === "KITCHEN"
+  const isCashier = role === "ADMIN" || role === "CASHIER"
   const logout = () => {
     localStorage.clear()
+    window.dispatchEvent(new Event("authChanged"))
     window.location.href = "/login"
-  }
+}
 
+    useEffect(() => {
+
+    const loadRole = () => {
+      const r = localStorage.getItem("role")
+      setRole(r)
+    }
+
+    loadRole()
+
+    window.addEventListener("authChanged", loadRole)
+
+    return () => {
+      window.removeEventListener("authChanged", loadRole)
+    }
+
+  }, [])
+  
+  console.log("APP ROLE:", role)
+  
   return (
     <>
+      {console.log("RENDER NAVBAR ROLE:", role)}
       {/* NAVBAR DINÁMICO */}
       {role && (
         <nav style={{ padding: 10, background: "#eee" }}>
@@ -24,29 +48,10 @@ function App() {
             Rol: <strong>{role}</strong>
           </span>
 
-          {(role === "ADMIN" || role === "WAITER") && (
-            <>
-              <Link to="/">Mesas</Link> |{" "}
-            </>
-          )}
-
-          {(role === "ADMIN" || role === "WAITER") && (
-            <>
-              <Link to="/waiter">Mozo</Link> |{" "}
-            </>
-          )}
-
-          {(role === "ADMIN" || role === "KITCHEN") && (
-            <>
-              <Link to="/kitchen/1">Cocina</Link> |{" "}
-            </>
-          )}
-
-          {(role === "ADMIN" || role === "CASHIER") && (
-            <>
-              <Link to="/cashier">Caja</Link> |{" "}
-            </>
-          )}
+            {isWaiter && <Link to="/">Mesas</Link>}
+            {isWaiter && <> | <Link to="/waiter">Mozo</Link></>}
+            {isKitchen && <> | <Link to="/kitchen/1">Cocina</Link></>}
+            {isCashier && <> | <Link to="/cashier">Caja</Link></>}
 
           <button
             onClick={logout}

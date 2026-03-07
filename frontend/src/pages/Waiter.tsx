@@ -15,12 +15,39 @@ interface Order {
   items: Item[]
 }
 
+const statusColor = (status: string) => {
+  switch (status) {
+    case "PENDING":
+      return "#999"
+    case "SENT":
+      return "orange"
+    case "READY":
+      return "dodgerblue"
+    case "DELIVERED":
+      return "green"
+    case "IN_PROGRESS":
+      return "purple"
+    default:
+      return "black"
+  }
+}
+
+const hasReadyItems = (order: Order) => {
+  return order.items.some(item => item.status === "READY")
+}
+
 export default function Waiter() {
   const [orders, setOrders] = useState<Order[]>([])
 
-  useEffect(() => {
+useEffect(() => {
+  fetchOrders()
+
+  const interval = setInterval(() => {
     fetchOrders()
-  }, [])
+  }, 5000)
+
+  return () => clearInterval(interval)
+}, [])
 
   const fetchOrders = async () => {
     const res = await fetch(`${API_URL}/orders/active`, {headers: getAuthHeaders()})
@@ -53,41 +80,63 @@ export default function Waiter() {
 
       {orders.length === 0 && <p>No hay órdenes activas</p>}
 
-      {orders.map(order => (
-        <div
-          key={order.id}
-          style={{
-            border: "1px solid #ccc",
-            padding: 20,
-            marginBottom: 20,
-            borderRadius: 8
-          }}
-        >
-          <h2>Mesa {order.table_number}</h2>
+      {[...orders]
+        .sort((a, b) => Number(hasReadyItems(b)) - Number(hasReadyItems(a)))
+        .map(order => (
+          <div
+            key={order.id}
+            style={{
+              border: hasReadyItems(order) ? "2px solid dodgerblue" : "1px solid #ccc",
+              backgroundColor: hasReadyItems(order) ? "#eef6ff" : "white",
+              padding: 20,
+              marginBottom: 20,
+              borderRadius: 8
+            }}
+  >
+            <h2>
+              Mesa {order.table_number}
+              {hasReadyItems(order) && (
+                <span style={{ marginLeft: 10 }}>🔔</span>
+              )}
+            </h2>
 
-          <ul>
-            {order.items.map(item => (
-              <li key={item.id} style={{ marginBottom: 5 }}>
-                {item.product_name} x {item.quantity} — {item.status}
+            <ul>
+              {order.items.map(item => (
+                <li key={item.id} style={{ marginBottom: 5 }}>
+                  {item.product_name} x {item.quantity}
 
-                {item.status === "READY" && (
-                  <button
-                    onClick={() => markAsDelivered(item.id)}
+                  <span
                     style={{
                       marginLeft: 10,
-                      backgroundColor: "green",
-                      color: "white",
+                      padding: "2px 8px",
                       borderRadius: 6,
-                      padding: "4px 8px"
+                      backgroundColor: statusColor(item.status),
+                      color: "white",
+                      fontSize: 12,
+                      fontWeight: "bold"
                     }}
-                  >
-                    Entregar
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
+  >
+                    {item.status}
+                  </span>
+
+                  {item.status === "READY" && (
+                    <button
+                      onClick={() => markAsDelivered(item.id)}
+                      style={{
+                        marginLeft: 10,
+                        backgroundColor: "green",
+                        color: "white",
+                        borderRadius: 6,
+                        padding: "4px 8px"
+                      }}
+                    >
+                      Entregar
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
       ))}
     </div>
   )

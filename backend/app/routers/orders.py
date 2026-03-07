@@ -5,6 +5,8 @@ from app.db.session import get_db
 from app.models.order import Order, OrderStatus
 from app.models.product import Product
 from app.models.user import User
+from app.models.cash_register import CashRegister
+from app.models.order_item import OrderItem, OrderItemStatus
 from app.dependencies.auth import get_current_user
 
 from app.schemas.order.order import OrderOut
@@ -47,16 +49,18 @@ def add_item_to_order(
         raise HTTPException(404, "Producto no disponible")
 
     service = OrderService(db)
-
+    print(dir(service))
     try:
-        service.add_item(order, product, item.quantity)
+        new_item = service.add_item(order, product, item.quantity)
+        db.commit()
+        db.refresh(new_item)
+        return new_item
     except OrderDomainError as e:
+        db.rollback()
         raise HTTPException(400, str(e))
-
-    db.commit()
-
-    return {"message": "Item agregado"}
-
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, str(e))
 
 @router.post("/{order_id}/send-to-kitchen")
 def send_to_kitchen(
@@ -101,17 +105,29 @@ def add_payment(
     if not order:
         raise HTTPException(404, "Order not found")
 
+    cash_register = db.query(CashRegister).filter(
+        CashRegister.restaurant_id == user.restaurant_id,
+        CashRegister.closed_at == None
+    ).first()
+
+    if not cash_register:
+        raise HTTPException(400, "No hay caja abierta")
+
     service = OrderService(db)
 
     try:
-        service.add_payment(order, payment.amount, payment.method)
+        service.add_payment(
+            order,
+            payment.amount,
+            payment.method,
+            cash_register
+        )
     except OrderDomainError as e:
         raise HTTPException(400, str(e))
 
     db.commit()
 
     return {"message": "Pago registrado"}
-
 
 @router.post("/{order_id}/close")
 def close_order(
@@ -142,6 +158,41 @@ def close_order(
         "order_id": order.id,
         "status": order.status
     }
+
+@router.delete("/order-items/{item_id}")
+def delete_order_item(
+    item_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    print("ITEM ID:", item_id)
+    print("USER RESTAURANT:", user.restaurant_id)
+
+    item = db.query(OrderItem).filter(
+        OrderItem.id == item_id
+    ).first()
+
+    print("ITEM FOUND:", item)
+
+    if item:
+        print("ITEM RESTAURANT:", item.restaurant_id)
+
+    item = db.query(OrderItem).filter(
+        OrderItem.id == item_id,
+        OrderItem.restaurant_id == user.restaurant_id
+    ).first()
+
+    if not item:
+        raise HTTPException(404, "Item not found")
+
+    if item.status != OrderItemStatus.PENDING:
+        raise HTTPException(400, "Item already sent to kitchen")
+
+    db.delete(item)
+    db.commit()
+
+    return {"message": "Item eliminado"}
 
 
 @router.get("/active", response_model=list[WaiterOrderOut])
@@ -256,3 +307,31 @@ def update_order_status(
         "order_id": order.id,
         "new_status": order.status
     }
+
+@router.patch("/order-items/{item_id}")
+def update_item_quantity(
+    item_id: int,
+    quantity: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    item = db.query(OrderItem).filter(
+        OrderItem.id == item_id,
+        OrderItem.restaurant_id == user.restaurant_id
+    ).first()
+
+    if not item:
+        raise HTTPException(404, "Item not found")
+
+    if item.status != OrderItemStatus.PENDING:
+        raise HTTPException(400, "Item already sent to kitchen")
+
+    if quantity <= 0:
+        db.delete(item)
+    else:
+        item.quantity = quantity
+
+    db.commit()
+
+    return {"ok": True}

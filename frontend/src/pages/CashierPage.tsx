@@ -100,13 +100,20 @@ export default function CashierPage() {
   const registerPayment = async () => {
     if (!selectedOrder || !paymentAmount) return
 
+    const amount = Number(paymentAmount)
+
+    if (amount > selectedOrder.remaining) {
+      alert("El pago excede el saldo")
+      return
+    }
+
     const res = await fetch(
       `${API_URL}/orders/${selectedOrder.id}/payments`,
       {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          amount: Number(paymentAmount),
+          amount,
           method: paymentMethod
         })
       }
@@ -178,6 +185,13 @@ export default function CashierPage() {
       <p>Total vendido: $ {Number(cashRegister.total_sales).toFixed(2)}</p>
       <p>Órdenes cobradas: {cashRegister.orders_count}</p>
       <p>Ticket promedio: $ {Number(cashRegister.average_ticket).toFixed(2)}</p>
+      <h3>Ventas por método</h3>
+
+        {Object.entries(cashRegister.by_method).map(([method, amount]) => (
+          <p key={method}>
+            {method}: $ {Number(amount).toFixed(2)}
+          </p>
+        ))}
 
       <button
         onClick={closeCashRegister}
@@ -188,19 +202,21 @@ export default function CashierPage() {
 
       <h2>Órdenes Activas</h2>
 
-      {orders.map(o => (
-        <div
-          key={o.id}
-          onClick={() => selectOrder(o.id)}
-          style={{
-            padding: 10,
-            marginBottom: 8,
-            cursor: "pointer",
-            border: "1px solid #ccc"
-          }}
-        >
-          Mesa {o.table_number} — Saldo: ${o.remaining.toFixed(2)}
-        </div>
+      {orders
+        .filter(o => o.remaining > 0)
+        .map(o => (
+          <div
+            key={o.id}
+            onClick={() => selectOrder(o.id)}
+            style={{
+              padding: 10,
+              marginBottom: 8,
+              cursor: "pointer",
+              border: o.remaining > 100 ? "2px solid orange" : "1px solid #ccc"
+            }}
+          >
+            Mesa {o.table_number} — Saldo: ${o.remaining.toFixed(2)}
+          </div>
       ))}
 
       {selectedOrder && (
