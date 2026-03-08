@@ -67,6 +67,16 @@ export default function Kitchen() {
     }
   }
 
+  const groupedByTable = items.reduce((acc, item) => {
+    if (!acc[item.table_number]) {
+      acc[item.table_number] = []
+    }
+
+    acc[item.table_number].push(item)
+
+    return acc
+  }, {} as Record<number, KitchenItem[]>)
+  
   return (
     <div style={{ padding: 40 }}>
       <h1>Estación #{station}</h1>
@@ -75,60 +85,77 @@ export default function Kitchen() {
         <p>No hay pedidos pendientes</p>
       )}
 
-      {items.map(item => (
+      {Object.entries(groupedByTable).map(([tableNumber, tableItems]) => (
         <div
-          key={item.item_id}
+          key={tableNumber}
           style={{
-            border: "1px solid #ccc",
-            padding: 15,
-            marginBottom: 15,
-            borderRadius: 8
+            border: "2px solid #ddd",
+            padding: 20,
+            marginBottom: 20,
+            borderRadius: 10,
+            background: "#fafafa"
           }}
         >
-          <h3>Mesa {item.table_number}</h3>
+          <h2>Mesa {tableNumber}</h2>
 
-          <p>
-            {item.product_name} x {item.quantity}
-          </p>
-
-          <p>
-            Estado:{" "}
-            <strong style={{ color: getStatusColor(item.status) }}>
-              {item.status}
-            </strong>
-          </p>
-
-          {item.status === "SENT" && (
-            <button
-              onClick={() =>
-                updateStatus(item.item_id, "IN_PROGRESS")
-              }
-              style={{ marginRight: 10 }}
+          {tableItems.map(item => (
+            <div
+              key={item.item_id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 10,
+                padding: 10,
+                border: "1px solid #eee",
+                borderRadius: 6,
+                background: "white"
+              }}
             >
-              Iniciar
-            </button>
-          )}
+              <div>
+                {item.product_name} x {item.quantity}
+              </div>
 
-          {item.status === "IN_PROGRESS" && (
-            <button
-              onClick={() =>
-                updateStatus(item.item_id, "READY")
-              }
-              style={{ marginRight: 10 }}
-            >
-              Listo
-            </button>
-          )}
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
 
-          {item.status === "READY" && (
-            <button
-              onClick={() =>
-                updateStatus(item.item_id, "DELIVERED")
-              }
-            >
-              Entregado
-            </button>
-          )}
+                <strong style={{ color: getStatusColor(item.status) }}>
+                  {item.status}
+                </strong>
+
+                {item.status === "SENT" && (
+                  <button
+                    onClick={() =>
+                      updateStatus(item.item_id, "IN_PROGRESS")
+                    }
+                  >
+                    Iniciar
+                  </button>
+                )}
+
+                {item.status === "IN_PROGRESS" && (
+                  <button
+                    onClick={() =>
+                      updateStatus(item.item_id, "READY")
+                    }
+                  >
+                    Listo
+                  </button>
+                )}
+
+                {item.status === "READY" && (
+                  <button
+                    onClick={() =>
+                      updateStatus(item.item_id, "DELIVERED")
+                    }
+                  >
+                    Entregado
+                  </button>
+                )}
+
+              </div>
+            </div>
+          ))}
+
         </div>
       ))}
     </div>
