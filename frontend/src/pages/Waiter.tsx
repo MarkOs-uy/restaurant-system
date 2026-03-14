@@ -39,15 +39,64 @@ const hasReadyItems = (order: Order) => {
 export default function Waiter() {
   const [orders, setOrders] = useState<Order[]>([])
 
-useEffect(() => {
-  fetchOrders()
+  useEffect(() => {
 
-  const interval = setInterval(() => {
     fetchOrders()
-  }, 5000)
 
-  return () => clearInterval(interval)
-}, [])
+    let ws: WebSocket | null = null
+    let reconnectTimer: any = null
+
+    const connect = () => {
+
+      ws = new WebSocket(
+        `ws://${location.host}/ws/waiter/1`
+      )
+
+      ws.onopen = () => {
+        console.log("Waiter WS connected")
+      }
+
+      ws.onmessage = (event) => {
+
+        const data = JSON.parse(event.data)
+
+        if (data.type === "ITEM_READY") {
+
+          console.log("Item ready:", data)
+
+          new Audio("/bell.mp3").play()
+
+          fetchOrders()
+
+        }
+
+      }
+
+      ws.onclose = () => {
+
+        console.log("Waiter WS disconnected")
+
+        reconnectTimer = setTimeout(() => {
+          console.log("Reconnecting waiter WS...")
+          connect()
+        }, 2000)
+
+      }
+
+      ws.onerror = () => {
+        ws?.close()
+      }
+
+    }
+
+    connect()
+
+    return () => {
+      ws?.close()
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+    }
+
+  }, [])
 
   const fetchOrders = async () => {
     const res = await fetch(`${API_URL}/orders/active`, {headers: getAuthHeaders()})
