@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 
 from app.db.session import get_db
@@ -9,6 +9,78 @@ from app.models.user import User
 from app.dependencies.auth import get_current_user
 
 router = APIRouter(prefix="/categories", tags=["categories"])
+
+@router.get("/")
+def list_categories(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return db.query(Category).filter(
+        Category.restaurant_id == user.restaurant_id
+    ).order_by(Category.name).all()
+
+
+@router.post("/")
+def create_category(
+    data: dict,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    category = Category(
+        name=data["name"],
+        restaurant_id=user.restaurant_id
+    )
+
+    db.add(category)
+    db.commit()
+    db.refresh(category)
+
+    return category
+
+
+@router.patch("/{category_id}")
+def update_category(
+    category_id: int,
+    data: dict,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    category = db.query(Category).filter(
+        Category.id == category_id,
+        Category.restaurant_id == user.restaurant_id
+    ).first()
+
+    if not category:
+        raise HTTPException(404, "Category not found")
+
+    category.name = data["name"]
+
+    db.commit()
+    db.refresh(category)
+
+    return category
+
+
+@router.delete("/{category_id}")
+def delete_category(
+    category_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    category = db.query(Category).filter(
+        Category.id == category_id,
+        Category.restaurant_id == user.restaurant_id
+    ).first()
+
+    if not category:
+        raise HTTPException(404, "Category not found")
+
+    db.delete(category)
+    db.commit()
+
+    return {"ok": True}
 
 @router.get("/with-products")
 def list_categories_with_products(

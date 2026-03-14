@@ -66,6 +66,8 @@ class OrderService:
         if order.status == OrderStatus.OPEN:
             order.status = OrderStatus.SENT
 
+        return pending_items
+
     # -------------------------
     # Cerrar orden
     # -------------------------

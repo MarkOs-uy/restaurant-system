@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from collections import defaultdict
 
 from app.db.session import get_db
 from app.models.order import Order, OrderStatus
@@ -14,6 +15,8 @@ from app.schemas.order.order_item import OrderItemCreate
 from app.schemas.order.payment import PaymentCreate
 from app.schemas.order.order import WaiterOrderOut
 from app.schemas.order.order import OrderStatusUpdate
+
+from app.websocket.manager import manager
 
 from app.domain.order_service import (
     OrderService,
@@ -63,7 +66,7 @@ def add_item_to_order(
         raise HTTPException(500, str(e))
 
 @router.post("/{order_id}/send-to-kitchen")
-def send_to_kitchen(
+async def send_to_kitchen(
     order_id: int,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -80,14 +83,44 @@ def send_to_kitchen(
     service = OrderService(db)
 
     try:
-        service.send_to_kitchen(order)
+        sent_items = service.send_to_kitchen(order)
     except OrderDomainError as e:
         raise HTTPException(400, str(e))
 
     db.commit()
 
-    return {"message": "Items enviados"}
+    # agrupar items por estación
+    stations = defaultdict(list)
 
+    for item in sent_items:
+        stations[item.product.station_id].append(item)
+
+    # enviar evento websocket por estación
+    for station_id, items in stations.items():
+
+        try:
+            await manager.send_to_station(
+                restaurant_id=user.restaurant_id,
+                station_id=station_id,
+                message={
+                    "type": "NEW_ITEMS",
+                    "order_id": order.id,
+                    "table": order.table.number,
+                    "items": [
+                        {
+                            "product": i.product.name,
+                            "quantity": i.quantity,
+                            "item_id": i.id
+                        }
+                        for i in items
+                    ]
+                }
+            )
+
+        except Exception as e:
+            print("WebSocket error:", e)
+
+    return {"message": "Items enviados"}
 
 @router.post("/{order_id}/payments")
 def add_payment(

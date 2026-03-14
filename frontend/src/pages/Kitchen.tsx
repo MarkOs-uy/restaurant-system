@@ -32,15 +32,59 @@ export default function Kitchen() {
 
   useEffect(() => {
     if (!station) return
-
     fetchItems()
-
-    const interval = setInterval(() => {
-      fetchItems()
-    }, 5000)
-
-    return () => clearInterval(interval)
   }, [station])
+
+  useEffect(() => {
+
+    let ws: WebSocket | null = null
+    let reconnectTimer: any = null
+
+    const connect = () => {
+
+      ws = new WebSocket(
+        `ws://${location.host}/ws/kitchen/1/${stationId}`
+      )
+
+      ws.onopen = () => {
+        console.log("Kitchen WS connected")
+      }
+
+      ws.onmessage = (event) => {
+
+        const data = JSON.parse(event.data)
+
+        if (data.type === "NEW_ITEMS") {
+          fetchItems()
+        }
+
+      }
+
+      ws.onclose = () => {
+
+        console.log("Kitchen WS disconnected")
+
+        reconnectTimer = setTimeout(() => {
+          console.log("Reconnecting kitchen WS...")
+          connect()
+        }, 2000)
+
+      }
+
+      ws.onerror = () => {
+        ws?.close()
+      }
+
+    }
+
+    connect()
+
+    return () => {
+      ws?.close()
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+    }
+
+  }, [stationId])
 
   const updateStatus = async (
     itemId: number,

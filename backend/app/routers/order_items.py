@@ -5,6 +5,7 @@ from app.models.order_item import OrderItem, OrderItemStatus
 from app.models.user import User, UserRole
 from app.schemas.order.order_item import OrderItemStatusUpdate
 from app.dependencies.auth import get_current_user
+from app.websocket.manager import manager
 
 router = APIRouter(prefix="/order-items", tags=["order-items"])
 
@@ -30,7 +31,7 @@ ALLOWED_ITEM_TRANSITIONS = {
 
 
 @router.patch("/{item_id}/status")
-def update_item_status(
+async def update_item_status(
     item_id: int,
     data: OrderItemStatusUpdate,
     user: User = Depends(get_current_user),
@@ -66,6 +67,21 @@ def update_item_status(
     item.status = data.status
     db.commit()
     db.refresh(item)
+
+        # avisar a mozos si el item está listo
+    if item.status == OrderItemStatus.READY:
+
+        await manager.send_to_waiters(
+            restaurant_id=user.restaurant_id,
+            message={
+                "type": "ITEM_READY",
+                "table": item.order.table.number,
+                "product": item.product.name,
+                "quantity": item.quantity,
+                "order_id": item.order.id,
+                "item_id": item.id
+            }
+        )
 
     return {
         "item_id": item.id,

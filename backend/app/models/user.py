@@ -23,7 +23,7 @@ class User(Base):
         nullable=False
     )
 
-    name = Column(String, nullable=False)
+    username = Column(String, nullable=False)
 
     role = Column(Enum(UserRole), nullable=False)
 

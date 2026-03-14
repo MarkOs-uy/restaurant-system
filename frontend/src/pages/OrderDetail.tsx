@@ -427,30 +427,50 @@ export default function OrderDetail() {
           {openCategory === category.id && (
             <div style={{ padding: 10 }}>
               {category.products.map(p => (
-                <div key={p.id} style={{ marginBottom: 8 }}>
-                  <input
-                    type="number"
-                    min="1"
-                    value={quantities[p.id] || 1}
-                    onChange={(e) =>
-                      setQuantities({
-                        ...quantities,
-                        [p.id]: Number(e.target.value)
-                      })
-                    }
-                    style={{ width: 60, marginRight: 5 }}
-                  />
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    marginBottom: 6
+                  }}
+                >
 
                   <button
-                    disabled={order.status === "CLOSED"}
                     onClick={() => addProduct(p.id)}
                     style={{
-                      padding: 6,
+                      flex: 1,
+                      padding: 8,
                       borderRadius: 6
                     }}
                   >
                     {p.name} - ${p.price}
                   </button>
+
+                  <button
+                    onClick={() =>
+                      setQuantities({
+                        ...quantities,
+                        [p.id]: Math.max((quantities[p.id] || 1) - 1, 1)
+                      })
+                    }
+                  >
+                    −
+                  </button>
+
+                  <strong>{quantities[p.id] || 1}</strong>
+
+                  <button
+                    onClick={() =>
+                      setQuantities({
+                        ...quantities,
+                        [p.id]: (quantities[p.id] || 1) + 1
+                      })
+                    }
+                  >
+                    +
+                  </button>
+
                 </div>
               ))}
             </div>

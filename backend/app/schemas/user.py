@@ -5,3 +5,4 @@ class UserOut(BaseSchema):
     id: int
     username: str
     role: UserRole
+    active: bool

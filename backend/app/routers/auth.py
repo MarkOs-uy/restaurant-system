@@ -23,7 +23,7 @@ def login(
     db: Session = Depends(get_db)
 ):
     user = db.query(User).filter(
-        User.name == form_data.username
+        User.username == form_data.username
     ).first()
 
     if not user or not pwd_context.verify(
