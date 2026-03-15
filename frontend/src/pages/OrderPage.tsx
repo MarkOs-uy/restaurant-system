@@ -9,7 +9,7 @@ interface OrderItem {
 }
 
 interface Order {
-  order_id: number
+  id: number
   table_number: number
   status: string
   items: OrderItem[]
@@ -33,7 +33,7 @@ export default function OrderPage() {
 
   return (
     <div style={{ padding: 40 }}>
-      <h1>Orden #{order.order_id}</h1>
+      <h1>Orden #{order.id}</h1>
       <h2>Mesa {order.table_number}</h2>
       <p>Estado: {order.status}</p>
 

@@ -1,21 +1,27 @@
 interface Props {
   number: number
-  occupied: boolean
+  color: string
   onClick: () => void
 }
 
-export default function TableCard({ number, occupied, onClick }: Props) {
+export default function TableCard({ number, color, onClick }: Props) {
   return (
     <div
       onClick={onClick}
       style={{
-        cursor: "pointer",
-        backgroundColor: occupied ? "#ff6b6b" : "#51cf66",
-        padding: 20,
-        borderRadius: 12,
+        background: color,
+        padding: 30,
         textAlign: "center",
-        fontSize: 20,
-        fontWeight: "bold"
+        fontSize: 24,
+        fontWeight: "bold",
+        cursor: "pointer",
+        boxShadow: "0 3px 8px rgba(0,0,0,0.2)",
+        borderRadius: "50%",
+        height: 120,
+        width: 120,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center"
       }}
     >
       Mesa {number}

@@ -64,7 +64,8 @@ export default function Waiter() {
 
           console.log("Item ready:", data)
 
-          new Audio("/bell.mp3").play()
+          const bell = new Audio("/bell.mp3")
+          bell.play().catch(() => {})
 
           fetchOrders()
 
@@ -134,12 +135,11 @@ export default function Waiter() {
         .map(order => (
           <div
             key={order.id}
+            className="card"
             style={{
               border: hasReadyItems(order) ? "2px solid dodgerblue" : "1px solid #ccc",
               backgroundColor: hasReadyItems(order) ? "#eef6ff" : "white",
-              padding: 20,
               marginBottom: 20,
-              borderRadius: 8
             }}
   >
             <h2>

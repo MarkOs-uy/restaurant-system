@@ -17,7 +17,7 @@ interface Payment {
 }
 
 interface Order {
-  order_id: number
+  id: number
   table_number: number
   status: string
   items: Item[]
@@ -201,7 +201,7 @@ export default function OrderDetail() {
 
   return (
     <div style={{ padding: 40, maxWidth: 900 }}>
-      <h1>Orden #{order.order_id}</h1>
+      <h1>Orden #{order.id}</h1>
       <p>Mesa: {order.table_number}</p>
       <p>
         Estado:{" "}

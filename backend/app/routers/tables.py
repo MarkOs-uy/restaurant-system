@@ -92,6 +92,9 @@ def list_tables(
             result.append({
                 "id": table.id,
                 "number": table.number,
+                "x": table.x,
+                "y": table.y,
+                "shape": table.shape,
                 "status": "ocupada",
                 "order_id": active_order.id,
                 "order_status": active_order.status.value
@@ -100,9 +103,37 @@ def list_tables(
             result.append({
                 "id": table.id,
                 "number": table.number,
+                "x": table.x,
+                "y": table.y,
+                "shape": table.shape,
                 "status": "libre",
                 "order_id": None,
                 "order_status": None
             })
 
     return result
+
+
+@router.patch("/{table_id}/position")
+def update_table_position(
+    table_id: int,
+    x: int,
+    y: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    table = db.query(Table).filter(
+        Table.id == table_id,
+        Table.restaurant_id == user.restaurant_id
+    ).first()
+
+    if not table:
+        raise HTTPException(status_code=404, detail="Table not found")
+
+    table.x = x
+    table.y = y
+
+    db.commit()
+
+    return {"success": True}

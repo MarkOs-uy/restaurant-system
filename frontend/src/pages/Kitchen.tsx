@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { useParams } from "react-router-dom"
+import { useParams, useNavigate } from "react-router-dom"
 import { API_URL, getAuthHeaders } from "../api"
 
 interface KitchenItem {
@@ -9,12 +9,14 @@ interface KitchenItem {
   status: string
   table_number: number
   order_id: number
+  created_at: string
 }
 
 export default function Kitchen() {
 
   const { stationId } = useParams()
   const station = Number(stationId)
+  const navigate = useNavigate()
 
   const [items, setItems] = useState<KitchenItem[]>([])
 
@@ -111,63 +113,122 @@ export default function Kitchen() {
     }
   }
 
-  const groupedByTable = items.reduce((acc, item) => {
-    if (!acc[item.table_number]) {
-      acc[item.table_number] = []
+  const getWaitingTime = (createdAt: string) => {
+    const created = new Date(createdAt).getTime()
+    const now = Date.now()
+
+    const diff = Math.floor((now - created) / 1000)
+
+    const minutes = Math.floor(diff / 60)
+    const seconds = diff % 60
+
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`
+  }
+
+
+
+  const groupedOrders = items.reduce((acc, item) => {
+    if (!acc[item.order_id]) {
+      acc[item.order_id] = {
+        table: item.table_number,
+        created_at: item.created_at,
+        items: []
+      }
     }
 
-    acc[item.table_number].push(item)
+    acc[item.order_id].items.push(item)
 
     return acc
-  }, {} as Record<number, KitchenItem[]>)
+  }, {} as Record<number, { table: number, created_at: string, items: KitchenItem[] }>)
   
   return (
     <div style={{ padding: 40 }}>
       <h1>Estación #{station}</h1>
 
+      <button
+        onClick={() => navigate("/kitchen")}
+        style={{ marginBottom: 20 }}
+      >
+        Cambiar estación
+      </button>
+
       {items.length === 0 && (
         <p>No hay pedidos pendientes</p>
       )}
 
-      {Object.entries(groupedByTable).map(([tableNumber, tableItems]) => (
+      {Object.entries(groupedOrders).map(([orderId, order]) => (
         <div
-          key={tableNumber}
+          key={orderId}
+          className="card"
           style={{
             border: "2px solid #ddd",
-            padding: 20,
             marginBottom: 20,
-            borderRadius: 10,
-            background: "#fafafa"
+            background: "#fafafa",
+            boxShadow: "0 3px 10px rgba(0,0,0,0.08)"
           }}
         >
-          <h2>Mesa {tableNumber}</h2>
 
-          {tableItems.map(item => (
+          <h2 style={{ fontSize: 28, marginBottom: 10 }}>
+            Mesa {order.table}
+
+            {order.created_at && (
+              <span
+                style={{
+                  marginLeft: 15,
+                  fontSize: 16,
+                  fontWeight: "normal",
+                  color: "#666"
+                }}
+              >
+                ⏱ {getWaitingTime(order.created_at)}
+              </span>
+            )}
+
+          </h2>
+
+          {order.items.map(item => (
+
             <div
               key={item.item_id}
               style={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                marginBottom: 10,
-                padding: 10,
+                marginBottom: 12,
+                padding: 12,
                 border: "1px solid #eee",
                 borderRadius: 6,
-                background: "white"
+                background:
+                  item.status === "SENT"
+                    ? "#fff3cd"
+                    : "white"
               }}
             >
-              <div>
-                {item.product_name} x {item.quantity}
+
+              <div style={{ fontSize: 20, fontWeight: 600 }}>
+                {item.product_name} × {item.quantity}
               </div>
 
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
 
-                <strong style={{ color: getStatusColor(item.status) }}>
+                <strong
+                  style={{
+                    background: getStatusColor(item.status),
+                    color: "white",
+                    padding: "6px 12px",
+                    borderRadius: 6,
+                    fontSize: 14
+                  }}
+                >
                   {item.status}
                 </strong>
 
                 {item.status === "SENT" && (
                   <button
+                    style={{
+                      fontSize: 16,
+                      padding: "8px 14px"
+                    }}
                     onClick={() =>
                       updateStatus(item.item_id, "IN_PROGRESS")
                     }
@@ -178,6 +239,10 @@ export default function Kitchen() {
 
                 {item.status === "IN_PROGRESS" && (
                   <button
+                    style={{
+                      fontSize: 16,
+                      padding: "8px 14px"
+                    }}
                     onClick={() =>
                       updateStatus(item.item_id, "READY")
                     }
@@ -188,6 +253,10 @@ export default function Kitchen() {
 
                 {item.status === "READY" && (
                   <button
+                    style={{
+                      fontSize: 16,
+                      padding: "8px 14px"
+                    }}
                     onClick={() =>
                       updateStatus(item.item_id, "DELIVERED")
                     }
@@ -197,9 +266,10 @@ export default function Kitchen() {
                 )}
 
               </div>
-            </div>
-          ))}
 
+            </div>
+
+          ))}
         </div>
       ))}
     </div>

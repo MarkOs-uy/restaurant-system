@@ -128,3 +128,16 @@ def get_station_items(
         })
 
     return result
+
+@router.get("/active")
+def list_active_stations(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    stations = db.query(ProductionStation).filter(
+        ProductionStation.restaurant_id == user.restaurant_id,
+        ProductionStation.active == True
+    ).order_by(ProductionStation.name).all()
+
+    return stations

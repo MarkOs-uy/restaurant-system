@@ -1,3 +1,4 @@
+import "./App.css"
 import { Routes, Route, Link } from "react-router-dom"
 import TablesPage from "./pages/TablesPage"
 import OrderDetail from "./pages/OrderDetail"
@@ -10,6 +11,7 @@ import StationsPage from "./pages/StationsPage"
 import UsersPage from "./pages/UsersPage"
 import ProductsPage from "./pages/ProductsPage"
 import ProtectedRoute from "./components/ProtectedRoute"
+import KitchenStations from "./pages/KitchenStations"
 import { useState, useEffect } from "react"
 
 function App() {
@@ -55,7 +57,7 @@ function App() {
 
           {isWaiter && <Link to="/">Mesas</Link>}
           {isWaiter && <> | <Link to="/waiter">Mozo</Link></>}
-          {isKitchen && <> | <Link to="/kitchen/1">Cocina</Link></>}
+          {isKitchen && <> | <Link to="/kitchen">Cocina</Link></>}
           {isCashier && <> | <Link to="/cashier">Caja</Link></>}
 
           {isAdmin && (
@@ -108,7 +110,17 @@ function App() {
           }
         />
 
-        {/* COCINA */}
+        {/* COCINA - SELECCIÓN */}
+        <Route
+          path="/kitchen"
+          element={
+            <ProtectedRoute allowedRoles={["ADMIN", "KITCHEN"]}>
+              <KitchenStations />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* COCINA - ESTACIÓN */}
         <Route
           path="/kitchen/:stationId"
           element={

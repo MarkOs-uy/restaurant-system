@@ -28,6 +28,13 @@ class Table(Base):
 
     active = Column(Boolean, default=True, nullable=False)
 
+    x = Column(Integer, nullable=False, default=0)
+    y = Column(Integer, nullable=False, default=0)
+
+    capacity = Column(Integer, default=4, nullable=False)
+
+    shape = Column(String, default="round")
+
     external_id = Column(
         String,
         default=lambda: str(uuid.uuid4()),
