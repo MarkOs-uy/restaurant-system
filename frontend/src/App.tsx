@@ -110,6 +110,16 @@ function App() {
           }
         />
 
+        {/* ORDEN NUEVA DESDE MESA */}
+        <Route
+          path="/orders/table/:tableId"
+          element={
+            <ProtectedRoute allowedRoles={["ADMIN", "WAITER"]}>
+              <OrderDetail />
+            </ProtectedRoute>
+          }
+        />
+
         {/* COCINA - SELECCIÓN */}
         <Route
           path="/kitchen"

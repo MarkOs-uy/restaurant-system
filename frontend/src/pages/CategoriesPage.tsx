@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react"
 import { API_URL, getAuthHeaders } from "../api"
 
+import Page from "../components/Page"
+import Card from "../components/Card"
+import DataTable from "../components/DataTable"
+
 interface Category {
   id: number
   name: string
@@ -15,7 +19,7 @@ export default function CategoriesPage() {
   const fetchCategories = async () => {
 
     const res = await fetch(
-      `${API_URL}/categories`,
+      `${API_URL}/categories/`,
       { headers: getAuthHeaders() }
     )
 
@@ -35,7 +39,7 @@ export default function CategoriesPage() {
 
     const url = editingId
       ? `${API_URL}/categories/${editingId}`
-      : `${API_URL}/categories`
+      : `${API_URL}/categories/`
 
     await fetch(url, {
       method,
@@ -73,49 +77,79 @@ export default function CategoriesPage() {
   }
 
   return (
-    <div style={{ padding: 40 }}>
+    <Page title="Categorías">
 
-      <h1>Categorías</h1>
+      <Card>
 
-      <div style={{ marginBottom: 20 }}>
-        <input
-          placeholder="Nombre categoría"
-          value={name}
-          onChange={e => setName(e.target.value)}
-        />
+        <div style={{ marginBottom: 20 }}>
 
-        <button
-          onClick={saveCategory}
-          style={{ marginLeft: 10 }}
-        >
-          {editingId ? "Actualizar" : "Crear"}
-        </button>
-      </div>
+          <input
+            placeholder="Nombre categoría"
+            value={name}
+            onChange={e => setName(e.target.value)}
+          />
 
-      <ul>
-        {categories.map(c => (
-          <li key={c.id}>
+          <button
+            onClick={saveCategory}
+            style={{ marginLeft: 10 }}
+          >
+            {editingId ? "Actualizar" : "Crear"}
+          </button>
 
-            {c.name}
+        </div>
 
-            <button
-              onClick={() => editCategory(c)}
-              style={{ marginLeft: 10 }}
-            >
-              Editar
-            </button>
+        <DataTable>
 
-            <button
-              onClick={() => deleteCategory(c.id)}
-              style={{ marginLeft: 10 }}
-            >
-              Eliminar
-            </button>
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th style={{ width: 200 }}>Acciones</th>
+            </tr>
+          </thead>
 
-          </li>
-        ))}
-      </ul>
+          <tbody>
 
-    </div>
+            {categories.map(c => (
+              <tr key={c.id}>
+
+                <td>{c.name}</td>
+
+                <td>
+
+                  <button onClick={() => editCategory(c)}>
+                    Editar
+                  </button>
+
+                  <button
+                    onClick={() => deleteCategory(c.id)}
+                    style={{ marginLeft: 10 }}
+                  >
+                    Eliminar
+                  </button>
+
+                  {editingId && (
+                    <button
+                      onClick={() => {
+                        setEditingId(null)
+                        setName("")
+                      }}
+                      style={{ marginLeft: 10 }}
+                    >
+                      Cancelar
+                    </button>
+                  )}
+
+                </td>
+
+              </tr>
+            ))}
+
+          </tbody>
+
+        </DataTable>
+
+      </Card>
+
+    </Page>
   )
 }

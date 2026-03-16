@@ -4,13 +4,18 @@ from sqlalchemy.orm import Session, joinedload
 from app.db.session import get_db
 from app.models import Table
 from app.models.order import Order, OrderStatus
+from app.models.product import Product
+from app.models.order_item import OrderItem, OrderItemStatus
+
+from app.schemas.table import TableCreate
+from app.schemas.order.order_item import AddItemRequest
 
 from app.models.user import User
 from app.dependencies.auth import get_current_user
 
 router = APIRouter(prefix="/tables", tags=["tables"])
 
-
+'''
 @router.post("/{table_id}/touch")
 def touch_table(
     table_id: int,
@@ -53,7 +58,93 @@ def touch_table(
         "table_number": table.number,
         "status": order.status
     }
+'''
+@router.post("/{table_id}/touch")
+def touch_table(
+    table_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
 
+    table = db.query(Table).filter(
+        Table.id == table_id,
+        Table.restaurant_id == user.restaurant_id,
+        Table.active == True
+    ).first()
+
+    if not table:
+        raise HTTPException(status_code=404, detail="Table not found")
+
+    order = db.query(Order).filter(
+        Order.table_id == table_id,
+        Order.restaurant_id == user.restaurant_id,
+        Order.status.notin_([
+            OrderStatus.CLOSED,
+            OrderStatus.CANCELLED
+        ])
+    ).first()
+
+    return {
+        "table_id": table_id,
+        "table_number": table.number,
+        "order_id": order.id if order else None
+    }
+
+@router.post("/{table_id}/add-product")
+def add_product_to_table(
+    table_id: int,
+    payload: AddItemRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    table = db.query(Table).filter(
+        Table.id == table_id,
+        Table.restaurant_id == user.restaurant_id
+    ).first()
+
+    if not table:
+        raise HTTPException(404, "Table not found")
+
+    order = db.query(Order).filter(
+        Order.table_id == table_id,
+        Order.restaurant_id == user.restaurant_id,
+        Order.status.notin_([
+            OrderStatus.CLOSED,
+            OrderStatus.CANCELLED
+        ])
+    ).first()
+
+    if not order:
+        order = Order(
+            table_id=table_id,
+            restaurant_id=user.restaurant_id,
+            status=OrderStatus.OPEN
+        )
+        db.add(order)
+        db.flush()
+
+    product = db.query(Product).filter(
+        Product.id == payload.product_id,
+        Product.restaurant_id == user.restaurant_id
+    ).first()
+
+    if not product:
+        raise HTTPException(404, "Product not found")
+
+    item = OrderItem(
+        restaurant_id=user.restaurant_id,
+        order_id=order.id,
+        product_id=product.id,
+        quantity=payload.quantity,
+        unit_price=product.price,
+        status=OrderItemStatus.PENDING
+    )
+
+    db.add(item)
+    db.commit()
+
+    return {"order_id": order.id}
 
 # 🔥 ESTE ES EL ENDPOINT IMPORTANTE
 @router.get("/")
@@ -113,6 +204,51 @@ def list_tables(
 
     return result
 
+@router.post("/")
+def create_table(
+    table_in: TableCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+
+    table = Table(
+        restaurant_id=user.restaurant_id,
+        number=table_in.number,
+        x=table_in.x,
+        y=table_in.y,
+        capacity=table_in.capacity,
+        shape=table_in.shape
+    )
+
+    db.add(table)
+    db.commit()
+    db.refresh(table)
+
+    return table
+
+@router.patch("/{table_id}")
+def update_table(
+    table_id: int,
+    table_in: TableCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+
+    table = db.query(Table).filter(
+        Table.id == table_id,
+        Table.restaurant_id == user.restaurant_id
+    ).first()
+
+    if not table:
+        raise HTTPException(status_code=404, detail="Table not found")
+
+    table.number = table_in.number
+    table.capacity = table_in.capacity
+    table.shape = table_in.shape
+
+    db.commit()
+
+    return {"success": True}
 
 @router.patch("/{table_id}/position")
 def update_table_position(
@@ -133,6 +269,27 @@ def update_table_position(
 
     table.x = x
     table.y = y
+
+    db.commit()
+
+    return {"success": True}
+
+@router.delete("/{table_id}")
+def delete_table(
+    table_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+
+    table = db.query(Table).filter(
+        Table.id == table_id,
+        Table.restaurant_id == user.restaurant_id
+    ).first()
+
+    if not table:
+        raise HTTPException(status_code=404, detail="Table not found")
+
+    table.active = False
 
     db.commit()
 

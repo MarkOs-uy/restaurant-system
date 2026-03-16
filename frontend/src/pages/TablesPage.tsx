@@ -14,10 +14,12 @@ interface Table {
 }
 
 export default function TablesPage() {
+
   const [tables, setTables] = useState<Table[]>([])
   const [loading, setLoading] = useState(true)
 
   const navigate = useNavigate()
+
   const [editMode, setEditMode] = useState(false)
   const [dragging, setDragging] = useState<number | null>(null)
 
@@ -25,8 +27,8 @@ export default function TablesPage() {
   const FLOOR_WIDTH = 900
   const FLOOR_HEIGHT = 500
 
-  useEffect(() => {
-    fetch(`${API_URL}/tables/`,{headers: getAuthHeaders()})
+  const loadTables = () => {
+    fetch(`${API_URL}/tables/`, { headers: getAuthHeaders() })
       .then(res => res.json())
       .then(data => {
         setTables(data)
@@ -36,53 +38,50 @@ export default function TablesPage() {
         console.error("Error cargando mesas:", err)
         setLoading(false)
       })
+  }
+
+  useEffect(() => {
+
+    loadTables()
+
+    // refresco automático (muy útil en POS)
+    const interval = setInterval(loadTables, 5000)
+
+    return () => clearInterval(interval)
+
   }, [])
 
   const touchTable = async (tableId: number) => {
-    try {
-      const res = await fetch(`${API_URL}/tables/${tableId}/touch`, {
-        method: "POST",
-        headers: getAuthHeaders()
-      })
 
-      if (!res.ok) {
-      throw new Error("Error en el servidor")
-      }
+    const res = await fetch(`${API_URL}/tables/${tableId}/touch`, {
+      method: "POST",
+      headers: getAuthHeaders()
+    })
 
-      const data = await res.json()
+    const data = await res.json()
 
-      setTables(prev =>
-        prev.map(t =>
-          t.id === tableId
-            ? {
-                ...t,
-                occupied: true,
-                order_id: data.order_id,
-                order_status: data.status
-              }
-            : t
-        )
-      )
-
-      // 🔥 REDIRECCIÓN
+    if (data.order_id) {
       navigate(`/orders/${data.order_id}`)
-
-    } catch (error) {
-      console.error("Error tocando mesa:", error)
+    } else {
+      navigate(`/orders/table/${tableId}`)
     }
-  }
 
-  if (loading) return <h2>Cargando mesas...</h2>
+  }
 
   const getTableColor = (table: Table) => {
 
-    if (!table.order_status) return "#dcdcdc"   // libre
+    if (!table.order_status) return "#dcdcdc" // libre
 
-    if (table.order_status === "OPEN") return "#f1c40f"  // orden activa
+    if (table.order_status === "OPEN") return "#f1c40f"
 
-    if (table.order_status === "READY") return "#2ecc71" // comida lista
+    if (table.order_status === "SENT") return "#e67e22"
+
+    if (table.order_status === "READY") return "#2ecc71"
+
+    if (table.order_status === "PAYING") return "#9b59b6"
 
     return "#95a5a6"
+
   }
 
   const moveTable = (id: number, x: number, y: number) => {
@@ -92,6 +91,7 @@ export default function TablesPage() {
         t.id === id ? { ...t, x, y } : t
       )
     )
+
   }
 
   const savePosition = async (tableId: number, x: number, y: number) => {
@@ -103,7 +103,45 @@ export default function TablesPage() {
 
   }
 
+  const createTable = async () => {
+
+    const number = tables.length + 1
+
+    const res = await fetch(`${API_URL}/tables/`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        number,
+        x: 50,
+        y: 50,
+        shape: "round",
+        capacity: 4
+      })
+    })
+
+    const table = await res.json()
+
+    setTables(prev => [...prev, table])
+
+  }
+
+  const deleteTable = async (id: number) => {
+
+    await fetch(`${API_URL}/tables/${id}`, {
+      method: "DELETE",
+      headers: getAuthHeaders()
+    })
+
+    setTables(prev => prev.filter(t => t.id !== id))
+
+  }
+
+  if (loading) {
+    return <p>Cargando mesas...</p>
+  }
+
   return (
+
     <div style={{ padding: 20 }}>
 
       <button
@@ -111,8 +149,12 @@ export default function TablesPage() {
         style={{ marginBottom: 20 }}
       >
         {editMode ? "Salir edición" : "Editar plano"}
-      </button>    
-       
+      </button>
+
+      <button onClick={createTable}>
+        + Mesa
+      </button>
+
       <div
         style={{
           position: "relative",
@@ -125,9 +167,16 @@ export default function TablesPage() {
           margin: "0 auto"
         }}
       >
-          {tables.map(t => (
+
+        {tables.map(t => {
+
+          const borderRadius = t.shape === "square" ? "12px" : "50%"
+
+          return (
+
             <div
               key={t.id}
+
               onClick={() => !editMode && touchTable(t.id)}
 
               onMouseDown={() => {
@@ -136,13 +185,17 @@ export default function TablesPage() {
               }}
 
               onMouseUp={() => {
+
                 if (dragging === t.id) {
                   savePosition(t.id, t.x, t.y)
                 }
+
                 setDragging(null)
+
               }}
 
               onMouseMove={(e) => {
+
                 if (dragging !== t.id) return
 
                 const rect = e.currentTarget.parentElement!.getBoundingClientRect()
@@ -154,31 +207,49 @@ export default function TablesPage() {
                 y = Math.max(0, Math.min(FLOOR_HEIGHT - TABLE_SIZE, y))
 
                 moveTable(t.id, x, y)
+
+              }}
+
+              onContextMenu={(e) => {
+
+                e.preventDefault()
+
+                if (!editMode) return
+
+                deleteTable(t.id)
+
               }}
 
               style={{
                 position: "absolute",
                 left: t.x,
                 top: t.y,
-                width: 100,
-                height: 100,
-                borderRadius: "50%",
+                width: TABLE_SIZE,
+                height: TABLE_SIZE,
+                borderRadius,
                 background: getTableColor(t),
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: 20,
+                fontSize: 22,
                 fontWeight: "bold",
                 cursor: editMode ? "grab" : "pointer",
                 boxShadow: "0 4px 10px rgba(0,0,0,0.2)",
                 userSelect: "none"
               }}
+
             >
               {t.number}
             </div>
 
-          ))}
+          )
+
+        })}
+
       </div>
+
     </div>
+
   )
+
 }

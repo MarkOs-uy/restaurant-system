@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react"
 import { API_URL, getAuthHeaders } from "../api"
 
+import Page from "../components/Page"
+import Card from "../components/Card"
+import DataTable from "../components/DataTable"
+
 interface User {
   id: number
   username: string
@@ -21,7 +25,7 @@ export default function UsersPage() {
   const fetchUsers = async () => {
 
     const res = await fetch(
-      `${API_URL}/users`,
+      `${API_URL}/users/`,
       { headers: getAuthHeaders() }
     )
 
@@ -41,7 +45,7 @@ export default function UsersPage() {
 
     const url = editingId
       ? `${API_URL}/users/${editingId}`
-      : `${API_URL}/users`
+      : `${API_URL}/users/`
 
     await fetch(url, {
       method,
@@ -85,89 +89,92 @@ export default function UsersPage() {
   }
 
   return (
-    <div style={{ padding: 40 }}>
+    <Page title="Usuarios">
 
-      <h1>Usuarios</h1>
+      <Card>
 
-      <div style={{ marginBottom: 20 }}>
+        <div style={{ marginBottom: 20 }}>
 
-        <input
-          placeholder="Usuario"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-        />
+          <input
+            placeholder="Usuario"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
 
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{ marginLeft: 10 }}
-        />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            style={{ marginLeft: 10 }}
+          />
 
-        <select
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
-          style={{ marginLeft: 10 }}
-        >
-          <option value="ADMIN">ADMIN</option>
-          <option value="WAITER">WAITER</option>
-          <option value="KITCHEN">KITCHEN</option>
-          <option value="CASHIER">CASHIER</option>
-        </select>
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            style={{ marginLeft: 10 }}
+          >
+            <option value="ADMIN">ADMIN</option>
+            <option value="WAITER">WAITER</option>
+            <option value="KITCHEN">KITCHEN</option>
+            <option value="CASHIER">CASHIER</option>
+          </select>
 
-        <button
-          onClick={saveUser}
-          style={{ marginLeft: 10 }}
-        >
-          {editingId ? "Actualizar" : "Crear"}
-        </button>
+          <button
+            onClick={saveUser}
+            style={{ marginLeft: 10 }}
+          >
+            {editingId ? "Actualizar" : "Crear"}
+          </button>
 
-      </div>
+        </div>
 
-      <table border={1} cellPadding={10} style={{ borderCollapse: "collapse" }}>
-        <thead>
-          <tr>
-            <th>Usuario</th>
-            <th>Rol</th>
-            <th>Activo</th>
-            <th></th>
-          </tr>
-        </thead>
+        <DataTable>
 
-        <tbody>
-          {users.map(u => (
-            <tr key={u.id}>
-
-              <td>{u.username}</td>
-
-              <td>{u.role}</td>
-
-              <td>{u.active ? "✔" : "❌"}</td>
-
-              <td>
-
-                <button
-                  onClick={() => editUser(u)}
-                >
-                  Editar
-                </button>
-
-                <button
-                  onClick={() => toggleUser(u.id)}
-                  style={{ marginLeft: 10 }}
-                >
-                  Activar / Desactivar
-                </button>
-
-              </td>
-
+          <thead>
+            <tr>
+              <th>Usuario</th>
+              <th>Rol</th>
+              <th>Activo</th>
+              <th style={{ width: 220 }}>Acciones</th>
             </tr>
-          ))}
-        </tbody>
+          </thead>
 
-      </table>
+          <tbody>
 
-    </div>
+            {users.map(u => (
+              <tr key={u.id}>
+
+                <td>{u.username}</td>
+
+                <td>{u.role}</td>
+
+                <td>{u.active ? "✔" : "❌"}</td>
+
+                <td>
+
+                  <button onClick={() => editUser(u)}>
+                    Editar
+                  </button>
+
+                  <button
+                    onClick={() => toggleUser(u.id)}
+                    style={{ marginLeft: 10 }}
+                  >
+                    Activar / Desactivar
+                  </button>
+
+                </td>
+
+              </tr>
+            ))}
+
+          </tbody>
+
+        </DataTable>
+
+      </Card>
+
+    </Page>
   )
 }

@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react"
 import { API_URL, getAuthHeaders } from "../api"
+
+import Page from "../components/Page"
+import Card from "../components/Card"
+import DataTable from "../components/DataTable"
+
 import ProductForm from "../components/ProductForm"
 
 interface Product {
@@ -32,10 +37,12 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [showForm, setShowForm] = useState(false)
 
+  const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({})
+
   const fetchProducts = async () => {
 
     const res = await fetch(
-      `${API_URL}/products`,
+      `${API_URL}/products/`,
       { headers: getAuthHeaders() }
     )
 
@@ -46,7 +53,7 @@ export default function ProductsPage() {
   const fetchCategories = async () => {
 
     const res = await fetch(
-      `${API_URL}/categories`,
+      `${API_URL}/categories/`,
       { headers: getAuthHeaders() }
     )
 
@@ -57,7 +64,7 @@ export default function ProductsPage() {
   const fetchStations = async () => {
 
     const res = await fetch(
-      `${API_URL}/stations`,
+      `${API_URL}/stations/`,
       { headers: getAuthHeaders() }
     )
 
@@ -77,7 +84,7 @@ export default function ProductsPage() {
 
     const url = product.id
       ? `${API_URL}/products/${product.id}`
-      : `${API_URL}/products`
+      : `${API_URL}/products/`
 
     await fetch(url, {
       method,
@@ -107,89 +114,137 @@ export default function ProductsPage() {
     fetchProducts()
   }
 
+  const groupedProducts = products.reduce((acc: any, p) => {
+    const cat = p.category?.name || "Sin categoría"
+
+    if (!acc[cat]) acc[cat] = []
+
+    acc[cat].push(p)
+
+    return acc
+  }, {})
+
+  const toggleCategory = (cat: string) => {
+    setOpenCategories(prev => ({
+      ...prev,
+      [cat]: !prev[cat]
+    }))
+  }
+
   return (
-    <div style={{ padding: 40 }}>
+    <Page title="Productos">
 
-      <h1>Productos</h1>
+      <Card>
 
-      <button
-        onClick={() => {
-          setEditingProduct(null)
-          setShowForm(true)
-        }}
-        style={{ marginBottom: 20 }}
-      >
-        + Nuevo producto
-      </button>
-
-      {showForm && (
-        <ProductForm
-          product={editingProduct}
-          categories={categories}
-          stations={stations}
-          onSave={saveProduct}
-          onCancel={() => {
-            setShowForm(false)
+        <button
+          onClick={() => {
             setEditingProduct(null)
+            setShowForm(true)
           }}
-        />
-      )}
+          style={{ marginBottom: 20 }}
+        >
+          + Nuevo producto
+        </button>
 
-      <table border={1} cellPadding={10} style={{ borderCollapse: "collapse" }}>
+        {showForm && (
+          <ProductForm
+            product={editingProduct}
+            categories={categories}
+            stations={stations}
+            onSave={saveProduct}
+            onCancel={() => {
+              setShowForm(false)
+              setEditingProduct(null)
+            }}
+          />
+        )}
 
-        <thead>
-          <tr>
-            <th>Nombre</th>
-            <th>Precio</th>
-            <th>Categoría</th>
-            <th>Estación</th>
-            <th>Activo</th>
-            <th></th>
-          </tr>
-        </thead>
+        <DataTable>
 
-        <tbody>
-
-          {products.map(p => (
-            <tr key={p.id}>
-
-              <td>{p.name}</td>
-
-              <td>${p.price}</td>
-
-              <td>{p.category?.name || "-"}</td>
-
-              <td>{p.station?.name || "-"}</td>
-
-              <td>{p.active ? "✔" : "❌"}</td>
-
-              <td>
-
-                <button
-                  onClick={() => {
-                    setEditingProduct(p)
-                    setShowForm(true)
-                  }}
-                >
-                  Editar
-                </button>
-
-                <button
-                  onClick={() => toggleActive(p.id)}
-                  style={{ marginLeft: 10 }}
-                >
-                  Activar / Desactivar
-                </button>
-
-              </td>
-
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Precio</th>
+              <th>Categoría</th>
+              <th>Estación</th>
+              <th>Activo</th>
+              <th style={{ width: 220 }}>Acciones</th>
             </tr>
-          ))}
+          </thead>
 
-        </tbody>
+          <tbody>
 
-      </table>
+          {Object.entries(groupedProducts)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([categoryName, items]: any) => (
 
-    </div>
+              <>
+                {/* HEADER CATEGORÍA */}
+
+                <tr
+                  style={{
+                    background: "#e9e9e9",
+                    cursor: "pointer"
+                  }}
+                  onClick={() => toggleCategory(categoryName)}
+                >
+                  <td colSpan={6} style={{ fontWeight: "bold" }}>
+                    {openCategories[categoryName] ? "▼" : "▶"} {categoryName}
+                  </td>
+                </tr>
+
+                {/* PRODUCTOS */}
+
+                {openCategories[categoryName] &&
+                  items
+                    .sort((a: any, b: any) => a.name.localeCompare(b.name))
+                    .map((p: any) => (
+
+                      <tr key={p.id}>
+
+                        <td>{p.name}</td>
+
+                        <td>${p.price}</td>
+
+                        <td>{p.category?.name || "-"}</td>
+
+                        <td>{p.station?.name || "-"}</td>
+
+                        <td>{p.active ? "✔" : "❌"}</td>
+
+                        <td>
+
+                          <button
+                            onClick={() => {
+                              setEditingProduct(p)
+                              setShowForm(true)
+                            }}
+                          >
+                            Editar
+                          </button>
+
+                          <button
+                            onClick={() => toggleActive(p.id)}
+                            style={{ marginLeft: 10 }}
+                          >
+                            Activar / Desactivar
+                          </button>
+
+                        </td>
+
+                      </tr>
+
+                    ))}
+
+              </>
+            ))}
+
+          </tbody>
+
+        </DataTable>
+
+      </Card>
+
+    </Page>
   )
 }

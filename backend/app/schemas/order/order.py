@@ -18,6 +18,7 @@ class OrderOut(BaseSchema):
 
 class WaiterOrderOut(BaseSchema):
     id: int
+    table_id: int
     table_number: int
     status: OrderStatus
     items: list[OrderItemOut]

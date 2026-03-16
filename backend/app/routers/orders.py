@@ -244,6 +244,7 @@ def get_active_orders(
 
         result.append({
             "id": order.id,
+            "table_id": order.table_id,
             "table_number": order.table.number,
             "status": order.status,
             "items": [
@@ -283,6 +284,7 @@ def get_order(
 
     return {
         "id": order.id,
+        "table_id": order.table_id,
         "table_number": order.table.number,
         "status": order.status,
         "items": [

@@ -1,4 +1,4 @@
-import { useParams } from "react-router-dom"
+import { useParams, useNavigate } from "react-router-dom"
 import { useEffect, useState } from "react"
 import { API_URL, getAuthHeaders } from "../api"
 
@@ -18,6 +18,7 @@ interface Payment {
 
 interface Order {
   id: number
+  table_id: number
   table_number: number
   status: string
   items: Item[]
@@ -40,9 +41,11 @@ interface Product {
 }
 
 export default function OrderDetail() {
-  const { orderId } = useParams()
+  const { orderId, tableId } = useParams()
   const id = Number(orderId)
+  const navigate = useNavigate()
 
+  const isNewOrder = !orderId
   const [order, setOrder] = useState<Order | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
   const [openCategory, setOpenCategory] = useState<number | null>(null)
@@ -51,9 +54,11 @@ export default function OrderDetail() {
   const [quantities, setQuantities] = useState<{ [key: number]: number }>({})
 
   useEffect(() => {
-    fetchOrder()
+    if (!isNewOrder) {
+      fetchOrder()
+    }
     fetchCategories()
-  }, [])
+  }, [orderId])
 
   const fetchOrder = async () => {
     const res = await fetch(`${API_URL}/orders/${id}`, {headers: getAuthHeaders()})
@@ -68,16 +73,40 @@ export default function OrderDetail() {
   }
 
   const addProduct = async (productId: number) => {
-    if (order?.status === "CLOSED") return
 
     const quantity = quantities[productId] || 1
 
-    await fetch(`${API_URL}/orders/${id}/items`, {
+    // 🟢 si la orden no existe → crearla
+    if (isNewOrder) {
+
+      const res = await fetch(
+        `${API_URL}/tables/${tableId}/add-product`,
+        {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            product_id: productId,
+            quantity
+          })
+        }
+      )
+
+      const data = await res.json()
+
+      navigate(`/orders/${data.order_id}`)
+
+      return
+    }
+
+    // 🟢 orden normal
+    if (order?.status === "CLOSED") return
+
+    await fetch(`${API_URL}/orders/${orderId}/items`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({
         product_id: productId,
-        quantity: quantity
+        quantity
       })
     })
 
@@ -136,22 +165,29 @@ export default function OrderDetail() {
     fetchOrder()
   }
 
-  if (!order) return <p>Cargando...</p>
+  if (!order && orderId) return <p>Cargando...</p>
+  const o = order!
+  const items = o?.items ?? []
+  const remaining = o?.remaining ?? 0
+  const status = o?.status
+  const total = o?.total ?? 0
+  const total_paid = o?.total_paid ?? 0
+  const payments = o?.payments ?? []
 
   const allDelivered =
-    order.items.length > 0 &&
-    order.items.every(i => i.status === "DELIVERED")
+    items.length > 0 &&
+    items.every(i => i.status === "DELIVERED")
 
   const canClose =
-    order.remaining === 0 &&
+    remaining === 0 &&
     allDelivered &&
-    order.status !== "CLOSED"
+    status !== "CLOSED"
 
   const hasPendingItems =
-    order.items.some(i => i.status === "PENDING")
+    items.some(i => i.status === "PENDING")
 
   const getStatusColor = () => {
-    switch (order.status) {
+    switch (status) {
       case "OPEN": return "green"
       case "SENT": return "orange"
       case "IN_PROGRESS": return "blue"
@@ -201,12 +237,12 @@ export default function OrderDetail() {
 
   return (
     <div style={{ padding: 40, maxWidth: 900 }}>
-      <h1>Orden #{order.id}</h1>
-      <p>Mesa: {order.table_number}</p>
+      <h1>{o ? `Orden #${o.id}` : `Nueva orden - Mesa ${tableId}`}</h1>
+      <p>Mesa: {order?.table_number || tableId}</p>
       <p>
         Estado:{" "}
         <strong style={{ color: getStatusColor() }}>
-          {order.status}
+          {status}
         </strong>
       </p>
 
@@ -214,7 +250,7 @@ export default function OrderDetail() {
       <h2>Items</h2>
 
       <ul style={{ listStyle: "none", padding: 0 }}>
-        {order.items.map((item) => (
+        {items.map((item) => (
           <li
             key={item.id}
             style={{
@@ -305,12 +341,12 @@ export default function OrderDetail() {
           </li>
         ))}
       </ul>
-      <h3>Total: ${order.total.toFixed(2)}</h3>
+      <h3>Total: ${total.toFixed(2)}</h3>
 
       <hr />
 
       {/* ENVIAR A COCINA */}
-      {order.status !== "CLOSED" && hasPendingItems && (
+      {status !== "CLOSED" && hasPendingItems && (
         <div style={{ marginTop: 20 }}>
           <button
             onClick={sendToKitchen}
@@ -331,21 +367,21 @@ export default function OrderDetail() {
       {/* PAGOS */}
       <h2>Pagos</h2>
 
-      {order.payments.length === 0 && <p>No hay pagos registrados</p>}
+      {payments.length === 0 && <p>No hay pagos registrados</p>}
 
       <ul>
-        {order.payments.map(p => (
+        {payments.map(p => (
           <li key={p.id}>
             ${Number(p.amount).toFixed(2)} — {p.method}
           </li>
         ))}
       </ul>
 
-      <p><strong>Total pagado:</strong> ${order.total_paid.toFixed(2)}</p>
-      <p><strong>Saldo pendiente:</strong> ${order.remaining.toFixed(2)}</p>
+      <p><strong>Total pagado:</strong> ${total_paid.toFixed(2)}</p>
+      <p><strong>Saldo pendiente:</strong> ${remaining.toFixed(2)}</p>
 
       {/* FORMULARIO DE PAGO */}
-      {order.status !== "CLOSED" && (
+      {status !== "CLOSED" && (
         <div style={{ marginTop: 20 }}>
           <h3>Registrar Pago</h3>
 

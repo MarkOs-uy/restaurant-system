@@ -1,4 +1,3 @@
-from decimal import Decimal
 from app.models.order_item import OrderItemStatus
 from ..base import BaseSchema
 
@@ -18,3 +17,7 @@ class OrderItemOut(BaseSchema):
     unit_price: float
     subtotal: float
     status: OrderItemStatus
+
+class AddItemRequest(BaseSchema):
+    product_id: int
+    quantity: int = 1

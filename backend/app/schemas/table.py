@@ -12,3 +12,10 @@ class TableOut(BaseSchema):
     status: str
     order_id: int | None
     order_status: OrderStatus | None
+
+class TableCreate(BaseSchema):
+    number: int
+    x: int = 0
+    y: int = 0
+    capacity: int = 4
+    shape: str = "round"
