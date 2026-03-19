@@ -67,3 +67,55 @@ table td {
   padding: 10px;
   border-top: 1px solid #ddd;
 }
+
+/* BASE */
+.btn {
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+/* VARIANTES */
+.btn-primary {
+  background: #2d2d2d;
+  color: white;
+  padding: 8px 14px;
+}
+
+.btn-primary:hover {
+  background: #3c3c3c;
+}
+
+/* BOTONES CHICOS (+ -) */
+.btn-icon {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: #fff;
+  color: #111;
+  border: 1px solid #ccc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* BOTÓN PRODUCTO */
+.btn-product {
+  flex: 1;
+  padding: 8px;
+  border-radius: 6px;
+  background: #2d2d2d;
+  color: white;
+}
+
+.navbar {
+  background: #1e1e1e;
+  color: white;
+}
+
+.navbar span {
+  color: white;
+}

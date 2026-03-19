@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from collections import defaultdict
+from decimal import Decimal
 
 from app.db.session import get_db
 from app.models.order import Order, OrderStatus
@@ -240,7 +241,7 @@ def get_active_orders(
     result = []
 
     for order in orders:
-        total, total_paid, remaining = service.calculate_totals(order)
+        subtotal, total, total_paid, remaining = service.calculate_totals(order)
 
         result.append({
             "id": order.id,
@@ -259,6 +260,8 @@ def get_active_orders(
                 for item in order.items
             ],
             "total": total,
+            "subtotal": subtotal,
+            "discount": float(order.discount or 0),
             "total_paid": total_paid,
             "remaining": remaining
         })
@@ -280,7 +283,7 @@ def get_order(
     except OrderDomainError as e:
         raise HTTPException(404, str(e))
 
-    total, total_paid, remaining = service.calculate_totals(order)
+    subtotal, total, total_paid, remaining = service.calculate_totals(order)
 
     return {
         "id": order.id,
@@ -307,6 +310,8 @@ def get_order(
             for p in order.payments
         ],
         "total": total,
+        "subtotal": subtotal,
+        "discount": float(order.discount or 0),
         "total_paid": total_paid,
         "remaining": remaining
     }
@@ -370,3 +375,37 @@ def update_item_quantity(
     db.commit()
 
     return {"ok": True}
+
+@router.put("/{order_id}/discount")
+def apply_discount(
+    order_id: int,
+    discount: float,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    order = db.query(Order).filter(
+        Order.id == order_id,
+        Order.restaurant_id == user.restaurant_id
+    ).first()
+
+    if not order:
+        raise HTTPException(404, "Order not found")
+
+    if discount < 0:
+        raise HTTPException(400, "Invalid discount")
+    
+    subtotal = sum(
+        item.quantity * item.unit_price
+        for item in order.items
+    )
+
+    if discount > subtotal:
+        raise HTTPException(400, "Discount exceeds total")
+
+    order.discount = Decimal(str(discount))
+
+    db.commit()
+    db.refresh(order)
+
+    return {"message": "Discount applied"}

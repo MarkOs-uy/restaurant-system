@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
+from decimal import Decimal
 
 from app.models.order import Order, OrderStatus
 from app.models.order_item import OrderItemStatus
@@ -25,10 +26,19 @@ class OrderService:
     # -------------------------
 
     def calculate_totals(self, order: Order):
-        total = sum(
+        from decimal import Decimal
+
+        subtotal = sum(
             item.quantity * item.unit_price
             for item in order.items
         )
+
+        discount = order.discount or Decimal("0")
+
+        total = subtotal - discount
+
+        if total < 0:
+            total = Decimal("0")
 
         total_paid = sum(
             payment.amount
@@ -38,6 +48,7 @@ class OrderService:
         remaining = total - total_paid
 
         return (
+            float(subtotal),
             float(total),
             float(total_paid),
             float(remaining)
@@ -106,7 +117,7 @@ class OrderService:
         if order.status == OrderStatus.CLOSED:
             raise OrderDomainError("Order already closed")
 
-        total, total_paid, remaining = self.calculate_totals(order)
+        subtotal, total, total_paid, remaining = self.calculate_totals(order)
 
         if amount > remaining:
             raise OrderDomainError(

@@ -89,7 +89,7 @@ export default function CategoriesPage() {
             onChange={e => setName(e.target.value)}
           />
 
-          <button
+          <button className="btn btn-primary"
             onClick={saveCategory}
             style={{ marginLeft: 10 }}
           >
@@ -116,11 +116,12 @@ export default function CategoriesPage() {
 
                 <td>
 
-                  <button onClick={() => editCategory(c)}>
+                  <button className="btn btn-primary"
+                    onClick={() => editCategory(c)}>
                     Editar
                   </button>
 
-                  <button
+                  <button className="btn btn-primary"
                     onClick={() => deleteCategory(c.id)}
                     style={{ marginLeft: 10 }}
                   >
@@ -128,7 +129,7 @@ export default function CategoriesPage() {
                   </button>
 
                   {editingId && (
-                    <button
+                    <button className="btn btn-primary"
                       onClick={() => {
                         setEditingId(null)
                         setName("")

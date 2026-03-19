@@ -50,8 +50,8 @@ function App() {
       {console.log("RENDER NAVBAR ROLE:", role)}
       {/* NAVBAR DINÁMICO */}
       {role && (
-        <nav style={{ padding: 10, background: "#eee" }}>
-          <span style={{ marginRight: 20 }}>
+        <nav className="navbar" style={{ padding: 10 }}>
+          <span className="navbar span" style={{ marginRight: 20 }}>
             Rol: <strong>{role}</strong>
           </span>
 

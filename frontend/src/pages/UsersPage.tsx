@@ -120,7 +120,7 @@ export default function UsersPage() {
             <option value="CASHIER">CASHIER</option>
           </select>
 
-          <button
+          <button className="btn btn-primary"
             onClick={saveUser}
             style={{ marginLeft: 10 }}
           >
@@ -136,7 +136,7 @@ export default function UsersPage() {
               <th>Usuario</th>
               <th>Rol</th>
               <th>Activo</th>
-              <th style={{ width: 220 }}>Acciones</th>
+              <th style={{ width: 260 }}>Acciones</th>
             </tr>
           </thead>
 
@@ -153,13 +153,14 @@ export default function UsersPage() {
 
                 <td>
 
-                  <button onClick={() => editUser(u)}>
+                  <button className="btn btn-primary"
+                    onClick={() => editUser(u)}>
                     Editar
                   </button>
 
-                  <button
+                  <button className="btn btn-primary"
                     onClick={() => toggleUser(u.id)}
-                    style={{ marginLeft: 10 }}
+                    style={{ marginLeft: 5 }}
                   >
                     Activar / Desactivar
                   </button>

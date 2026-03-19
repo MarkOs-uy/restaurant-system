@@ -87,7 +87,7 @@ export default function StationsPage() {
             onChange={(e) => setName(e.target.value)}
           />
 
-          <button
+          <button className="btn btn-primary"
             onClick={saveStation}
             style={{ marginLeft: 10 }}
           >
@@ -114,11 +114,12 @@ export default function StationsPage() {
 
                 <td>
 
-                  <button onClick={() => editStation(s)}>
+                  <button className="btn btn-primary"
+                    onClick={() => editStation(s)}>
                     Editar
                   </button>
 
-                  <button
+                  <button className="btn btn-primary"
                     onClick={() => toggleStation(s.id)}
                     style={{ marginLeft: 10 }}
                   >

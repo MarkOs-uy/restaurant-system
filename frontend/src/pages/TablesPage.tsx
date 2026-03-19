@@ -11,6 +11,7 @@ interface Table {
   status: string
   order_id?: number | null
   order_status?: string | null
+  capacity: number
 }
 
 export default function TablesPage() {
@@ -70,15 +71,11 @@ export default function TablesPage() {
 
   const getTableColor = (table: Table) => {
 
-    if (!table.order_status) return "#dcdcdc" // libre
-
-    if (table.order_status === "OPEN") return "#f1c40f"
-
-    if (table.order_status === "SENT") return "#e67e22"
-
-    if (table.order_status === "READY") return "#2ecc71"
-
-    if (table.order_status === "PAYING") return "#9b59b6"
+    if (!table.order_status) return "#bdc3c7"   // gris claro (libre)
+    if (table.order_status === "OPEN") return "#f1c40f"   // amarillo
+    if (table.order_status === "SENT") return "#e67e22"   // naranja
+    if (table.order_status === "READY") return "#27ae60"  // verde fuerte
+    if (table.order_status === "PAYING") return "#8e44ad" // violeta
 
     return "#95a5a6"
 
@@ -105,24 +102,27 @@ export default function TablesPage() {
 
   const createTable = async () => {
 
-    const number = tables.length + 1
+    const shape = prompt("Forma: Cuadrada / Circular / Rectangular") || "Circular"
 
     const res = await fetch(`${API_URL}/tables/`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({
-        number,
         x: 50,
         y: 50,
-        shape: "round",
+        shape,
         capacity: 4
       })
     })
 
+    if (!res.ok) {
+      alert("Error creando mesa")
+      return
+    }
+
     const table = await res.json()
 
     setTables(prev => [...prev, table])
-
   }
 
   const deleteTable = async (id: number) => {
@@ -155,6 +155,20 @@ export default function TablesPage() {
         + Mesa
       </button>
 
+      {editMode && (
+        <div style={{
+          background: "#fff3cd",
+          color: "#856404",
+          padding: "8px 12px",
+          borderRadius: 6,
+          marginTop: 10,
+          marginBottom: 10,
+          fontSize: 14
+        }}>
+          🛠 Modo edición activo — arrastrar mesas / click derecho elimina
+        </div>
+      )}
+
       <div
         style={{
           position: "relative",
@@ -164,13 +178,29 @@ export default function TablesPage() {
           borderRadius: 20,
           border: "2px solid #ddd",
           overflow: "hidden",
-          margin: "0 auto"
+          margin: "0 auto",
+          backgroundImage: `
+            linear-gradient(#ddd 1px, transparent 1px),
+            linear-gradient(90deg, #ddd 1px, transparent 1px)
+          `,
+          backgroundSize: "40px 40px",
         }}
       >
 
         {tables.map(t => {
 
-          const borderRadius = t.shape === "square" ? "12px" : "50%"
+          const size = 60 + (t.capacity || 4) * 10
+          let borderRadius = "12px"
+          let width = size
+          let height = size
+
+          if (t.shape === "Circular") {
+            borderRadius = "50%"
+          }
+
+          if (t.shape === "Rectangular") {
+            width = size * 1.4
+          }
 
           return (
 
@@ -178,6 +208,15 @@ export default function TablesPage() {
               key={t.id}
 
               onClick={() => !editMode && touchTable(t.id)}
+
+              onMouseEnter={(e) => {
+                if (editMode) return
+                e.currentTarget.style.transform = "scale(1.05)"
+              }}
+
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "scale(1)"
+              }}
 
               onMouseDown={() => {
                 if (!editMode) return
@@ -200,8 +239,8 @@ export default function TablesPage() {
 
                 const rect = e.currentTarget.parentElement!.getBoundingClientRect()
 
-                let x = e.clientX - rect.left - TABLE_SIZE / 2
-                let y = e.clientY - rect.top - TABLE_SIZE / 2
+                let x = Math.round(e.clientX - rect.left - TABLE_SIZE / 2)
+                let y = Math.round(e.clientY - rect.top - TABLE_SIZE / 2)
 
                 x = Math.max(0, Math.min(FLOOR_WIDTH - TABLE_SIZE, x))
                 y = Math.max(0, Math.min(FLOOR_HEIGHT - TABLE_SIZE, y))
@@ -224,8 +263,8 @@ export default function TablesPage() {
                 position: "absolute",
                 left: t.x,
                 top: t.y,
-                width: TABLE_SIZE,
-                height: TABLE_SIZE,
+                width,
+                height,
                 borderRadius,
                 background: getTableColor(t),
                 display: "flex",
@@ -233,13 +272,24 @@ export default function TablesPage() {
                 justifyContent: "center",
                 fontSize: 22,
                 fontWeight: "bold",
-                cursor: editMode ? "grab" : "pointer",
+                cursor: dragging === t.id ? "grabbing" : editMode ? "grab" : "pointer",
                 boxShadow: "0 4px 10px rgba(0,0,0,0.2)",
-                userSelect: "none"
+                userSelect: "none",
+                transition: "0.1s"
               }}
 
             >
-              {t.number}
+                <div style={{ textAlign: "center", color: "#fff" }}>
+                  <div style={{ fontSize: 18, fontWeight: "bold" }}>
+                    {t.number}
+                  </div>
+
+                  {t.order_status && (
+                    <div style={{ fontSize: 10 }}>
+                      {t.order_status}
+                    </div>
+                  )}
+                </div>
             </div>
 
           )

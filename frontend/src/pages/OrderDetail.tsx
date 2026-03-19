@@ -22,10 +22,12 @@ interface Order {
   table_number: number
   status: string
   items: Item[]
+  subtotal: number
   payments: Payment[]
   total: number
   total_paid: number
   remaining: number
+  discount: number
 }
 
 interface Category {
@@ -52,6 +54,8 @@ export default function OrderDetail() {
   const [paymentAmount, setPaymentAmount] = useState("")
   const [paymentMethod, setPaymentMethod] = useState("CASH")
   const [quantities, setQuantities] = useState<{ [key: number]: number }>({})
+  const [discount, setDiscount] = useState("")
+  const [discountType, setDiscountType] = useState<"amount" | "percent">("amount")
 
   useEffect(() => {
     if (!isNewOrder) {
@@ -171,6 +175,7 @@ export default function OrderDetail() {
   const remaining = o?.remaining ?? 0
   const status = o?.status
   const total = o?.total ?? 0
+  const subtotal = o?.subtotal ?? 0
   const total_paid = o?.total_paid ?? 0
   const payments = o?.payments ?? []
 
@@ -235,6 +240,34 @@ export default function OrderDetail() {
     fetchOrder()
   }
 
+  const applyDiscount = async () => {
+    if (!discount) return
+
+    let finalDiscount = Number(discount)
+
+    if (discountType === "percent") {
+      finalDiscount = (o.subtotal * finalDiscount) / 100
+    }
+
+    const res = await fetch(
+      `${API_URL}/orders/${id}/discount?discount=${finalDiscount}`,
+      {
+        method: "PUT",
+        headers: getAuthHeaders()
+      }
+    )
+
+    if (!res.ok) {
+      const error = await res.json()
+      alert(error.detail)
+      return
+    }
+
+    setDiscount("")
+    fetchOrder()
+  }
+
+
   return (
     <div style={{ padding: 40, maxWidth: 900 }}>
       <h1>{o ? `Orden #${o.id}` : `Nueva orden - Mesa ${tableId}`}</h1>
@@ -267,44 +300,16 @@ export default function OrderDetail() {
 
             {item.status === "PENDING" && (
               <>
-                <button
+                <button className="btn btn-icon"
                   onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                  style={{
-                    width: 26,
-                    height: 26,
-                    borderRadius: 6,
-                    border: "1px solid #ccc",
-                    background: "white",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 16,
-                    lineHeight: 1,
-                    padding: 0
-                  }}
                 >
                   −
                 </button>
 
                 <strong>{item.quantity}</strong>
 
-                <button
+                <button className="btn btn-icon"
                   onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                  style={{
-                    width: 26,
-                    height: 26,
-                    borderRadius: 6,
-                    border: "1px solid #ccc",
-                    background: "white",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 16,
-                    lineHeight: 1,
-                    padding: 0
-                  }}
                 >
                   +
                 </button>
@@ -341,9 +346,24 @@ export default function OrderDetail() {
           </li>
         ))}
       </ul>
-      <h3>Total: ${total.toFixed(2)}</h3>
+      
+      <div style={{
+        background: "#fff",
+        color: "#111",
+        padding: 15,
+        borderRadius: 8,
+        marginTop: 10
+      }}>
+        <p>Subtotal: ${subtotal.toFixed(2)}</p>
 
-      <hr />
+        {o.discount > 0 && (
+          <p style={{ color: "red" }}>
+            Descuento: -${o.discount.toFixed(2)}
+          </p>
+        )}
+
+        <h3>Total: ${total.toFixed(2)}</h3>
+      </div>
 
       {/* ENVIAR A COCINA */}
       {status !== "CLOSED" && hasPendingItems && (
@@ -363,6 +383,36 @@ export default function OrderDetail() {
       )}
 
       <hr />
+
+      <hr />
+
+      <h2>Descuento</h2>
+
+      <select
+        value={discountType}
+        onChange={(e) => setDiscountType(e.target.value as "amount" | "percent")}
+        style={{ marginRight: 10, padding: 5 }}
+      >
+        <option value="amount">Monto</option>
+        <option value="percent">%</option>
+      </select>
+
+      <input
+        type="number"
+        placeholder="Monto descuento"
+        value={discount}
+        onChange={(e) => setDiscount(e.target.value)}
+        style={{ marginRight: 10, padding: 5 }}
+      />
+
+      <button className="btn btn-primary"
+        onClick={applyDiscount}
+        style={{ padding: 8, borderRadius: 6 }}
+      >
+        Aplicar Descuento
+      </button>
+
+
 
       {/* PAGOS */}
       <h2>Pagos</h2>
@@ -403,12 +453,8 @@ export default function OrderDetail() {
             <option value="TRANSFER">Transferencia</option>
           </select>
 
-          <button
+          <button className="btn btn-primary"
             onClick={registerPayment}
-            style={{
-              padding: 8,
-              borderRadius: 6
-            }}
           >
             Agregar Pago
           </button>
@@ -422,7 +468,7 @@ export default function OrderDetail() {
             ✔ Orden pagada y entregada. Puede cerrarse.
           </p>
 
-          <button
+          <button 
             onClick={closeOrder}
             style={{
               padding: 10,
@@ -453,6 +499,7 @@ export default function OrderDetail() {
               cursor: "pointer",
               fontWeight: "bold",
               background: "#eee",
+              color: "#111",
               padding: 10,
               borderRadius: 6
             }}
@@ -472,18 +519,13 @@ export default function OrderDetail() {
                   }}
                 >
 
-                  <button
+                  <button className="btn btn-product"
                     onClick={() => addProduct(p.id)}
-                    style={{
-                      flex: 1,
-                      padding: 8,
-                      borderRadius: 6
-                    }}
                   >
                     {p.name} - ${p.price}
                   </button>
 
-                  <button
+                  <button className="btn btn-primary"
                     onClick={() =>
                       setQuantities({
                         ...quantities,
@@ -496,7 +538,7 @@ export default function OrderDetail() {
 
                   <strong>{quantities[p.id] || 1}</strong>
 
-                  <button
+                  <button className="btn btn-primary"
                     onClick={() =>
                       setQuantities({
                         ...quantities,

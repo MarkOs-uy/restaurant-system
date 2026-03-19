@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func
 
 from app.db.session import get_db
 from app.models import Table
@@ -15,50 +16,7 @@ from app.dependencies.auth import get_current_user
 
 router = APIRouter(prefix="/tables", tags=["tables"])
 
-'''
-@router.post("/{table_id}/touch")
-def touch_table(
-    table_id: int,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
 
-    table = db.query(Table).filter(
-        Table.id == table_id,
-        Table.restaurant_id == user.restaurant_id,
-        Table.active == True
-    ).first()
-
-    if not table:
-        raise HTTPException(status_code=404, detail="Table not found")
-
-    # 🔴 MODIFICADO → ahora también excluye CANCELLED
-    order = db.query(Order).filter(
-        Order.table_id == table_id,
-        Order.restaurant_id == user.restaurant_id,
-        Order.status.notin_([
-            OrderStatus.CLOSED,
-            OrderStatus.CANCELLED
-        ])
-    ).first()
-
-    # si no existe → crearlo
-    if not order:
-        order = Order(
-            table_id=table_id,
-            restaurant_id=table.restaurant_id,
-            status=OrderStatus.OPEN  # 🟢 AGREGADO explícito
-        )
-        db.add(order)
-        db.commit()
-        db.refresh(order)
-
-    return {
-        "order_id": order.id,
-        "table_number": table.number,
-        "status": order.status
-    }
-'''
 @router.post("/{table_id}/touch")
 def touch_table(
     table_id: int,
@@ -185,6 +143,7 @@ def list_tables(
                 "number": table.number,
                 "x": table.x,
                 "y": table.y,
+                "capacity": table.capacity,
                 "shape": table.shape,
                 "status": "ocupada",
                 "order_id": active_order.id,
@@ -211,9 +170,15 @@ def create_table(
     user: User = Depends(get_current_user)
 ):
 
+    max_number = db.query(func.max(Table.number)).filter(
+        Table.restaurant_id == user.restaurant_id
+    ).scalar()
+
+    new_number = (max_number or 0) + 1
+
     table = Table(
         restaurant_id=user.restaurant_id,
-        number=table_in.number,
+        number=new_number,
         x=table_in.x,
         y=table_in.y,
         capacity=table_in.capacity,

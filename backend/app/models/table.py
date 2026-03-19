@@ -33,7 +33,7 @@ class Table(Base):
 
     capacity = Column(Integer, default=4, nullable=False)
 
-    shape = Column(String, default="round")
+    shape = Column(String, default="Circular")
 
     external_id = Column(
         String,

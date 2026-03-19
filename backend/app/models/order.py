@@ -1,6 +1,6 @@
 import enum
 import uuid
-from sqlalchemy import Column, Integer, ForeignKey, String, DateTime, Enum, Index
+from sqlalchemy import Column, Integer, Numeric, ForeignKey, String, DateTime, Enum, Index
 from sqlalchemy.sql import func
 from app.db.base_class import Base
 from sqlalchemy.orm import relationship
@@ -34,6 +34,7 @@ class Order(Base):
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     closed_at = Column(DateTime, nullable=True)
+    discount = Column(Numeric(10, 2), nullable=False, default=0)
     external_id = Column(
         String,
         unique=True,

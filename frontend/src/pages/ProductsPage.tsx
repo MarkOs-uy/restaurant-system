@@ -136,7 +136,7 @@ export default function ProductsPage() {
 
       <Card>
 
-        <button
+        <button className="btn btn-primary"
           onClick={() => {
             setEditingProduct(null)
             setShowForm(true)
@@ -168,7 +168,7 @@ export default function ProductsPage() {
               <th>Categoría</th>
               <th>Estación</th>
               <th>Activo</th>
-              <th style={{ width: 220 }}>Acciones</th>
+              <th style={{ width: 300 }}>Acciones</th>
             </tr>
           </thead>
 
@@ -214,7 +214,7 @@ export default function ProductsPage() {
 
                         <td>
 
-                          <button
+                          <button className="btn btn-primary"
                             onClick={() => {
                               setEditingProduct(p)
                               setShowForm(true)
@@ -223,7 +223,7 @@ export default function ProductsPage() {
                             Editar
                           </button>
 
-                          <button
+                          <button className="btn btn-primary"
                             onClick={() => toggleActive(p.id)}
                             style={{ marginLeft: 10 }}
                           >
