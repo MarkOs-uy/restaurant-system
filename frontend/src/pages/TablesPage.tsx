@@ -9,12 +9,13 @@ interface Table {
   y: number
   shape: string
   status: string
+  active: boolean
   order_id?: number | null
   order_status?: string | null
   capacity: number
 }
 
-export default function TablesPage() {
+export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
 
   const [tables, setTables] = useState<Table[]>([])
   const [loading, setLoading] = useState(true)
@@ -23,6 +24,18 @@ export default function TablesPage() {
 
   const [editMode, setEditMode] = useState(false)
   const [dragging, setDragging] = useState<number | null>(null)
+
+  const [newTableForm, setNewTableForm] = useState({
+    shape: "circle",
+    capacity: 4
+  })
+
+  const [showForm, setShowForm] = useState(false)
+
+  const [layout, setLayout] = useState({
+    width: 900,
+    height: 500
+  })
 
   const TABLE_SIZE = 100
   const FLOOR_WIDTH = 900
@@ -102,16 +115,14 @@ export default function TablesPage() {
 
   const createTable = async () => {
 
-    const shape = prompt("Forma: Cuadrada / Circular / Rectangular") || "Circular"
-
     const res = await fetch(`${API_URL}/tables/`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({
         x: 50,
         y: 50,
-        shape,
-        capacity: 4
+        shape: newTableForm.shape,
+        capacity: newTableForm.capacity
       })
     })
 
@@ -123,6 +134,7 @@ export default function TablesPage() {
     const table = await res.json()
 
     setTables(prev => [...prev, table])
+    setShowForm(false)
   }
 
   const deleteTable = async (id: number) => {
@@ -135,6 +147,17 @@ export default function TablesPage() {
     setTables(prev => prev.filter(t => t.id !== id))
 
   }
+
+  const activateTable = async (id: number) => {
+    await fetch(`${API_URL}/tables/${id}/activate`, {
+      method: "PATCH",
+      headers: getAuthHeaders()
+    })
+
+    loadTables()
+  }
+
+  const inactiveTables = tables.filter(t => !t.active)
 
   if (loading) {
     return <p>Cargando mesas...</p>
@@ -151,8 +174,12 @@ export default function TablesPage() {
         {editMode ? "Salir edición" : "Editar plano"}
       </button>
 
-      <button onClick={createTable}>
+      <button onClick={() => setShowForm(true)}>
         + Mesa
+      </button>
+
+      <button onClick={() => navigate("/tables/manage")}>
+        Administrar mesas
       </button>
 
       {editMode && (
@@ -169,11 +196,51 @@ export default function TablesPage() {
         </div>
       )}
 
+      {showForm && (
+        <div style={{
+          background: "#fff",
+          padding: 15,
+          borderRadius: 8,
+          marginBottom: 10,
+          color: "#111"
+        }}>
+          <h3>Nueva mesa</h3>
+
+          <select
+            value={newTableForm.shape}
+            onChange={(e) =>
+              setNewTableForm({ ...newTableForm, shape: e.target.value })
+            }
+          >
+            <option value="circle">Redonda</option>
+            <option value="square">Cuadrada</option>
+            <option value="rectangle">Rectangular</option>
+          </select>
+
+          <input
+            type="number"
+            value={newTableForm.capacity}
+            onChange={(e) =>
+              setNewTableForm({ ...newTableForm, capacity: Number(e.target.value) })
+            }
+            style={{ marginLeft: 10 }}
+          />
+
+          <button onClick={createTable} style={{ marginLeft: 10 }}>
+            Crear
+          </button>
+
+          <button onClick={() => setShowForm(false)} style={{ marginLeft: 10 }}>
+            Cancelar
+          </button>
+        </div>
+      )}
+
       <div
         style={{
           position: "relative",
-          width: FLOOR_WIDTH,
-          height: FLOOR_HEIGHT,
+          width: layout.width,
+          height: layout.height,
           background: "#f5f5f5",
           borderRadius: 20,
           border: "2px solid #ddd",
@@ -297,6 +364,22 @@ export default function TablesPage() {
         })}
 
       </div>
+
+      {isAdmin && inactiveTables.length > 0 && (
+        <div style={{ marginTop: 30 }}>
+          <h3>Mesas inactivas</h3>
+
+          {inactiveTables.map(t => (
+            <div key={t.id}>
+              Mesa {t.number}
+
+              <button onClick={() => activateTable(t.id)}>
+                Reactivar
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
     </div>
 

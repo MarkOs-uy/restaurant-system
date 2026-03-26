@@ -9,4 +9,3 @@ class BaseSchema(BaseModel):
 
 class TimestampSchema(BaseSchema):
     created_at: datetime
-    updated_at: datetime

@@ -1,5 +1,5 @@
 # 📊 Project Summary
-Generated: 2026-03-18 15:16:07.810475
+Generated: 2026-03-24 10:32:23.995651
 
 ## 📁 Estructura del proyecto
 
@@ -10,8 +10,11 @@ Generated: 2026-03-18 15:16:07.810475
     - alembic/
       - env.py
       - versions/
+        - 0d21e3868b2f_add_draft_status_to_orderstatus.py
         - 50f5f9de1220_add_table_shape.py
         - 530c9b9f2a9f_initial_schema.py
+        - 5aa86605f254_add_discount_to_orders.py
+        - 7b0b567ffe9e_add_discount_to_orders.py
         - 9607a137eec7_add_password_to_user.py
         - b30663f913d9_add_cash_register_audit_fields.py
         - fa7705341950_add_table_coordinates.py
@@ -78,6 +81,7 @@ Generated: 2026-03-18 15:16:07.810475
           - payment.py
       - websocket/
         - manager.py
+        - ws.py
   - backups/
     - daily/
     - last/
@@ -329,6 +333,54 @@ else:
 
 ---
 
+### .\backend\alembic\versions\0d21e3868b2f_add_draft_status_to_orderstatus.py
+
+**Funciones (2):**
+- upgrade
+- downgrade
+
+**Clases (0):**
+
+**Imports (4):**
+- typing.Sequence
+- typing.Union
+- alembic.op
+- sqlalchemy
+
+```python
+"""add draft status to orderstatus
+
+Revision ID: 0d21e3868b2f
+Revises: 5aa86605f254
+Create Date: 2026-03-22 15:34:58.319184
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+
+
+# revision identifiers, used by Alembic.
+revision: str = '0d21e3868b2f'
+down_revision: Union[str, Sequence[str], None] = '5aa86605f254'
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    op.execute("ALTER TYPE orderstatus ADD VALUE 'DRAFT'")
+    pass
+
+
+def downgrade() -> None:
+    """Downgrade schema."""
+    pass
+
+```
+
+---
+
 ### .\backend\alembic\versions\50f5f9de1220_add_table_shape.py
 
 **Funciones (2):**
@@ -567,6 +619,105 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_restaurants_external_id'), table_name='restaurants')
     op.drop_table('restaurants')
     # ### end Alembic commands ###
+
+```
+
+---
+
+### .\backend\alembic\versions\5aa86605f254_add_discount_to_orders.py
+
+**Funciones (2):**
+- upgrade
+- downgrade
+
+**Clases (0):**
+
+**Imports (4):**
+- typing.Sequence
+- typing.Union
+- alembic.op
+- sqlalchemy
+
+```python
+"""add discount to orders
+
+Revision ID: 5aa86605f254
+Revises: 7b0b567ffe9e
+Create Date: 2026-03-18 18:02:40.042295
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+
+
+# revision identifiers, used by Alembic.
+revision: str = '5aa86605f254'
+down_revision: Union[str, Sequence[str], None] = '7b0b567ffe9e'
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    op.add_column(
+        'orders',
+        sa.Column('discount', sa.Numeric(10, 2), nullable=False, server_default="0")
+    )
+    
+    op.alter_column('orders', 'discount', server_default=None)
+
+
+def downgrade() -> None:
+    op.drop_column('orders', 'discount')
+
+```
+
+---
+
+### .\backend\alembic\versions\7b0b567ffe9e_add_discount_to_orders.py
+
+**Funciones (2):**
+- upgrade
+- downgrade
+
+**Clases (0):**
+
+**Imports (4):**
+- typing.Sequence
+- typing.Union
+- alembic.op
+- sqlalchemy
+
+```python
+"""add discount to orders
+
+Revision ID: 7b0b567ffe9e
+Revises: 50f5f9de1220
+Create Date: 2026-03-18 18:02:00.580785
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+
+
+# revision identifiers, used by Alembic.
+revision: str = '7b0b567ffe9e'
+down_revision: Union[str, Sequence[str], None] = '50f5f9de1220'
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    """Upgrade schema."""
+    pass
+
+
+def downgrade() -> None:
+    """Downgrade schema."""
+    pass
 
 ```
 
@@ -812,7 +963,7 @@ def downgrade() -> None:
 - app.routers.stations
 - app.routers.auth
 - app.routers.users
-- app.routers.ws_kitchen
+- app.websocket.ws
 - app.routers.kitchen.router
 - fastapi.middleware.cors.CORSMiddleware
 
@@ -830,7 +981,8 @@ from app.seed import seed_tables
 
 from app import models
 
-from app.routers import tables, orders, products, cash_register, category, order_items, stations, auth, users, ws_kitchen
+from app.routers import tables, orders, products, cash_register, category, order_items, stations, auth, users
+from app.websocket import ws
 from app.routers.kitchen import router as kitchen_router
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -861,7 +1013,7 @@ app.include_router(products.router, prefix="/api")
 app.include_router(stations.router, prefix="/api")
 app.include_router(tables.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
-app.include_router(ws_kitchen.router)
+app.include_router(ws.router)
 @app.get("/")
 def root():
     return {"status": "running"}
@@ -1232,15 +1384,16 @@ def get_current_restaurant(
 
 **Clases (0):**
 
-**Imports (5):**
+**Imports (6):**
 - datetime.datetime
 - datetime.timedelta
+- datetime.timezone
 - jose.JWTError
 - jose.jwt
 - passlib.context.CryptContext
 
 ```python
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
@@ -1264,7 +1417,7 @@ def verify_password(plain_password: str, hashed_password: str):
 # 🎟 Create JWT
 def create_access_token(data: dict):
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(
+    expire = datetime.now(timezone.utc) + timedelta(
         minutes=ACCESS_TOKEN_EXPIRE_MINUTES
     )
     to_encode.update({"exp": expire})
@@ -1461,46 +1614,123 @@ def get_current_user(
 **Clases (1):**
 - OrderItemDomainError
 
-**Imports (6):**
+**Imports (10):**
 - app.models.order_item.OrderItem
 - app.models.order_item.OrderItemStatus
 - app.models.user.User
 - app.models.user.UserRole
 - app.models.order.OrderStatus
 - app.domain.order_item_transitions.can_transition
+- app.domain.order_service.OrderService
+- app.websocket.manager.manager
+- asyncio
+- asyncio
 
 ```python
 from app.models.order_item import OrderItem, OrderItemStatus
 from app.models.user import User, UserRole
 from app.models.order import OrderStatus
 from app.domain.order_item_transitions import can_transition
-
+from app.domain.order_service import OrderService
+from app.websocket.manager import manager
+import asyncio
 
 class OrderItemDomainError(Exception):
     pass
 
 
-def change_item_status(item: OrderItem, new_status: OrderItemStatus, user: User):
+def change_item_status(
+    item: OrderItem,
+    new_status: OrderItemStatus,
+    user: User,
+    order_service: OrderService
+):
 
-    if item.order.status == OrderStatus.CLOSED:
-        raise OrderItemDomainError("Cannot modify items of closed order")
+    order = item.order
+
+    if order.status == OrderStatus.CLOSED:
+        raise OrderItemDomainError("No se pueden modificar items en una orden cerrada")
 
     # 🔐 reglas por rol
     if new_status == OrderItemStatus.IN_PROGRESS and user.role != UserRole.KITCHEN:
-        raise OrderItemDomainError("Only kitchen can start items")
+        raise OrderItemDomainError("Sólo COCINA COMIENZA items")
 
     if new_status == OrderItemStatus.READY and user.role != UserRole.KITCHEN:
-        raise OrderItemDomainError("Only kitchen can mark ready")
+        raise OrderItemDomainError("Sólo COCINA marca como LISTO")
 
     if new_status == OrderItemStatus.DELIVERED and user.role != UserRole.WAITER:
-        raise OrderItemDomainError("Only waiter can deliver")
+        raise OrderItemDomainError("Sólo MOZO puede ENTREGAR")
 
     if not can_transition(item.status, new_status):
         raise OrderItemDomainError(
-            f"Invalid transition from {item.status.value} to {new_status.value}"
+            f"Transición inválida desde {item.status.value} a {new_status.value}"
         )
 
+    # 🔄 cambiar estado del item
     item.status = new_status
+
+    # =========================
+    # 🔥 SINCRONIZAR ORDEN
+    # =========================
+
+    items = (
+        order_service.db.query(OrderItem)
+        .filter(OrderItem.order_id == order.id)
+        .all()
+    )
+
+    # 👉 PRIORIDAD 1
+    if any(i.status == OrderItemStatus.IN_PROGRESS for i in items):
+        if order.status != OrderStatus.IN_PROGRESS:
+            order_service.update_status(order, OrderStatus.IN_PROGRESS)
+
+    # 👉 PRIORIDAD 2
+    elif items and all(
+        i.status in [OrderItemStatus.READY, OrderItemStatus.DELIVERED]
+        for i in items
+    ):
+        if order.status != OrderStatus.READY:
+            order_service.update_status(order, OrderStatus.READY)
+
+    # 👉 PRIORIDAD 3
+    elif any(i.status == OrderItemStatus.SENT for i in items):
+        if order.status != OrderStatus.SENT:
+            order_service.update_status(order, OrderStatus.SENT)
+
+    # 👉 PRIORIDAD 4
+    elif items:
+        if order.status != OrderStatus.OPEN:
+            order_service.update_status(order, OrderStatus.OPEN)
+
+    # =========================
+    # 🔔 EVENTO GLOBAL
+    # =========================
+
+    import asyncio
+
+    # 👉 avisar a cocina (por estación)
+    asyncio.create_task(
+        manager.send_to_station(
+            order.restaurant_id,
+            item.product.station_id,
+            {
+                "type": "ORDER_UPDATED",
+                "order_id": order.id
+            }
+        )
+    )
+
+    # 👉 avisar a mozos
+    asyncio.create_task(
+        manager.send_to_role(
+            order.restaurant_id,
+            user.role,
+            {
+                "type": "ORDER_UPDATED",
+                "order_id": order.id
+            }
+        )
+    )
 ```
 
 ---
@@ -1568,31 +1798,37 @@ def allowed_transitions(status: OrderItemStatus) -> list[OrderItemStatus]:
 - OrderDomainError
 - OrderService
 
-**Imports (10):**
+**Imports (15):**
 - sqlalchemy.orm.Session
 - sqlalchemy.orm.joinedload
 - sqlalchemy.func
+- decimal.Decimal
 - app.models.order.Order
 - app.models.order.OrderStatus
 - app.models.order_item.OrderItemStatus
+- app.models.user.UserRole
 - app.models.payment.Payment
-- app.models.user.User
+- app.websocket.manager.manager
 - app.models.order_item.OrderItem
 - app.domain.order_transitions.is_valid_order_transition
+- asyncio
+- decimal.Decimal
+- asyncio
 
 ```python
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
+from decimal import Decimal
 
 from app.models.order import Order, OrderStatus
 from app.models.order_item import OrderItemStatus
+from app.models.user import UserRole
 from app.models.payment import Payment
-from app.models.user import User
+from app.websocket.manager import manager
 from app.models.order_item import OrderItem
 
-
 from app.domain.order_transitions import is_valid_order_transition
-
+import asyncio
 
 class OrderDomainError(Exception):
     pass
@@ -1608,10 +1844,19 @@ class OrderService:
     # -------------------------
 
     def calculate_totals(self, order: Order):
-        total = sum(
+        from decimal import Decimal
+
+        subtotal = sum(
             item.quantity * item.unit_price
             for item in order.items
         )
+
+        discount = order.discount or Decimal("0")
+
+        total = subtotal - discount
+
+        if total < 0:
+            total = Decimal("0")
 
         total_paid = sum(
             payment.amount
@@ -1621,6 +1866,7 @@ class OrderService:
         remaining = total - total_paid
 
         return (
+            float(subtotal),
             float(total),
             float(total_paid),
             float(remaining)
@@ -1647,7 +1893,24 @@ class OrderService:
             item.status = OrderItemStatus.SENT
 
         if order.status == OrderStatus.OPEN:
-            order.status = OrderStatus.SENT
+            self.update_status(order, OrderStatus.SENT)
+
+        station_ids = {
+            item.product.station_id
+            for item in pending_items
+        }
+
+        for station_id in station_ids:
+            asyncio.create_task(
+                manager.send_to_station(
+                    order.restaurant_id,
+                    station_id,
+                    {
+                        "type": "ORDER_UPDATED",
+                        "order_id": order.id
+                    }
+                )
+            )
 
         return pending_items
 
@@ -1660,26 +1923,70 @@ class OrderService:
         if order.status == OrderStatus.CLOSED:
             raise OrderDomainError("Order already closed")
 
-        total, total_paid, remaining = self.calculate_totals(order)
+        subtotal, total, total_paid, remaining = self.calculate_totals(order)
 
         if remaining > 0:
             raise OrderDomainError(
-                f"Order not fully paid. Remaining: {remaining}"
+                f"Order not fully paid. Remaining: {remaining:.2f}"
             )
 
+        if not order.items:
+            raise OrderDomainError("Order has no items")
+
+        # 🔍 validar items entregados
         not_delivered = [
-            item for item in order.items
+            {
+                "id": item.id,
+                "status": item.status.value if hasattr(item.status, "value") else str(item.status)
+            }
+            for item in order.items
             if item.status != OrderItemStatus.DELIVERED
         ]
 
+        # 🔎 debug útil
+        print("ORDER ID:", order.id)
+        print("ITEM STATES:", [
+            (item.id, str(item.status))
+            for item in order.items
+        ])
+
         if not_delivered:
             raise OrderDomainError(
-                "All items must be DELIVERED before closing order"
+                f"Cannot close order. Items not delivered: {not_delivered}"
             )
 
-        order.status = OrderStatus.CLOSED
+        # ✅ transición correcta
+        self.update_status(order, OrderStatus.CLOSED)
         order.closed_at = func.now()
 
+        # =========================
+        # 🔔 EVENTO: ORDEN CERRADA
+        # =========================
+
+        try:
+            asyncio.run(
+                manager.send_to_role(
+                    order.restaurant_id,
+                    UserRole.WAITER,
+                    {
+                        "type": "ORDER_CLOSED",
+                        "order_id": order.id
+                    }
+                )
+            )
+        except RuntimeError:
+            # fallback por si ya hay loop (ej: tests async)
+            loop = asyncio.get_event_loop()
+            loop.create_task(
+                manager.send_to_role(
+                    order.restaurant_id,
+                    UserRole.WAITER,
+                    {
+                        "type": "ORDER_CLOSED",
+                        "order_id": order.id
+                    }
+                )
+            )
     # -------------------------
     # Registrar pago
     # -------------------------
@@ -1689,7 +1996,7 @@ class OrderService:
         if order.status == OrderStatus.CLOSED:
             raise OrderDomainError("Order already closed")
 
-        total, total_paid, remaining = self.calculate_totals(order)
+        subtotal, total, total_paid, remaining = self.calculate_totals(order)
 
         if amount > remaining:
             raise OrderDomainError(
@@ -1717,7 +2024,12 @@ class OrderService:
             )
             .filter(
                 Order.restaurant_id == restaurant_id,
-                Order.status != OrderStatus.CLOSED
+                Order.status.in_([
+                    OrderStatus.OPEN,
+                    OrderStatus.SENT,
+                    OrderStatus.IN_PROGRESS,
+                    OrderStatus.READY
+                ])
             )
             .all()
         )
@@ -1747,10 +2059,17 @@ class OrderService:
 
     def update_status(self, order: Order, new_status: OrderStatus):
 
+        if order.status == new_status:
+            return order
+
         if not is_valid_order_transition(order.status, new_status):
-            raise OrderDomainError("Invalid status transition")
+            raise OrderDomainError(
+                f"Invalid transition: {order.status} → {new_status}"
+            )
 
         order.status = new_status
+
+        return order
 
 
     def add_item(self, order, product, quantity: int):
@@ -1771,6 +2090,9 @@ class OrderService:
             existing_item.quantity += quantity
             return existing_item
 
+        if order.status == OrderStatus.DRAFT:
+            self.update_status(order, OrderStatus.OPEN)
+
         new_item = OrderItem(
             restaurant_id=order.restaurant_id,
             order_id=order.id,
@@ -1781,6 +2103,29 @@ class OrderService:
         )
 
         self.db.add(new_item)
+
+
+        # =========================
+        # 🔥 NOTIFICAR A COCINA
+        # =========================
+
+        station_id = product.station_id
+
+        import asyncio
+        if existing_item:
+            existing_item.quantity += quantity
+            asyncio.create_task(
+                manager.send_to_station(
+                    order.restaurant_id,
+                    product.station_id,
+                    {
+                        "type": "ORDER_UPDATED",
+                        "order_id": order.id
+                    }
+                )
+            )
+            return existing_item
+        
         return new_item
 ```
 
@@ -1802,12 +2147,17 @@ class OrderService:
 from app.models.order import OrderStatus
 
 ORDER_ALLOWED_TRANSITIONS = {
+    OrderStatus.DRAFT: [
+        OrderStatus.OPEN,
+        OrderStatus.CANCELLED
+    ],
     OrderStatus.OPEN: [
         OrderStatus.SENT,
         OrderStatus.CANCELLED
     ],
     OrderStatus.SENT: [
         OrderStatus.IN_PROGRESS,
+        OrderStatus.READY,
         OrderStatus.CANCELLED
     ],
     OrderStatus.IN_PROGRESS: [
@@ -1826,9 +2176,6 @@ def is_valid_order_transition(
     current_status: OrderStatus,
     new_status: OrderStatus
 ) -> bool:
-    """
-    Valida si una transición de estado de orden es permitida.
-    """
 
     allowed = ORDER_ALLOWED_TRANSITIONS.get(current_status, [])
 
@@ -1940,11 +2287,12 @@ class Category(Base):
 - OrderStatus
 - Order
 
-**Imports (12):**
+**Imports (13):**
 - enum
 - uuid
 - sqlalchemy.Column
 - sqlalchemy.Integer
+- sqlalchemy.Numeric
 - sqlalchemy.ForeignKey
 - sqlalchemy.String
 - sqlalchemy.DateTime
@@ -1957,12 +2305,13 @@ class Category(Base):
 ```python
 import enum
 import uuid
-from sqlalchemy import Column, Integer, ForeignKey, String, DateTime, Enum, Index
+from sqlalchemy import Column, Integer, Numeric, ForeignKey, String, DateTime, Enum, Index
 from sqlalchemy.sql import func
 from app.db.base_class import Base
 from sqlalchemy.orm import relationship
 
 class OrderStatus(str, enum.Enum):
+    DRAFT = "DRAFT"
     OPEN = "OPEN"
     SENT = "SENT"
     IN_PROGRESS = "IN_PROGRESS"
@@ -1991,6 +2340,7 @@ class Order(Base):
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     closed_at = Column(DateTime, nullable=True)
+    discount = Column(Numeric(10, 2), nullable=False, default=0)
     external_id = Column(
         String,
         unique=True,
@@ -2367,7 +2717,7 @@ class Table(Base):
 
     capacity = Column(Integer, default=4, nullable=False)
 
-    shape = Column(String, default="round")
+    shape = Column(String, default="Circular")
 
     external_id = Column(
         String,
@@ -2911,7 +3261,7 @@ def list_categories_with_products(
 
 **Clases (0):**
 
-**Imports (16):**
+**Imports (17):**
 - fastapi.APIRouter
 - fastapi.Depends
 - fastapi.HTTPException
@@ -2928,6 +3278,7 @@ def list_categories_with_products(
 - app.schemas.order.kitchen.KitchenItemOut
 - app.domain.order_item_service.change_item_status
 - app.domain.order_item_service.OrderItemDomainError
+- app.domain.order_service.OrderService
 
 ```python
 from fastapi import APIRouter, Depends, HTTPException
@@ -2950,6 +3301,8 @@ from app.domain.order_item_service import (
     change_item_status,
     OrderItemDomainError
 )
+
+from app.domain.order_service import OrderService
 
 router = APIRouter(prefix="/kitchen", tags=["kitchen"])
 
@@ -3029,7 +3382,7 @@ def update_item_status(
 
 ### .\backend\app\routers\orders.py
 
-**Funciones (8):**
+**Funciones (9):**
 - add_item_to_order
 - add_payment
 - close_order
@@ -3038,15 +3391,17 @@ def update_item_status(
 - get_order
 - update_order_status
 - update_item_quantity
+- apply_discount
 
 **Clases (0):**
 
-**Imports (22):**
+**Imports (23):**
 - fastapi.APIRouter
 - fastapi.Depends
 - fastapi.HTTPException
 - sqlalchemy.orm.Session
 - collections.defaultdict
+- decimal.Decimal
 - app.db.session.get_db
 - app.models.order.Order
 - app.models.order.OrderStatus
@@ -3069,6 +3424,7 @@ def update_item_status(
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from collections import defaultdict
+from decimal import Decimal
 
 from app.db.session import get_db
 from app.models.order import Order, OrderStatus
@@ -3308,7 +3664,7 @@ def get_active_orders(
     result = []
 
     for order in orders:
-        total, total_paid, remaining = service.calculate_totals(order)
+        subtotal, total, total_paid, remaining = service.calculate_totals(order)
 
         result.append({
             "id": order.id,
@@ -3327,6 +3683,8 @@ def get_active_orders(
                 for item in order.items
             ],
             "total": total,
+            "subtotal": subtotal,
+            "discount": float(order.discount or 0),
             "total_paid": total_paid,
             "remaining": remaining
         })
@@ -3348,7 +3706,7 @@ def get_order(
     except OrderDomainError as e:
         raise HTTPException(404, str(e))
 
-    total, total_paid, remaining = service.calculate_totals(order)
+    subtotal, total, total_paid, remaining = service.calculate_totals(order)
 
     return {
         "id": order.id,
@@ -3375,6 +3733,8 @@ def get_order(
             for p in order.payments
         ],
         "total": total,
+        "subtotal": subtotal,
+        "discount": float(order.discount or 0),
         "total_paid": total_paid,
         "remaining": remaining
     }
@@ -3438,6 +3798,40 @@ def update_item_quantity(
     db.commit()
 
     return {"ok": True}
+
+@router.put("/{order_id}/discount")
+def apply_discount(
+    order_id: int,
+    discount: float,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    order = db.query(Order).filter(
+        Order.id == order_id,
+        Order.restaurant_id == user.restaurant_id
+    ).first()
+
+    if not order:
+        raise HTTPException(404, "Order not found")
+
+    if discount < 0:
+        raise HTTPException(400, "Invalid discount")
+    
+    subtotal = sum(
+        item.quantity * item.unit_price
+        for item in order.items
+    )
+
+    if discount > subtotal:
+        raise HTTPException(400, "Discount exceeds total")
+
+    order.discount = Decimal(str(discount))
+
+    db.commit()
+    db.refresh(order)
+
+    return {"message": "Discount applied"}
 ```
 
 ---
@@ -3448,7 +3842,7 @@ def update_item_quantity(
 
 **Clases (0):**
 
-**Imports (12):**
+**Imports (14):**
 - fastapi.APIRouter
 - fastapi.Depends
 - fastapi.HTTPException
@@ -3457,7 +3851,9 @@ def update_item_quantity(
 - app.models.order_item.OrderItem
 - app.models.order_item.OrderItemStatus
 - app.models.user.User
-- app.models.user.UserRole
+- app.domain.order_service.OrderService
+- app.domain.order_item_service.change_item_status
+- app.domain.order_item_service.OrderItemDomainError
 - app.schemas.order.order_item.OrderItemStatusUpdate
 - app.dependencies.auth.get_current_user
 - app.websocket.manager.manager
@@ -3467,7 +3863,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.order_item import OrderItem, OrderItemStatus
-from app.models.user import User, UserRole
+from app.models.user import User
+from app.domain.order_service import OrderService
+from app.domain.order_item_service import change_item_status, OrderItemDomainError
 from app.schemas.order.order_item import OrderItemStatusUpdate
 from app.dependencies.auth import get_current_user
 from app.websocket.manager import manager
@@ -3511,33 +3909,21 @@ async def update_item_status(
     if not item:
         raise HTTPException(404, "Item not found")
 
-    # 🔐 CONTROL POR ROL
+    service = OrderService(db)
 
-    if data.status == OrderItemStatus.IN_PROGRESS and user.role != UserRole.KITCHEN:
-        raise HTTPException(403, "Only kitchen can start items")
+    try:
+        change_item_status(item, data.status, user, service)
+    except OrderItemDomainError as e:
+        raise HTTPException(400, str(e))
 
-    if data.status == OrderItemStatus.READY and user.role != UserRole.KITCHEN:
-        raise HTTPException(403, "Only kitchen can mark ready")
-
-    if data.status == OrderItemStatus.DELIVERED and user.role != UserRole.WAITER:
-        raise HTTPException(403, "Only waiter can deliver")
-
-
-    if data.status not in ALLOWED_ITEM_TRANSITIONS[item.status]:
-        raise HTTPException(
-            400,
-            f"Invalid transition from {item.status} to {data.status}"
-        )
-
-    item.status = data.status
     db.commit()
     db.refresh(item)
 
-        # avisar a mozos si el item está listo
+    # 🔔 notificación
     if item.status == OrderItemStatus.READY:
-
-        await manager.send_to_waiters(
+        await manager.send_to_role(
             restaurant_id=user.restaurant_id,
+            role=user.role,
             message={
                 "type": "ITEM_READY",
                 "table": item.order.table.number,
@@ -3552,7 +3938,6 @@ async def update_item_status(
         "item_id": item.id,
         "new_status": item.status
     }
-
 ```
 
 ---
@@ -3856,23 +4241,28 @@ def list_active_stations(
 
 ### .\backend\app\routers\tables.py
 
-**Funciones (7):**
+**Funciones (11):**
 - touch_table
 - add_product_to_table
 - list_tables
+- get_inactive_tables
 - create_table
 - update_table
 - update_table_position
-- delete_table
+- deactivate_table
+- activate_table
+- get_all_tables
+- update_table
 
 **Clases (0):**
 
-**Imports (16):**
+**Imports (18):**
 - fastapi.APIRouter
 - fastapi.Depends
 - fastapi.HTTPException
 - sqlalchemy.orm.Session
 - sqlalchemy.orm.joinedload
+- sqlalchemy.func
 - app.db.session.get_db
 - app.models.Table
 - app.models.order.Order
@@ -3882,12 +4272,14 @@ def list_active_stations(
 - app.models.order_item.OrderItemStatus
 - app.schemas.table.TableCreate
 - app.schemas.order.order_item.AddItemRequest
+- app.schemas.table.TableUpdate
 - app.models.user.User
 - app.dependencies.auth.get_current_user
 
 ```python
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func
 
 from app.db.session import get_db
 from app.models import Table
@@ -3897,13 +4289,14 @@ from app.models.order_item import OrderItem, OrderItemStatus
 
 from app.schemas.table import TableCreate
 from app.schemas.order.order_item import AddItemRequest
+from app.schemas.table import TableUpdate
 
 from app.models.user import User
 from app.dependencies.auth import get_current_user
 
 router = APIRouter(prefix="/tables", tags=["tables"])
 
-'''
+
 @router.post("/{table_id}/touch")
 def touch_table(
     table_id: int,
@@ -3920,57 +4313,19 @@ def touch_table(
     if not table:
         raise HTTPException(status_code=404, detail="Table not found")
 
-    # 🔴 MODIFICADO → ahora también excluye CANCELLED
     order = db.query(Order).filter(
         Order.table_id == table_id,
         Order.restaurant_id == user.restaurant_id,
-        Order.status.notin_([
-            OrderStatus.CLOSED,
-            OrderStatus.CANCELLED
-        ])
+        Order.status.in_(["DRAFT", "OPEN", "SENT", "IN_PROGRESS", "READY"])
     ).first()
 
-    # si no existe → crearlo
+    
     if not order:
         order = Order(
             table_id=table_id,
-            restaurant_id=table.restaurant_id,
-            status=OrderStatus.OPEN  # 🟢 AGREGADO explícito
+            restaurant_id=user.restaurant_id,
+            status=OrderStatus.DRAFT
         )
-        db.add(order)
-        db.commit()
-        db.refresh(order)
-
-    return {
-        "order_id": order.id,
-        "table_number": table.number,
-        "status": order.status
-    }
-'''
-@router.post("/{table_id}/touch")
-def touch_table(
-    table_id: int,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-
-    table = db.query(Table).filter(
-        Table.id == table_id,
-        Table.restaurant_id == user.restaurant_id,
-        Table.active == True
-    ).first()
-
-    if not table:
-        raise HTTPException(status_code=404, detail="Table not found")
-
-    order = db.query(Order).filter(
-        Order.table_id == table_id,
-        Order.restaurant_id == user.restaurant_id,
-        Order.status.notin_([
-            OrderStatus.CLOSED,
-            OrderStatus.CANCELLED
-        ])
-    ).first()
 
     return {
         "table_id": table_id,
@@ -4073,6 +4428,7 @@ def list_tables(
                 "number": table.number,
                 "x": table.x,
                 "y": table.y,
+                "capacity": table.capacity,
                 "shape": table.shape,
                 "status": "ocupada",
                 "order_id": active_order.id,
@@ -4092,6 +4448,19 @@ def list_tables(
 
     return result
 
+@router.get("/inactive")
+def get_inactive_tables(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+
+    tables = db.query(Table).filter(
+        Table.restaurant_id == user.restaurant_id,
+        Table.active == False
+    ).order_by(Table.number).all()
+
+    return tables
+
 @router.post("/")
 def create_table(
     table_in: TableCreate,
@@ -4099,9 +4468,15 @@ def create_table(
     user: User = Depends(get_current_user)
 ):
 
+    max_number = db.query(func.max(Table.number)).filter(
+        Table.restaurant_id == user.restaurant_id
+    ).scalar()
+
+    new_number = (max_number or 0) + 1
+
     table = Table(
         restaurant_id=user.restaurant_id,
-        number=table_in.number,
+        number=new_number,
         x=table_in.x,
         y=table_in.y,
         capacity=table_in.capacity,
@@ -4163,7 +4538,7 @@ def update_table_position(
     return {"success": True}
 
 @router.delete("/{table_id}")
-def delete_table(
+def deactivate_table(
     table_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
@@ -4175,13 +4550,79 @@ def delete_table(
     ).first()
 
     if not table:
-        raise HTTPException(status_code=404, detail="Table not found")
+        raise HTTPException(404, "Table not found")
 
     table.active = False
 
     db.commit()
 
-    return {"success": True}
+    return {"message": "Mesa desactivada"}
+
+@router.patch("/{table_id}/activate")
+def activate_table(
+    table_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+
+    table = db.query(Table).filter(
+        Table.id == table_id,
+        Table.restaurant_id == user.restaurant_id
+    ).first()
+
+    if not table:
+        raise HTTPException(404, "Table not found")
+
+    table.active = True
+
+    db.commit()
+
+    return {"message": "Mesa activada"}
+
+@router.get("/all")
+def get_all_tables(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+
+    tables = db.query(Table).filter(
+        Table.restaurant_id == user.restaurant_id
+    ).order_by(Table.number).all()
+
+    return tables
+
+@router.patch("/{table_id}")
+def update_table(
+    table_id: int,
+    table_in: TableUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+
+    table = db.query(Table).filter(
+        Table.id == table_id,
+        Table.restaurant_id == user.restaurant_id
+    ).first()
+
+    if not table:
+        raise HTTPException(404, "Table not found")
+
+    if table_in.number is not None:
+        table.number = table_in.number
+
+    if table_in.capacity is not None:
+        table.capacity = table_in.capacity
+
+    if table_in.shape is not None:
+        table.shape = table_in.shape
+
+    if table_in.active is not None:
+        table.active = table_in.active
+
+    db.commit()
+    db.refresh(table)
+
+    return table
 ```
 
 ---
@@ -4569,36 +5010,43 @@ class ProductOut(BaseSchema):
 
 **Funciones (0):**
 
-**Clases (2):**
+**Clases (3):**
 - TableOut
 - TableCreate
+- TableUpdate
 
-**Imports (2):**
+**Imports (3):**
 - app.models.order.OrderStatus
 - base.BaseSchema
+- typing.Optional
 
 ```python
 from app.models.order import OrderStatus
 from .base import BaseSchema
+from typing import Optional
 
 class TableOut(BaseSchema):
     id: int
     number: int
-
     x: int
     y: int
+    capacity: int
     shape: str
-
     status: str
     order_id: int | None
     order_status: OrderStatus | None
 
 class TableCreate(BaseSchema):
-    number: int
     x: int = 0
     y: int = 0
     capacity: int = 4
-    shape: str = "round"
+    shape: str = "Circular"
+
+class TableUpdate(BaseSchema):
+    number: Optional[int] = None
+    capacity: Optional[int] = None
+    shape: Optional[str] = None
+    active: Optional[bool] = None
 ```
 
 ---
@@ -4712,6 +5160,8 @@ class OrderOut(BaseSchema):
     status: OrderStatus
     items: list[OrderItemOut]
     payments: list[PaymentOut]
+    subtotal: float
+    discount: float
     total: float
     total_paid: float
     remaining: float
@@ -4723,6 +5173,8 @@ class WaiterOrderOut(BaseSchema):
     table_number: int
     status: OrderStatus
     items: list[OrderItemOut]
+    subtotal: float
+    discount: float
     total: float
     total_paid: float
     remaining: float
@@ -4809,10 +5261,9 @@ class PaymentOut(BaseSchema):
 
 ### .\backend\app\websocket\manager.py
 
-**Funciones (3):**
+**Funciones (2):**
 - __init__
 - disconnect
-- disconnect_waiter
 
 **Clases (1):**
 - ConnectionManager
@@ -4829,93 +5280,123 @@ from collections import defaultdict
 class ConnectionManager:
 
     def __init__(self):
+        # restaurant_id -> list of connections
+        self.connections = defaultdict(list)
 
-        # restaurant -> station -> kitchen connections
-        self.connections = defaultdict(lambda: defaultdict(list))
-
-        # restaurant -> waiter connections
-        self.waiters = defaultdict(list)
-
-
-    # =========================
-    # KITCHEN
-    # =========================
-
-    async def connect(self, websocket: WebSocket, restaurant_id: int, station_id: int):
+    async def connect(self, websocket: WebSocket, user, station_id=None):
 
         await websocket.accept()
 
-        self.connections[restaurant_id][station_id].append(websocket)
+        self.connections[user.restaurant_id].append({
+            "ws": websocket,
+            "user": user,
+            "station_id": station_id
+        })
 
-        print(f"WS kitchen connected r={restaurant_id} s={station_id}")
+        print(f"WS connected r={user.restaurant_id} role={user.role}")
 
+    def disconnect(self, websocket: WebSocket):
 
-    def disconnect(self, websocket: WebSocket, restaurant_id: int, station_id: int):
+        for restaurant_id in self.connections:
+            self.connections[restaurant_id] = [
+                c for c in self.connections[restaurant_id]
+                if c["ws"] != websocket
+            ]
 
-        if websocket in self.connections[restaurant_id][station_id]:
-            self.connections[restaurant_id][station_id].remove(websocket)
+        print("WS disconnected")
 
-        print(f"WS kitchen disconnected r={restaurant_id} s={station_id}")
+    # =========================
+    # ENVÍOS
+    # =========================
 
+    async def send_to_role(self, restaurant_id: int, role, message: dict):
+
+        for c in self.connections[restaurant_id]:
+            if c["user"].role == role:
+                await self._safe_send(c["ws"], message)
 
     async def send_to_station(self, restaurant_id: int, station_id: int, message: dict):
 
-        dead = []
+        for c in self.connections[restaurant_id]:
+            if c["station_id"] == station_id:
+                await self._safe_send(c["ws"], message)
 
-        for connection in self.connections[restaurant_id][station_id]:
-            try:
-                await connection.send_json(message)
-            except:
-                dead.append(connection)
+    async def broadcast(self, restaurant_id: int, message: dict):
 
-        for conn in dead:
-            self.connections[restaurant_id][station_id].remove(conn)
+        for c in self.connections[restaurant_id]:
+            await self._safe_send(c["ws"], message)
 
-        print(
-            f"Kitchen broadcast to {len(self.connections[restaurant_id][station_id])} clients"
-        )
-
-
-    # =========================
-    # WAITERS
-    # =========================
-
-    async def connect_waiter(self, websocket: WebSocket, restaurant_id: int):
-
-        await websocket.accept()
-
-        self.waiters[restaurant_id].append(websocket)
-
-        print(f"WS waiter connected r={restaurant_id}")
-
-
-    def disconnect_waiter(self, websocket: WebSocket, restaurant_id: int):
-
-        if websocket in self.waiters[restaurant_id]:
-            self.waiters[restaurant_id].remove(websocket)
-
-        print(f"WS waiter disconnected r={restaurant_id}")
-
-
-    async def send_to_waiters(self, restaurant_id: int, message: dict):
-
-        dead = []
-
-        for connection in self.waiters[restaurant_id]:
-            try:
-                await connection.send_json(message)
-            except:
-                dead.append(connection)
-
-        for conn in dead:
-            self.waiters[restaurant_id].remove(conn)
-
-        print(
-            f"Waiter broadcast to {len(self.waiters[restaurant_id])} clients"
-        )
+    async def _safe_send(self, ws: WebSocket, message: dict):
+        try:
+            await ws.send_json(message)
+        except:
+            pass
 
 
 manager = ConnectionManager()
+```
+
+---
+
+### .\backend\app\websocket\ws.py
+
+**Funciones (1):**
+- __init__
+
+**Clases (1):**
+- WSUser
+
+**Imports (5):**
+- fastapi.APIRouter
+- fastapi.WebSocket
+- fastapi.WebSocketDisconnect
+- app.websocket.manager.manager
+- app.core.security.decode_access_token
+
+```python
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from app.websocket.manager import manager
+from app.core.security import decode_access_token
+
+router = APIRouter()
+
+@router.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+
+    token = websocket.query_params.get("token")
+
+    if not token:
+        await websocket.close(code=1008)
+        return
+
+    payload = decode_access_token(token)
+
+    if not payload:
+        await websocket.close(code=1008)
+        return
+
+    # 🔥 ARMAR USER FAKE (simple y suficiente)
+    class WSUser:
+        def __init__(self, payload):
+            self.id = payload.get("sub")
+            self.role = payload.get("role")
+            self.restaurant_id = payload.get("restaurant_id")
+
+    user = WSUser(payload)
+
+    station_id = websocket.query_params.get("station_id")
+
+    await manager.connect(
+        websocket,
+        user,
+        int(station_id) if station_id else None
+    )
+
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
 ```
 
 ---

@@ -11,7 +11,8 @@ from app.seed import seed_tables
 
 from app import models
 
-from app.routers import tables, orders, products, cash_register, category, order_items, stations, auth, users, ws_kitchen
+from app.routers import tables, orders, products, cash_register, category, order_items, stations, auth, users
+from app.websocket import ws
 from app.routers.kitchen import router as kitchen_router
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -42,7 +43,7 @@ app.include_router(products.router, prefix="/api")
 app.include_router(stations.router, prefix="/api")
 app.include_router(tables.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
-app.include_router(ws_kitchen.router)
+app.include_router(ws.router)
 @app.get("/")
 def root():
     return {"status": "running"}

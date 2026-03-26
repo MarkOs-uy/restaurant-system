@@ -6,6 +6,7 @@ from app.db.base_class import Base
 from sqlalchemy.orm import relationship
 
 class OrderStatus(str, enum.Enum):
+    DRAFT = "DRAFT"
     OPEN = "OPEN"
     SENT = "SENT"
     IN_PROGRESS = "IN_PROGRESS"

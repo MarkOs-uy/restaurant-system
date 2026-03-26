@@ -19,6 +19,8 @@ from app.domain.order_item_service import (
     OrderItemDomainError
 )
 
+from app.domain.order_service import OrderService
+
 router = APIRouter(prefix="/kitchen", tags=["kitchen"])
 
 @router.get("/stations/{station_id}/items", response_model=list[KitchenItemOut])

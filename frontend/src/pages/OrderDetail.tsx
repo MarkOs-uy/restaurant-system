@@ -47,7 +47,6 @@ export default function OrderDetail() {
   const id = Number(orderId)
   const navigate = useNavigate()
 
-  const isNewOrder = !orderId
   const [order, setOrder] = useState<Order | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
   const [openCategory, setOpenCategory] = useState<number | null>(null)
@@ -58,9 +57,7 @@ export default function OrderDetail() {
   const [discountType, setDiscountType] = useState<"amount" | "percent">("amount")
 
   useEffect(() => {
-    if (!isNewOrder) {
-      fetchOrder()
-    }
+    fetchOrder()
     fetchCategories()
   }, [orderId])
 
@@ -80,8 +77,11 @@ export default function OrderDetail() {
 
     const quantity = quantities[productId] || 1
 
-    // 🟢 si la orden no existe → crearla
-    if (isNewOrder) {
+    // 🚫 orden cerrada
+    if (order?.status === "CLOSED") return
+
+    // 🆕 NO hay orden → crearla
+    if (!orderId) {
 
       const res = await fetch(
         `${API_URL}/tables/${tableId}/add-product`,
@@ -97,14 +97,13 @@ export default function OrderDetail() {
 
       const data = await res.json()
 
+      // 🔥 redirigir a la nueva orden
       navigate(`/orders/${data.order_id}`)
 
       return
     }
 
-    // 🟢 orden normal
-    if (order?.status === "CLOSED") return
-
+    // 🧾 orden existente
     await fetch(`${API_URL}/orders/${orderId}/items`, {
       method: "POST",
       headers: getAuthHeaders(),
@@ -169,7 +168,8 @@ export default function OrderDetail() {
     fetchOrder()
   }
 
-  if (!order && orderId) return <p>Cargando...</p>
+  if (!order) return <p>Cargando...</p>
+
   const o = order!
   const items = o?.items ?? []
   const remaining = o?.remaining ?? 0
@@ -279,6 +279,17 @@ export default function OrderDetail() {
         </strong>
       </p>
 
+      {o.status === "DRAFT" && (
+        <div style={{
+          background: "#333",
+          padding: 10,
+          borderRadius: 8,
+          marginBottom: 10
+        }}>
+          🧾 Agrega productos para iniciar la orden
+        </div>
+      )}
+
       {/* ITEMS */}
       <h2>Items</h2>
 
@@ -356,7 +367,7 @@ export default function OrderDetail() {
       }}>
         <p>Subtotal: ${subtotal.toFixed(2)}</p>
 
-        {o.discount > 0 && (
+        {o.discount && o.discount > 0 && (
           <p style={{ color: "red" }}>
             Descuento: -${o.discount.toFixed(2)}
           </p>
@@ -386,33 +397,35 @@ export default function OrderDetail() {
 
       <hr />
 
-      <h2>Descuento</h2>
+      {o.status !== "DRAFT" && (
+        <>
+          <h2>Descuento</h2>
 
-      <select
-        value={discountType}
-        onChange={(e) => setDiscountType(e.target.value as "amount" | "percent")}
-        style={{ marginRight: 10, padding: 5 }}
-      >
-        <option value="amount">Monto</option>
-        <option value="percent">%</option>
-      </select>
+          <select
+            value={discountType}
+            onChange={(e) => setDiscountType(e.target.value as "amount" | "percent")}
+            style={{ marginRight: 10, padding: 5 }}
+          >
+            <option value="amount">Monto</option>
+            <option value="percent">%</option>
+          </select>
 
-      <input
-        type="number"
-        placeholder="Monto descuento"
-        value={discount}
-        onChange={(e) => setDiscount(e.target.value)}
-        style={{ marginRight: 10, padding: 5 }}
-      />
+          <input
+            type="number"
+            placeholder="Monto descuento"
+            value={discount}
+            onChange={(e) => setDiscount(e.target.value)}
+            style={{ marginRight: 10, padding: 5 }}
+          />
 
-      <button className="btn btn-primary"
-        onClick={applyDiscount}
-        style={{ padding: 8, borderRadius: 6 }}
-      >
-        Aplicar Descuento
-      </button>
-
-
+          <button className="btn btn-primary"
+            onClick={applyDiscount}
+            style={{ padding: 8, borderRadius: 6 }}
+          >
+            Aplicar Descuento
+          </button>
+        </>
+      )}
 
       {/* PAGOS */}
       <h2>Pagos</h2>
@@ -510,7 +523,7 @@ export default function OrderDetail() {
           {openCategory === category.id && (
             <div style={{ padding: 10 }}>
               {category.products.map(p => (
-                <div
+                <div key={p.id}
                   style={{
                     display: "flex",
                     alignItems: "center",

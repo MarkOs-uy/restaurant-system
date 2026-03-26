@@ -53,7 +53,7 @@ def add_item_to_order(
         raise HTTPException(404, "Producto no disponible")
 
     service = OrderService(db)
-    print(dir(service))
+
     try:
         new_item = service.add_item(order, product, item.quantity)
         db.commit()
@@ -141,7 +141,7 @@ def add_payment(
 
     cash_register = db.query(CashRegister).filter(
         CashRegister.restaurant_id == user.restaurant_id,
-        CashRegister.closed_at == None
+        CashRegister.is_open == True
     ).first()
 
     if not cash_register:
@@ -202,15 +202,6 @@ def delete_order_item(
 
     print("ITEM ID:", item_id)
     print("USER RESTAURANT:", user.restaurant_id)
-
-    item = db.query(OrderItem).filter(
-        OrderItem.id == item_id
-    ).first()
-
-    print("ITEM FOUND:", item)
-
-    if item:
-        print("ITEM RESTAURANT:", item.restaurant_id)
 
     item = db.query(OrderItem).filter(
         OrderItem.id == item_id,

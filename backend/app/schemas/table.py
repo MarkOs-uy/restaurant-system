@@ -1,5 +1,6 @@
 from app.models.order import OrderStatus
 from .base import BaseSchema
+from typing import Optional
 
 class TableOut(BaseSchema):
     id: int
@@ -17,3 +18,9 @@ class TableCreate(BaseSchema):
     y: int = 0
     capacity: int = 4
     shape: str = "Circular"
+
+class TableUpdate(BaseSchema):
+    number: Optional[int] = None
+    capacity: Optional[int] = None
+    shape: Optional[str] = None
+    active: Optional[bool] = None

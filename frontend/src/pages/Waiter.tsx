@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { API_URL, getAuthHeaders } from "../api"
+import { API_URL, WS_URL, getAuthHeaders } from "../api"
 
 interface Item {
   id: number
@@ -36,21 +36,48 @@ const hasReadyItems = (order: Order) => {
   return order.items.some(item => item.status === "READY")
 }
 
+const playSound = () => {
+  const audio = new Audio("/bell.mp3")
+  audio.play().catch(() => {})
+}
+
 export default function Waiter() {
   const [orders, setOrders] = useState<Order[]>([])
 
   useEffect(() => {
 
-    fetchOrders()
-
     let ws: WebSocket | null = null
     let reconnectTimer: any = null
 
+    // 🔥 CONTROL DE FETCH
+    let fetching = false
+    let pending = false
+
+    const safeFetchOrders = async () => {
+
+      if (fetching) {
+        pending = true
+        return
+      }
+
+      fetching = true
+
+      await fetchOrders()
+
+      fetching = false
+
+      if (pending) {
+        pending = false
+        safeFetchOrders()
+      }
+    }
+
+    // 👇 PRIMER FETCH
+    safeFetchOrders()
+
     const connect = () => {
 
-      ws = new WebSocket(
-        `ws://${location.host}/ws/waiter/1`
-      )
+      ws = new WebSocket(`${WS_URL}/ws?token=${localStorage.getItem("token")}`)
 
       ws.onopen = () => {
         console.log("Waiter WS connected")
@@ -60,28 +87,48 @@ export default function Waiter() {
 
         const data = JSON.parse(event.data)
 
-        if (data.type === "ITEM_READY") {
+        switch (data.type) {
 
-          console.log("Item ready:", data)
+          case "ITEM_READY":
+            playSound()
+            setOrders(prev => prev.map(order => {
+              if (order.id !== data.order_id) return order
+              return {
+                ...order,
+                items: order.items.map(item =>
+                  item.id === data.item_id
+                    ? { ...item, status: "READY" }
+                    : item
+                )
+              }
+            }))
+            setTimeout(() => {
+              safeFetchOrders()
+            }, 2000)
+            break
 
-          const bell = new Audio("/bell.mp3")
-          bell.play().catch(() => {})
+            case "ORDER_STATUS_CHANGED":
+              setOrders(prev => prev.map(order =>
+                order.id === data.order_id
+                  ? { ...order, status: data.status }
+                  : order
+              ))
+              break
 
-          fetchOrders()
+            case "ORDER_UPDATED":case "ORDER_UPDATED":
+              safeFetchOrders()
+            break   
 
+            case "ORDER_CLOSED":
+              setOrders(prev =>
+                prev.filter(order => order.id !== data.order_id)
+              )
+              break
         }
-
       }
 
       ws.onclose = () => {
-
-        console.log("Waiter WS disconnected")
-
-        reconnectTimer = setTimeout(() => {
-          console.log("Reconnecting waiter WS...")
-          connect()
-        }, 2000)
-
+        reconnectTimer = setTimeout(connect, 2000)
       }
 
       ws.onerror = () => {

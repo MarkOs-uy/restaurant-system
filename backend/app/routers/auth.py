@@ -5,14 +5,16 @@ from fastapi.security import OAuth2PasswordRequestForm
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.auth import TokenResponse
-from app.core.security import create_access_token
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from fastapi.security import OAuth2PasswordRequestForm
+
+from app.db.session import get_db
+from app.models.user import User
+from app.schemas.auth import TokenResponse
+from app.core.security import create_access_token, verify_password
 from app.dependencies.auth import get_current_user
-
 from app.schemas.user import UserOut
-
-from passlib.context import CryptContext
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -26,13 +28,10 @@ def login(
         User.username == form_data.username
     ).first()
 
-    if not user or not pwd_context.verify(
-        form_data.password,
-        user.password_hash
-    ):
+    if not user or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid credentials"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Credenciales inválidas"
         )
 
     token = create_access_token({

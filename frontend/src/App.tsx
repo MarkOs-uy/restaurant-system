@@ -12,6 +12,7 @@ import UsersPage from "./pages/UsersPage"
 import ProductsPage from "./pages/ProductsPage"
 import ProtectedRoute from "./components/ProtectedRoute"
 import KitchenStations from "./pages/KitchenStations"
+import ManageTables from "./pages/ManageTables"
 import { useState, useEffect } from "react"
 
 function App() {
@@ -42,12 +43,9 @@ function App() {
     }
 
   }, [])
-  
-  console.log("APP ROLE:", role)
-  
+    
   return (
     <>
-      {console.log("RENDER NAVBAR ROLE:", role)}
       {/* NAVBAR DINÁMICO */}
       {role && (
         <nav className="navbar" style={{ padding: 10 }}>
@@ -62,6 +60,8 @@ function App() {
 
           {isAdmin && (
             <>
+              {" | "}
+              <Link to="/tables/manage">Mesas</Link>
               {" | "}
               <Link to="/admin/products">Productos</Link>
               {" | "}
@@ -95,7 +95,7 @@ function App() {
           path="/"
           element={
             <ProtectedRoute allowedRoles={["ADMIN", "WAITER"]}>
-              <TablesPage />
+              <TablesPage isAdmin={isAdmin} />
             </ProtectedRoute>
           }
         />
@@ -196,6 +196,16 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["ADMIN"]}>
               <UsersPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ADMIN TABLES */}
+        <Route
+          path="/tables/manage"
+          element={
+            <ProtectedRoute allowedRoles={["ADMIN"]}>
+              <ManageTables />
             </ProtectedRoute>
           }
         />

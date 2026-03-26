@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { API_URL, getAuthHeaders } from "../api"
+import { API_URL, WS_URL, getAuthHeaders } from "../api"
 
 interface KitchenItem {
   item_id: number
@@ -20,7 +20,6 @@ export default function Kitchen() {
 
   const [items, setItems] = useState<KitchenItem[]>([])
 
-  console.log("Calling:", `${API_URL}/kitchen/stations/${station}/items`)
   const fetchItems = async () => {
     const res = await fetch(
       `${API_URL}/kitchen/stations/${station}/items`, {
@@ -41,11 +40,40 @@ export default function Kitchen() {
 
     let ws: WebSocket | null = null
     let reconnectTimer: any = null
+    let shouldReconnect = true
+
+    // 🔥 CONTROL DE FETCH
+    let fetching = false
+    let pending = false
+
+    const safeFetchItems = async () => {
+
+      if (fetching) {
+        pending = true
+        return
+      }
+
+      fetching = true
+
+      await fetchItems()
+
+      fetching = false
+
+      if (pending) {
+        pending = false
+        safeFetchItems()
+      }
+    }
+
+    // 👉 carga inicial
+    safeFetchItems()
 
     const connect = () => {
 
+      const token = localStorage.getItem("token")
+
       ws = new WebSocket(
-        `ws://${location.host}/ws/kitchen/1/${stationId}`
+        `${WS_URL}/ws?token=${token}&station_id=${stationId}`
       )
 
       ws.onopen = () => {
@@ -56,21 +84,26 @@ export default function Kitchen() {
 
         const data = JSON.parse(event.data)
 
-        if (data.type === "NEW_ITEMS") {
-          fetchItems()
+        switch (data.type) {
+
+          case "ORDER_UPDATED":
+          case "ORDER_STATUS_CHANGED":
+            safeFetchItems()
+            break
+
         }
 
       }
 
       ws.onclose = () => {
-
         console.log("Kitchen WS disconnected")
+
+        if (!shouldReconnect) return
 
         reconnectTimer = setTimeout(() => {
           console.log("Reconnecting kitchen WS...")
           connect()
         }, 2000)
-
       }
 
       ws.onerror = () => {
@@ -82,6 +115,7 @@ export default function Kitchen() {
     connect()
 
     return () => {
+      shouldReconnect = false
       ws?.close()
       if (reconnectTimer) clearTimeout(reconnectTimer)
     }
@@ -100,7 +134,6 @@ export default function Kitchen() {
         body: JSON.stringify({ status: newStatus })
       }
     )
-
     fetchItems()
   }
 

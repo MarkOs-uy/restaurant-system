@@ -1,94 +1,62 @@
 from fastapi import WebSocket
 from collections import defaultdict
+from app.models.user import UserRole
 
 
 class ConnectionManager:
 
     def __init__(self):
+        # restaurant_id -> list of connections
+        self.connections = defaultdict(list)
 
-        # restaurant -> station -> kitchen connections
-        self.connections = defaultdict(lambda: defaultdict(list))
-
-        # restaurant -> waiter connections
-        self.waiters = defaultdict(list)
-
-
-    # =========================
-    # KITCHEN
-    # =========================
-
-    async def connect(self, websocket: WebSocket, restaurant_id: int, station_id: int):
+    async def connect(self, websocket: WebSocket, user, station_id=None):
 
         await websocket.accept()
 
-        self.connections[restaurant_id][station_id].append(websocket)
+        self.connections[user.restaurant_id].append({
+            "ws": websocket,
+            "user": user,
+            "station_id": station_id
+        })
 
-        print(f"WS kitchen connected r={restaurant_id} s={station_id}")
+        print(f"WS connected r={user.restaurant_id} role={user.role}")
 
+    def disconnect(self, websocket: WebSocket):
 
-    def disconnect(self, websocket: WebSocket, restaurant_id: int, station_id: int):
+        for restaurant_id in self.connections:
+            self.connections[restaurant_id] = [
+                c for c in self.connections[restaurant_id]
+                if c["ws"] != websocket
+            ]
 
-        if websocket in self.connections[restaurant_id][station_id]:
-            self.connections[restaurant_id][station_id].remove(websocket)
+        print("WS disconnected")
 
-        print(f"WS kitchen disconnected r={restaurant_id} s={station_id}")
+    # =========================
+    # ENVÍOS
+    # =========================
 
+    async def send_to_role(self, restaurant_id: int, role: UserRole, message: dict):
+
+        for c in self.connections[restaurant_id]:
+            if c["user"].role == role:
+                await self._safe_send(c["ws"], message)
 
     async def send_to_station(self, restaurant_id: int, station_id: int, message: dict):
 
-        dead = []
+        for c in self.connections[restaurant_id]:
+            if c["station_id"] == station_id:
+                await self._safe_send(c["ws"], message)
 
-        for connection in self.connections[restaurant_id][station_id]:
-            try:
-                await connection.send_json(message)
-            except:
-                dead.append(connection)
+    async def broadcast(self, restaurant_id: int, message: dict):
 
-        for conn in dead:
-            self.connections[restaurant_id][station_id].remove(conn)
+        for c in self.connections[restaurant_id]:
+            await self._safe_send(c["ws"], message)
 
-        print(
-            f"Kitchen broadcast to {len(self.connections[restaurant_id][station_id])} clients"
-        )
-
-
-    # =========================
-    # WAITERS
-    # =========================
-
-    async def connect_waiter(self, websocket: WebSocket, restaurant_id: int):
-
-        await websocket.accept()
-
-        self.waiters[restaurant_id].append(websocket)
-
-        print(f"WS waiter connected r={restaurant_id}")
-
-
-    def disconnect_waiter(self, websocket: WebSocket, restaurant_id: int):
-
-        if websocket in self.waiters[restaurant_id]:
-            self.waiters[restaurant_id].remove(websocket)
-
-        print(f"WS waiter disconnected r={restaurant_id}")
-
-
-    async def send_to_waiters(self, restaurant_id: int, message: dict):
-
-        dead = []
-
-        for connection in self.waiters[restaurant_id]:
-            try:
-                await connection.send_json(message)
-            except:
-                dead.append(connection)
-
-        for conn in dead:
-            self.waiters[restaurant_id].remove(conn)
-
-        print(
-            f"Waiter broadcast to {len(self.waiters[restaurant_id])} clients"
-        )
+    async def _safe_send(self, ws: WebSocket, message: dict):
+        try:
+            await ws.send_json(message)
+        except:
+            pass
 
 
 manager = ConnectionManager()

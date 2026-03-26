@@ -10,6 +10,7 @@ from app.models.order_item import OrderItem, OrderItemStatus
 
 from app.schemas.table import TableCreate
 from app.schemas.order.order_item import AddItemRequest
+from app.schemas.table import TableUpdate
 
 from app.models.user import User
 from app.dependencies.auth import get_current_user
@@ -36,11 +37,16 @@ def touch_table(
     order = db.query(Order).filter(
         Order.table_id == table_id,
         Order.restaurant_id == user.restaurant_id,
-        Order.status.notin_([
-            OrderStatus.CLOSED,
-            OrderStatus.CANCELLED
-        ])
+        Order.status.in_(["DRAFT", "OPEN", "SENT", "IN_PROGRESS", "READY"])
     ).first()
+
+    
+    if not order:
+        order = Order(
+            table_id=table_id,
+            restaurant_id=user.restaurant_id,
+            status=OrderStatus.DRAFT
+        )
 
     return {
         "table_id": table_id,
@@ -163,6 +169,19 @@ def list_tables(
 
     return result
 
+@router.get("/inactive")
+def get_inactive_tables(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+
+    tables = db.query(Table).filter(
+        Table.restaurant_id == user.restaurant_id,
+        Table.active == False
+    ).order_by(Table.number).all()
+
+    return tables
+
 @router.post("/")
 def create_table(
     table_in: TableCreate,
@@ -240,7 +259,7 @@ def update_table_position(
     return {"success": True}
 
 @router.delete("/{table_id}")
-def delete_table(
+def deactivate_table(
     table_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
@@ -252,10 +271,76 @@ def delete_table(
     ).first()
 
     if not table:
-        raise HTTPException(status_code=404, detail="Table not found")
+        raise HTTPException(404, "Table not found")
 
     table.active = False
 
     db.commit()
 
-    return {"success": True}
+    return {"message": "Mesa desactivada"}
+
+@router.patch("/{table_id}/activate")
+def activate_table(
+    table_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+
+    table = db.query(Table).filter(
+        Table.id == table_id,
+        Table.restaurant_id == user.restaurant_id
+    ).first()
+
+    if not table:
+        raise HTTPException(404, "Table not found")
+
+    table.active = True
+
+    db.commit()
+
+    return {"message": "Mesa activada"}
+
+@router.get("/all")
+def get_all_tables(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+
+    tables = db.query(Table).filter(
+        Table.restaurant_id == user.restaurant_id
+    ).order_by(Table.number).all()
+
+    return tables
+
+@router.patch("/{table_id}")
+def update_table(
+    table_id: int,
+    table_in: TableUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+
+    table = db.query(Table).filter(
+        Table.id == table_id,
+        Table.restaurant_id == user.restaurant_id
+    ).first()
+
+    if not table:
+        raise HTTPException(404, "Table not found")
+
+    if table_in.number is not None:
+        table.number = table_in.number
+
+    if table_in.capacity is not None:
+        table.capacity = table_in.capacity
+
+    if table_in.shape is not None:
+        table.shape = table_in.shape
+
+    if table_in.active is not None:
+        table.active = table_in.active
+
+    db.commit()
+    db.refresh(table)
+
+    return table

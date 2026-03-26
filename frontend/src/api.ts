@@ -1,7 +1,6 @@
 export const API_URL = "/api"
 
-export const WS_URL =
-  location.origin.replace("http", "ws") + "/ws"
+export const WS_URL = "ws://localhost:8000"
 
 export const getAuthHeaders = () => ({
   "Content-Type": "application/json",
