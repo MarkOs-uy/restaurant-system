@@ -2,7 +2,21 @@ from typing import List
 from .base import BaseSchema
 from .product import ProductOut
 
-class CategoryOut(BaseSchema):
-    id: int
+class CategoryBase(BaseSchema):
     name: str
-    products: list[ProductOut]
+
+
+class CategoryCreate(CategoryBase):
+    pass
+
+
+class CategoryUpdate(BaseSchema):
+    name: str
+
+
+class CategoryResponse(CategoryBase):
+    id: int
+
+
+class CategoryWithProducts(CategoryResponse):
+    products: List[ProductOut] = []

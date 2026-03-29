@@ -10,7 +10,7 @@ from app.websocket.manager import manager
 from app.models.order_item import OrderItem
 
 from app.domain.order_transitions import is_valid_order_transition
-from app.domain.event_service import event_service
+from backend.app.services.event_service import event_service
 
 import asyncio
 
@@ -322,6 +322,7 @@ class OrderService:
 
         return item
 
+
     def recalculate_order_status(self, order: Order):
 
         items = order.items
@@ -329,24 +330,35 @@ class OrderService:
         if not items:
             return order
 
-        statuses = [item.status for item in items]
+        # ❗ ignorar cancelados
+        active_items = [
+            item for item in items
+            if item.status != OrderItemStatus.CANCELLED
+        ]
 
-        # 🔴 PRIORIDAD 1: algún item en preparación
+        # si todos fueron cancelados
+        if not active_items:
+            self.update_status(order, OrderStatus.CANCELLED)
+            return order
+
+        statuses = [item.status for item in active_items]
+
+        # 🔴 PRIORIDAD 1
         if any(s == OrderItemStatus.IN_PROGRESS for s in statuses):
             self.update_status(order, OrderStatus.IN_PROGRESS)
             return order
 
-        # 🟠 PRIORIDAD 2: algún item enviado
+        # 🟠 PRIORIDAD 2
         if any(s == OrderItemStatus.SENT for s in statuses):
             self.update_status(order, OrderStatus.SENT)
             return order
 
-        # 🟡 PRIORIDAD 3: hay pendientes
+        # 🟡 PRIORIDAD 3
         if any(s == OrderItemStatus.PENDING for s in statuses):
             self.update_status(order, OrderStatus.OPEN)
             return order
 
-        # 🟢 PRIORIDAD 4: todos listos o entregados
+        # 🟢 PRIORIDAD 4
         if all(s in [OrderItemStatus.READY, OrderItemStatus.DELIVERED] for s in statuses):
             self.update_status(order, OrderStatus.READY)
             return order

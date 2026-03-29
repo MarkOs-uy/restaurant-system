@@ -30,9 +30,9 @@ def seed_tables(db: Session):
 def run():
     db = SessionLocal()
     try:
-        seed_tables(db)
-        seed_stations(db)
-        seed_products(db)
+        #seed_tables(db)
+        #seed_stations(db)
+        #seed_products(db)
         seed_users(db)
     finally:
         db.close()

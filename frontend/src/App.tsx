@@ -13,6 +13,7 @@ import ProductsPage from "./pages/ProductsPage"
 import ProtectedRoute from "./components/ProtectedRoute"
 import KitchenStations from "./pages/KitchenStations"
 import ManageTables from "./pages/ManageTables"
+import { startHealthMonitor } from "./services/healthMonitor.ts"
 import { useState, useEffect } from "react"
 
 function App() {
@@ -25,9 +26,13 @@ function App() {
     localStorage.clear()
     window.dispatchEvent(new Event("authChanged"))
     window.location.href = "/login"
-}
+  }
 
-    useEffect(() => {
+  useEffect(() => {
+    startHealthMonitor()
+  }, [])
+
+  useEffect(() => {
 
     const loadRole = () => {
       const r = localStorage.getItem("role")

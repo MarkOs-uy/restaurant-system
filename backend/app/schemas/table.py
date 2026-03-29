@@ -1,6 +1,11 @@
 from app.models.order import OrderStatus
 from .base import BaseSchema
 from typing import Optional
+from enum import Enum
+
+class TableStatus(str, Enum):
+    FREE = "libre"
+    OCCUPIED = "ocupada"
 
 class TableOut(BaseSchema):
     id: int
@@ -9,7 +14,7 @@ class TableOut(BaseSchema):
     y: int
     capacity: int
     shape: str
-    status: str
+    status: TableStatus
     order_id: int | None
     order_status: OrderStatus | None
 

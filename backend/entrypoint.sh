@@ -2,7 +2,7 @@
 
 echo "Esperando a Postgres..."
 
-until pg_isready -h db -p 5432 -U admin
+until pg_isready -h db -U admin
 do
   sleep 2
 done

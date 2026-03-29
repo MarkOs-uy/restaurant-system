@@ -1,6 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func
 
 from app.db.session import get_db
 from app.models import Table
@@ -10,12 +9,23 @@ from app.models.order_item import OrderItem, OrderItemStatus
 
 from app.schemas.table import TableCreate
 from app.schemas.order.order_item import AddItemRequest
-from app.schemas.table import TableUpdate
+from app.schemas.table import TableUpdate, TableOut
+
+from app.domain.table.table_service import TableService
+from app.domain.table.dependencies import get_table_service
 
 from app.models.user import User
 from app.dependencies.auth import get_current_user
 
 router = APIRouter(prefix="/tables", tags=["tables"])
+
+@router.post("/")
+def create_table(
+    table_in: TableCreate,
+    user: User = Depends(get_current_user),
+    service: TableService = Depends(get_table_service)
+):
+    return service.create_table(user.restaurant_id, table_in)
 
 
 @router.post("/{table_id}/touch")
@@ -53,6 +63,7 @@ def touch_table(
         "table_number": table.number,
         "order_id": order.id if order else None
     }
+
 
 @router.post("/{table_id}/add-product")
 def add_product_to_table(
@@ -110,129 +121,23 @@ def add_product_to_table(
 
     return {"order_id": order.id}
 
-# 🔥 ESTE ES EL ENDPOINT IMPORTANTE
-@router.get("/")
+
+@router.get("/", response_model=list[TableOut])
 def list_tables(
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user)
+    active: bool | None = Query(default=True),
+    user: User = Depends(get_current_user),
+    service: TableService = Depends(get_table_service)
 ):
+    return service.list_tables(user.restaurant_id, active)
 
-    tables = (
-        db.query(Table)
-        .options(joinedload(Table.orders))
-        .filter(
-            Table.active == True,
-            Table.restaurant_id == user.restaurant_id
-        )
-        .order_by(Table.number)
-        .all()
-    )
-    result = []
 
-    for table in tables:
-
-        # buscar orden activa
-        active_order = next(
-            (
-                order for order in table.orders
-                if order.status not in [
-                    OrderStatus.CLOSED,
-                    OrderStatus.CANCELLED
-                ]
-            ),
-            None
-        )
-
-        if active_order:
-            result.append({
-                "id": table.id,
-                "number": table.number,
-                "x": table.x,
-                "y": table.y,
-                "capacity": table.capacity,
-                "shape": table.shape,
-                "status": "ocupada",
-                "order_id": active_order.id,
-                "order_status": active_order.status.value
-            })
-        else:
-            result.append({
-                "id": table.id,
-                "number": table.number,
-                "x": table.x,
-                "y": table.y,
-                "shape": table.shape,
-                "status": "libre",
-                "order_id": None,
-                "order_status": None
-            })
-
-    return result
-
-@router.get("/inactive")
-def get_inactive_tables(
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user)
+@router.get("/status")
+def list_tables_status(
+    user: User = Depends(get_current_user),
+    service: TableService = Depends(get_table_service)
 ):
+    return service.list_tables_status(user.restaurant_id)
 
-    tables = db.query(Table).filter(
-        Table.restaurant_id == user.restaurant_id,
-        Table.active == False
-    ).order_by(Table.number).all()
-
-    return tables
-
-@router.post("/")
-def create_table(
-    table_in: TableCreate,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user)
-):
-
-    max_number = db.query(func.max(Table.number)).filter(
-        Table.restaurant_id == user.restaurant_id
-    ).scalar()
-
-    new_number = (max_number or 0) + 1
-
-    table = Table(
-        restaurant_id=user.restaurant_id,
-        number=new_number,
-        x=table_in.x,
-        y=table_in.y,
-        capacity=table_in.capacity,
-        shape=table_in.shape
-    )
-
-    db.add(table)
-    db.commit()
-    db.refresh(table)
-
-    return table
-
-@router.patch("/{table_id}")
-def update_table(
-    table_id: int,
-    table_in: TableCreate,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user)
-):
-
-    table = db.query(Table).filter(
-        Table.id == table_id,
-        Table.restaurant_id == user.restaurant_id
-    ).first()
-
-    if not table:
-        raise HTTPException(status_code=404, detail="Table not found")
-
-    table.number = table_in.number
-    table.capacity = table_in.capacity
-    table.shape = table_in.shape
-
-    db.commit()
-
-    return {"success": True}
 
 @router.patch("/{table_id}/position")
 def update_table_position(
@@ -240,107 +145,34 @@ def update_table_position(
     x: int,
     y: int,
     user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    service: TableService = Depends(get_table_service)
 ):
+    return service.update_position(user.restaurant_id, table_id, x, y)
 
-    table = db.query(Table).filter(
-        Table.id == table_id,
-        Table.restaurant_id == user.restaurant_id
-    ).first()
-
-    if not table:
-        raise HTTPException(status_code=404, detail="Table not found")
-
-    table.x = x
-    table.y = y
-
-    db.commit()
-
-    return {"success": True}
-
-@router.delete("/{table_id}")
-def deactivate_table(
-    table_id: int,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user)
-):
-
-    table = db.query(Table).filter(
-        Table.id == table_id,
-        Table.restaurant_id == user.restaurant_id
-    ).first()
-
-    if not table:
-        raise HTTPException(404, "Table not found")
-
-    table.active = False
-
-    db.commit()
-
-    return {"message": "Mesa desactivada"}
 
 @router.patch("/{table_id}/activate")
 def activate_table(
     table_id: int,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user)
+    user: User = Depends(get_current_user),
+    service: TableService = Depends(get_table_service)
 ):
+    return service.activate_table(user.restaurant_id, table_id)
 
-    table = db.query(Table).filter(
-        Table.id == table_id,
-        Table.restaurant_id == user.restaurant_id
-    ).first()
 
-    if not table:
-        raise HTTPException(404, "Table not found")
-
-    table.active = True
-
-    db.commit()
-
-    return {"message": "Mesa activada"}
-
-@router.get("/all")
-def get_all_tables(
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user)
-):
-
-    tables = db.query(Table).filter(
-        Table.restaurant_id == user.restaurant_id
-    ).order_by(Table.number).all()
-
-    return tables
-
-@router.patch("/{table_id}")
+@router.patch("/{table_id}", response_model=TableOut)
 def update_table(
     table_id: int,
     table_in: TableUpdate,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user)
+    user: User = Depends(get_current_user),
+    service: TableService = Depends(get_table_service)
 ):
+    return service.update_table(user.restaurant_id, table_id, table_in)
 
-    table = db.query(Table).filter(
-        Table.id == table_id,
-        Table.restaurant_id == user.restaurant_id
-    ).first()
 
-    if not table:
-        raise HTTPException(404, "Table not found")
-
-    if table_in.number is not None:
-        table.number = table_in.number
-
-    if table_in.capacity is not None:
-        table.capacity = table_in.capacity
-
-    if table_in.shape is not None:
-        table.shape = table_in.shape
-
-    if table_in.active is not None:
-        table.active = table_in.active
-
-    db.commit()
-    db.refresh(table)
-
-    return table
+@router.delete("/{table_id}")
+def deactivate_table(
+    table_id: int,
+    user: User = Depends(get_current_user),
+    service: TableService = Depends(get_table_service)
+):
+    return service.deactivate_table(user.restaurant_id, table_id)

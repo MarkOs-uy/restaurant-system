@@ -3,7 +3,7 @@ from app.models.user import User, UserRole
 from app.models.order import OrderStatus
 from app.domain.order_item_transitions import can_transition
 from app.domain.order_service import OrderService
-from app.domain.event_service import event_service
+from backend.app.services.event_service import event_service
 from app.websocket.manager import manager
 
 class OrderItemDomainError(Exception):

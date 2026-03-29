@@ -13,7 +13,7 @@ def seed_restaurant(db: Session):
     print("Creando restaurant default...")
 
     restaurant = Restaurant(
-        name="Sistema Demo"
+        name=input("Ingrese el nombre del restaurant: ")
     )
 
     db.add(restaurant)

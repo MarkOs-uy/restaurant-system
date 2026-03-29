@@ -42,7 +42,7 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
   const FLOOR_HEIGHT = 500
 
   const loadTables = () => {
-    fetch(`${API_URL}/tables/`, { headers: getAuthHeaders() })
+    fetch(`${API_URL}/tables/status`, { headers: getAuthHeaders() })
       .then(res => res.json())
       .then(data => {
         setTables(data)
@@ -55,14 +55,10 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
   }
 
   useEffect(() => {
-
     loadTables()
-
-    // refresco automático (muy útil en POS)
     const interval = setInterval(loadTables, 5000)
 
     return () => clearInterval(interval)
-
   }, [])
 
   const touchTable = async (tableId: number) => {
@@ -83,34 +79,27 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
   }
 
   const getTableColor = (table: Table) => {
-
     if (!table.order_status) return "#bdc3c7"   // gris claro (libre)
     if (table.order_status === "OPEN") return "#f1c40f"   // amarillo
     if (table.order_status === "SENT") return "#e67e22"   // naranja
     if (table.order_status === "READY") return "#27ae60"  // verde fuerte
     if (table.order_status === "PAYING") return "#8e44ad" // violeta
-
     return "#95a5a6"
-
   }
 
   const moveTable = (id: number, x: number, y: number) => {
-
     setTables(prev =>
       prev.map(t =>
         t.id === id ? { ...t, x, y } : t
       )
     )
-
   }
 
   const savePosition = async (tableId: number, x: number, y: number) => {
-
     await fetch(`${API_URL}/tables/${tableId}/position?x=${x}&y=${y}`, {
       method: "PATCH",
       headers: getAuthHeaders()
     })
-
   }
 
   const createTable = async () => {
@@ -137,28 +126,27 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
     setShowForm(false)
   }
 
-  const deleteTable = async (id: number) => {
 
+  const deleteTable = async (id: number) => {
     await fetch(`${API_URL}/tables/${id}`, {
       method: "DELETE",
       headers: getAuthHeaders()
     })
-
     setTables(prev => prev.filter(t => t.id !== id))
-
   }
+
 
   const activateTable = async (id: number) => {
     await fetch(`${API_URL}/tables/${id}/activate`, {
       method: "PATCH",
       headers: getAuthHeaders()
     })
-
     loadTables()
   }
 
-  const inactiveTables = tables.filter(t => !t.active)
 
+  const inactiveTables = tables.filter(t => !t.active)
+  
   if (loading) {
     return <p>Cargando mesas...</p>
   }

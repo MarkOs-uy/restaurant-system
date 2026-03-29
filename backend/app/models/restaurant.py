@@ -41,5 +41,6 @@ class Restaurant(Base):
     categories = relationship("Category", back_populates="restaurant", cascade="all, delete")
     order_items = relationship("OrderItem", back_populates="restaurant", cascade="all, delete")
     users = relationship("User", back_populates="restaurant")
+    domain_events = relationship("DomainEvent", back_populates="restaurant")
 
 

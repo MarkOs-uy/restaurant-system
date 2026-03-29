@@ -1,5 +1,5 @@
 # 📊 Project Summary
-Generated: 2026-03-24 10:32:23.995651
+Generated: 2026-03-28 18:54:46.128811
 
 ## 📁 Estructura del proyecto
 
@@ -15,8 +15,10 @@ Generated: 2026-03-24 10:32:23.995651
         - 530c9b9f2a9f_initial_schema.py
         - 5aa86605f254_add_discount_to_orders.py
         - 7b0b567ffe9e_add_discount_to_orders.py
+        - 900c4d6546a2_creando_tabla_de_eventos.py
         - 9607a137eec7_add_password_to_user.py
         - b30663f913d9_add_cash_register_audit_fields.py
+        - e2398672eb07_agregar_índice_a_tabla_de_eventos_por_.py
         - fa7705341950_add_table_coordinates.py
     - app/
       - main.py
@@ -27,6 +29,7 @@ Generated: 2026-03-24 10:32:23.995651
       - seed_users.py
       - core/
         - dependencies.py
+        - redis.py
         - security.py
       - db/
         - base.py
@@ -36,13 +39,18 @@ Generated: 2026-03-24 10:32:23.995651
       - dependencies/
         - auth.py
       - domain/
+        - event_service.py
         - order_item_service.py
         - order_item_transitions.py
         - order_service.py
         - order_transitions.py
+        - zeroconf_service.py
+      - events/
+        - redis_listener.py
       - models/
         - cash_register.py
         - category.py
+        - domain_event.py
         - order.py
         - order_item.py
         - payment.py
@@ -52,6 +60,8 @@ Generated: 2026-03-24 10:32:23.995651
         - table.py
         - user.py
         - __init__.py
+      - network/
+        - service_discovery.py
       - routers/
         - auth.py
         - cash_register.py
@@ -63,8 +73,6 @@ Generated: 2026-03-24 10:32:23.995651
         - stations.py
         - tables.py
         - users.py
-        - ws_kitchen.py
-        - ws_waiter.py
       - schemas/
         - auth.py
         - base.py
@@ -93,6 +101,7 @@ Generated: 2026-03-24 10:32:23.995651
       - assets/
       - components/
       - pages/
+      - services/
 ```
 
 ## 📄 Archivos analizados
@@ -268,9 +277,6 @@ if config.config_file_name is not None:
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 target_metadata = Base.metadata
-
-print("MODELOS REGISTRADOS:")
-print(Base.metadata.tables.keys())
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -723,6 +729,65 @@ def downgrade() -> None:
 
 ---
 
+### .\backend\alembic\versions\900c4d6546a2_creando_tabla_de_eventos.py
+
+**Funciones (2):**
+- upgrade
+- downgrade
+
+**Clases (0):**
+
+**Imports (4):**
+- typing.Sequence
+- typing.Union
+- alembic.op
+- sqlalchemy
+
+```python
+"""creando tabla de eventos
+
+Revision ID: 900c4d6546a2
+Revises: 0d21e3868b2f
+Create Date: 2026-03-26 17:33:05.954838
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+
+
+# revision identifiers, used by Alembic.
+revision: str = '900c4d6546a2'
+down_revision: Union[str, Sequence[str], None] = '0d21e3868b2f'
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade():
+    op.create_table(
+        "domain_events",
+        sa.Column("id", sa.Integer(), primary_key=True),
+        sa.Column("restaurant_id", sa.Integer(), nullable=False),
+        sa.Column("event_type", sa.String(), nullable=False),
+        sa.Column("payload", sa.JSON(), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(),
+            server_default=sa.func.now(),
+            nullable=False
+        )
+    )
+
+
+def downgrade() -> None:
+    """Downgrade schema."""
+    op.drop_table("domain_events")
+
+```
+
+---
+
 ### .\backend\alembic\versions\9607a137eec7_add_password_to_user.py
 
 **Funciones (2):**
@@ -871,6 +936,60 @@ def downgrade() -> None:
 
 ---
 
+### .\backend\alembic\versions\e2398672eb07_agregar_índice_a_tabla_de_eventos_por_.py
+
+**Funciones (2):**
+- upgrade
+- downgrade
+
+**Clases (0):**
+
+**Imports (4):**
+- typing.Sequence
+- typing.Union
+- alembic.op
+- sqlalchemy
+
+```python
+"""agregar índice a tabla de eventos por restaurant_id
+
+Revision ID: e2398672eb07
+Revises: 900c4d6546a2
+Create Date: 2026-03-26 17:46:46.648977
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+
+
+# revision identifiers, used by Alembic.
+revision: str = 'e2398672eb07'
+down_revision: Union[str, Sequence[str], None] = '900c4d6546a2'
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    op.create_index(
+        "idx_domain_events_restaurant",
+        "domain_events",
+        ["restaurant_id"]
+    )
+
+
+
+def downgrade() -> None:
+    op.drop_index(
+        "idx_domain_events_restaurant",
+        table_name="domain_events"
+    )
+
+```
+
+---
+
 ### .\backend\alembic\versions\fa7705341950_add_table_coordinates.py
 
 **Funciones (2):**
@@ -938,22 +1057,19 @@ def downgrade() -> None:
 
 ### .\backend\app\main.py
 
-**Funciones (1):**
+**Funciones (2):**
 - root
+- health
 
 **Clases (0):**
 
-**Imports (22):**
+**Imports (18):**
 - fastapi.FastAPI
-- fastapi.Depends
-- sqlalchemy.orm.Session
-- sqlalchemy.text
-- app.db.base.Base
-- app.db.session.engine
 - contextlib.asynccontextmanager
-- app.db.session.SessionLocal
-- app.seed.seed_tables
+- asyncio
 - app.models
+- app.events.redis_listener.redis_event_listener
+- app.domain.zeroconf_service.ZeroconfService
 - app.routers.tables
 - app.routers.orders
 - app.routers.products
@@ -963,50 +1079,67 @@ def downgrade() -> None:
 - app.routers.stations
 - app.routers.auth
 - app.routers.users
+- app.routers.kitchen
 - app.websocket.ws
-- app.routers.kitchen.router
 - fastapi.middleware.cors.CORSMiddleware
 
 ```python
-from fastapi import FastAPI, Depends
-from sqlalchemy.orm import Session
-from sqlalchemy import text
-
-from app.db.base import Base
-from app.db.session import engine
-
+from fastapi import FastAPI
 from contextlib import asynccontextmanager
-from app.db.session import SessionLocal
-from app.seed import seed_tables
+import asyncio
 
 from app import models
+from app.events.redis_listener import redis_event_listener
+from app.domain.zeroconf_service import ZeroconfService
 
-from app.routers import tables, orders, products, cash_register, category, order_items, stations, auth, users
+# routers
+from app.routers import tables, orders, products, cash_register, category, order_items, stations, auth, users, kitchen
 from app.websocket import ws
-from app.routers.kitchen import router as kitchen_router
+
 from fastapi.middleware.cors import CORSMiddleware
+
+
+zeroconf_service = ZeroconfService()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+
     print("Backend arrancando...")
+
+    # Redis listener
+    redis_task = asyncio.create_task(redis_event_listener())
+
+    # Zeroconf
+    await zeroconf_service.start()
+
     yield
+
     print("Backend apagándose...")
+
+    redis_task.cancel()
+
+    await zeroconf_service.stop()
+
 
 app = FastAPI(lifespan=lifespan)
 
+
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # luego lo restringimos
-    #allow_origins=["http://localhost:5173","http://localhost:8000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+
+# routers
 app.include_router(auth.router, prefix="/api")
 app.include_router(cash_register.router, prefix="/api")
 app.include_router(category.router, prefix="/api")
-app.include_router(kitchen_router, prefix="/api")
+app.include_router(kitchen.router, prefix="/api")
 app.include_router(order_items.router, prefix="/api")
 app.include_router(orders.router, prefix="/api")
 app.include_router(products.router, prefix="/api")
@@ -1014,10 +1147,20 @@ app.include_router(stations.router, prefix="/api")
 app.include_router(tables.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(ws.router)
+
+
 @app.get("/")
 def root():
     return {"status": "running"}
 
+
+@app.get("/health")
+def health():
+    return {
+        "status": "ok",
+        "service": "restaurant-pos",
+        "version": "1.0.0"
+    }
 ```
 
 ---
@@ -1072,9 +1215,9 @@ def seed_tables(db: Session):
 def run():
     db = SessionLocal()
     try:
-        seed_tables(db)
-        seed_stations(db)
-        seed_products(db)
+        #seed_tables(db)
+        #seed_stations(db)
+        #seed_products(db)
         seed_users(db)
     finally:
         db.close()
@@ -1214,7 +1357,7 @@ def seed_restaurant(db: Session):
     print("Creando restaurant default...")
 
     restaurant = Restaurant(
-        name="Sistema Demo"
+        name=input("Ingrese el nombre del restaurant: ")
     )
 
     db.add(restaurant)
@@ -1299,21 +1442,21 @@ def seed_users(db: Session):
         print("Seed usuarios ya ejecutado.")
         return
 
-    print("Creando usuarios iniciales...")
+    print("Creando usuario admin...")
 
     pass_hash = get_password_hash("1234")
 
     users = [
-        User(name="admin", role="ADMIN", password_hash = pass_hash, restaurant_id=restaurant.id),
-        User(name="waiter", role="WAITER", password_hash = pass_hash, restaurant_id=restaurant.id),
-        User(name="kitchen", role="KITCHEN", password_hash = pass_hash, restaurant_id=restaurant.id),
-        User(name="cashier", role="CASHIER", password_hash = pass_hash, restaurant_id=restaurant.id),
+        User(username="admin", role="ADMIN", password_hash = pass_hash, restaurant_id=restaurant.id),
+        #User(username="waiter", role="WAITER", password_hash = pass_hash, restaurant_id=restaurant.id),
+        #User(username="kitchen", role="KITCHEN", password_hash = pass_hash, restaurant_id=restaurant.id),
+        #User(username="cashier", role="CASHIER", password_hash = pass_hash, restaurant_id=restaurant.id),
     ]
 
     db.add_all(users)
     db.commit()
 
-    print("Estaciones creadas.")
+    print("Usuario Admin creado.")
 
 ```
 
@@ -1370,6 +1513,30 @@ def get_current_restaurant(
 
     return restaurant
 
+```
+
+---
+
+### .\backend\app\core\redis.py
+
+**Funciones (0):**
+
+**Clases (0):**
+
+**Imports (2):**
+- redis.asyncio
+- os
+
+```python
+import redis.asyncio as redis
+import os
+
+redis_client = redis.Redis(
+    host=os.getenv("REDIS_HOST", "localhost"),
+    port=int(os.getenv("REDIS_PORT", 6379)),
+    decode_responses=True,
+    socket_keepalive=True
+)
 ```
 
 ---
@@ -1442,7 +1609,7 @@ def decode_access_token(token: str):
 
 **Clases (0):**
 
-**Imports (8):**
+**Imports (12):**
 - app.db.base_class.Base
 - app.models.table.Table
 - app.models.restaurant.Restaurant
@@ -1451,6 +1618,10 @@ def decode_access_token(token: str):
 - app.models.order.Order
 - app.models.order_item.OrderItem
 - app.models.cash_register.CashRegister
+- app.models.user.User
+- app.models.category.Category
+- app.models.production_station.ProductionStation
+- app.models.domain_event.DomainEvent
 
 ```python
 from app.db.base_class import Base
@@ -1462,6 +1633,10 @@ from app.models.payment import Payment
 from app.models.order import Order
 from app.models.order_item import OrderItem
 from app.models.cash_register import CashRegister
+from app.models.user import User
+from app.models.category import Category
+from app.models.production_station import ProductionStation
+from app.models.domain_event import DomainEvent
 
 
 
@@ -1606,6 +1781,136 @@ def get_current_user(
 
 ---
 
+### .\backend\app\domain\event_service.py
+
+**Funciones (5):**
+- emit_to_role
+- emit_to_station
+- broadcast
+- _persist_event
+- _dispatch
+
+**Clases (1):**
+- EventService
+
+**Imports (8):**
+- asyncio
+- json
+- sqlalchemy.orm.Session
+- app.websocket.manager.manager
+- app.models.user.UserRole
+- app.models.domain_event.DomainEvent
+- app.db.session.SessionLocal
+- app.core.redis.redis_client
+
+```python
+import asyncio
+import json
+from sqlalchemy.orm import Session
+
+from app.websocket.manager import manager
+from app.models.user import UserRole
+from app.models.domain_event import DomainEvent
+from app.db.session import SessionLocal
+from app.core.redis import redis_client
+
+
+class EventService:
+
+    # =========================
+    # API PÚBLICA
+    # =========================
+
+    def emit_to_role(
+        self,
+        restaurant_id: int,
+        role: UserRole,
+        message: dict
+    ):
+        self._persist_event(restaurant_id, message)
+        self._dispatch(manager.send_to_role, restaurant_id, role, message)
+
+    def emit_to_station(
+        self,
+        restaurant_id: int,
+        station_id: int,
+        message: dict
+    ):
+        self._persist_event(restaurant_id, message)
+        self._dispatch(manager.send_to_station, restaurant_id, station_id, message)
+
+    def broadcast(
+        self,
+        restaurant_id: int,
+        message: dict
+    ):
+        self._persist_event(restaurant_id, message)
+        self._dispatch(manager.broadcast, restaurant_id, message)
+
+    # =========================
+    # GUARDAR EVENTO
+    # =========================
+
+    def _persist_event(
+        self,
+        restaurant_id: int,
+        message: dict
+    ):
+
+        try:
+            db: Session = SessionLocal()
+
+            event = DomainEvent(
+                restaurant_id=restaurant_id,
+                event_type=message.get("type"),
+                payload=message
+            )
+
+            db.add(event)
+            db.commit()
+
+        except Exception as e:
+            print("EVENT STORE ERROR:", e)
+
+        finally:
+            db.close()
+
+    # =========================
+    # DESPACHO POR WEBSOCKET
+    # =========================
+
+    async def _publish_redis(self, message: dict):
+
+        try:
+            await redis_client.publish(
+                "restaurant_events",
+                json.dumps(message)
+            )
+        except Exception as e:
+            print("REDIS ERROR:", e)    
+
+
+    def _dispatch(self, func, *args):
+
+        message = args[-1]
+
+        try:
+            loop = asyncio.get_running_loop()
+
+            loop.create_task(func(*args))
+            loop.create_task(self._publish_redis(message))
+
+        except RuntimeError:
+
+            asyncio.run(func(*args))
+            asyncio.run(self._publish_redis(message))
+
+
+event_service = EventService()
+```
+
+---
+
 ### .\backend\app\domain\order_item_service.py
 
 **Funciones (1):**
@@ -1614,7 +1919,7 @@ def get_current_user(
 **Clases (1):**
 - OrderItemDomainError
 
-**Imports (10):**
+**Imports (9):**
 - app.models.order_item.OrderItem
 - app.models.order_item.OrderItemStatus
 - app.models.user.User
@@ -1622,9 +1927,8 @@ def get_current_user(
 - app.models.order.OrderStatus
 - app.domain.order_item_transitions.can_transition
 - app.domain.order_service.OrderService
+- app.domain.event_service.event_service
 - app.websocket.manager.manager
-- asyncio
-- asyncio
 
 ```python
 from app.models.order_item import OrderItem, OrderItemStatus
@@ -1632,8 +1936,8 @@ from app.models.user import User, UserRole
 from app.models.order import OrderStatus
 from app.domain.order_item_transitions import can_transition
 from app.domain.order_service import OrderService
+from app.domain.event_service import event_service
 from app.websocket.manager import manager
-import asyncio
 
 class OrderItemDomainError(Exception):
     pass
@@ -1669,68 +1973,41 @@ def change_item_status(
     # 🔄 cambiar estado del item
     item.status = new_status
 
-    # =========================
-    # 🔥 SINCRONIZAR ORDEN
-    # =========================
-
-    items = (
-        order_service.db.query(OrderItem)
-        .filter(OrderItem.order_id == order.id)
-        .all()
-    )
-
-    # 👉 PRIORIDAD 1
-    if any(i.status == OrderItemStatus.IN_PROGRESS for i in items):
-        if order.status != OrderStatus.IN_PROGRESS:
-            order_service.update_status(order, OrderStatus.IN_PROGRESS)
-
-    # 👉 PRIORIDAD 2
-    elif items and all(
-        i.status in [OrderItemStatus.READY, OrderItemStatus.DELIVERED]
-        for i in items
-    ):
-        if order.status != OrderStatus.READY:
-            order_service.update_status(order, OrderStatus.READY)
-
-    # 👉 PRIORIDAD 3
-    elif any(i.status == OrderItemStatus.SENT for i in items):
-        if order.status != OrderStatus.SENT:
-            order_service.update_status(order, OrderStatus.SENT)
-
-    # 👉 PRIORIDAD 4
-    elif items:
-        if order.status != OrderStatus.OPEN:
-            order_service.update_status(order, OrderStatus.OPEN)
+    # 🔥 recalcular orden
+    previous_status = order.status
+    order_service.recalculate_order_status(order)
 
     # =========================
-    # 🔔 EVENTO GLOBAL
+    # 🔔 EVENTOS
     # =========================
 
-    import asyncio
+    if order.status != previous_status:
 
-    # 👉 avisar a cocina (por estación)
-    asyncio.create_task(
-        manager.send_to_station(
+        # 👉 cocina (solo la estación afectada)
+        event_service.emit_to_station(
             order.restaurant_id,
             item.product.station_id,
             {
-                "type": "ORDER_UPDATED",
-                "order_id": order.id
+                "type": "ITEM_STATUS_CHANGED",
+                "order_id": order.id,
+                "item_id": item.id,
+                "status": new_status.value
             }
         )
-    )
 
-    # 👉 avisar a mozos
-    asyncio.create_task(
-        manager.send_to_role(
-            order.restaurant_id,
-            user.role,
-            {
-                "type": "ORDER_UPDATED",
-                "order_id": order.id
-            }
-        )
-    )
+        # 👉 si es READY
+        if new_status == OrderItemStatus.READY:
+            event_service.emit_to_role(
+                order.restaurant_id,
+                UserRole.WAITER,
+                {
+                    "type": "ITEM_READY",
+                    "order_id": order.id,
+                    "table": order.table.number,
+                    "product": item.product.name,
+                    "quantity": item.quantity
+                }
+            )
 ```
 
 ---
@@ -1783,7 +2060,7 @@ def allowed_transitions(status: OrderItemStatus) -> list[OrderItemStatus]:
 
 ### .\backend\app\domain\order_service.py
 
-**Funciones (9):**
+**Funciones (10):**
 - __init__
 - calculate_totals
 - send_to_kitchen
@@ -1793,12 +2070,13 @@ def allowed_transitions(status: OrderItemStatus) -> list[OrderItemStatus]:
 - get_order
 - update_status
 - add_item
+- recalculate_order_status
 
 **Clases (2):**
 - OrderDomainError
 - OrderService
 
-**Imports (15):**
+**Imports (16):**
 - sqlalchemy.orm.Session
 - sqlalchemy.orm.joinedload
 - sqlalchemy.func
@@ -1811,6 +2089,7 @@ def allowed_transitions(status: OrderItemStatus) -> list[OrderItemStatus]:
 - app.websocket.manager.manager
 - app.models.order_item.OrderItem
 - app.domain.order_transitions.is_valid_order_transition
+- app.domain.event_service.event_service
 - asyncio
 - decimal.Decimal
 - asyncio
@@ -1828,6 +2107,8 @@ from app.websocket.manager import manager
 from app.models.order_item import OrderItem
 
 from app.domain.order_transitions import is_valid_order_transition
+from app.domain.event_service import event_service
+
 import asyncio
 
 class OrderDomainError(Exception):
@@ -1879,40 +2160,62 @@ class OrderService:
     def send_to_kitchen(self, order: Order):
 
         if order.status == OrderStatus.CLOSED:
-            raise OrderDomainError("Order is closed")
+            raise OrderDomainError("La orden está cerrada")
 
+        # 👉 obtener items pendientes
         pending_items = [
             item for item in order.items
             if item.status == OrderItemStatus.PENDING
         ]
 
         if not pending_items:
-            raise OrderDomainError("No pending items to send")
+            raise OrderDomainError("No hay items pendientes de envío")
 
+        # 🔄 cambiar estado de items
         for item in pending_items:
             item.status = OrderItemStatus.SENT
 
-        if order.status == OrderStatus.OPEN:
-            self.update_status(order, OrderStatus.SENT)
+        # 🔥 recalcular estado de la orden (UNIFICADO)
+        previous_status = order.status
+        self.recalculate_order_status(order)
 
+        # =========================
+        # 🔔 EVENTOS
+        # =========================
+
+        import asyncio
+
+        # 👉 agrupar por estación (clave para no spamear)
         station_ids = {
             item.product.station_id
             for item in pending_items
         }
 
+        # 👉 cocina
         for station_id in station_ids:
-            asyncio.create_task(
-                manager.send_to_station(
-                    order.restaurant_id,
-                    station_id,
-                    {
-                        "type": "ORDER_UPDATED",
-                        "order_id": order.id
-                    }
-                )
+            event_service.emit_to_station(
+                order.restaurant_id,
+                station_id,
+                {
+                    "type": "ORDER_UPDATED",
+                    "order_id": order.id
+                }
+            )
+
+        # 👉 mozos (solo si cambia estado)
+        if order.status != previous_status:
+            event_service.emit_to_role(
+                order.restaurant_id,
+                UserRole.WAITER,
+                {
+                    "type": "ORDER_STATUS_CHANGED",
+                    "order_id": order.id,
+                    "status": order.status.value
+                }
             )
 
         return pending_items
+
 
     # -------------------------
     # Cerrar orden
@@ -1952,7 +2255,7 @@ class OrderService:
 
         if not_delivered:
             raise OrderDomainError(
-                f"Cannot close order. Items not delivered: {not_delivered}"
+                f"No se puede cerrar la orden. Hay items no entregados. Items: {not_delivered}"
             )
 
         # ✅ transición correcta
@@ -1963,30 +2266,16 @@ class OrderService:
         # 🔔 EVENTO: ORDEN CERRADA
         # =========================
 
-        try:
-            asyncio.run(
-                manager.send_to_role(
-                    order.restaurant_id,
-                    UserRole.WAITER,
-                    {
-                        "type": "ORDER_CLOSED",
-                        "order_id": order.id
-                    }
-                )
-            )
-        except RuntimeError:
-            # fallback por si ya hay loop (ej: tests async)
-            loop = asyncio.get_event_loop()
-            loop.create_task(
-                manager.send_to_role(
-                    order.restaurant_id,
-                    UserRole.WAITER,
-                    {
-                        "type": "ORDER_CLOSED",
-                        "order_id": order.id
-                    }
-                )
-            )
+        event_service.emit_to_role(
+            order.restaurant_id,
+            UserRole.WAITER,
+            {
+                "type": "ORDER_CLOSED",
+                "order_id": order.id
+            }
+        )
+
+
     # -------------------------
     # Registrar pago
     # -------------------------
@@ -2075,10 +2364,10 @@ class OrderService:
     def add_item(self, order, product, quantity: int):
 
         if order.status == OrderStatus.CLOSED:
-            raise OrderDomainError("Cannot add items to a closed order")
+            raise OrderDomainError("No se pueden agregar items a una orden cerrada")
 
         if quantity <= 0:
-            raise OrderDomainError("Quantity must be greater than zero")
+            raise OrderDomainError("La cantidad debe ser mayor a 0 (cero)")
 
         existing_item = self.db.query(OrderItem).filter(
             OrderItem.order_id == order.id,
@@ -2088,45 +2377,78 @@ class OrderService:
 
         if existing_item:
             existing_item.quantity += quantity
-            return existing_item
+            item = existing_item
+        else:
+            item = OrderItem(
+                restaurant_id=order.restaurant_id,
+                order_id=order.id,
+                product_id=product.id,
+                quantity=quantity,
+                unit_price=product.price,
+                status=OrderItemStatus.PENDING
+            )
+            self.db.add(item)
 
-        if order.status == OrderStatus.DRAFT:
-            self.update_status(order, OrderStatus.OPEN)
+        # 🔥 recalcular estado de orden
+        previous_status = order.status
+        self.recalculate_order_status(order)
 
-        new_item = OrderItem(
-            restaurant_id=order.restaurant_id,
-            order_id=order.id,
-            product_id=product.id,
-            quantity=quantity,
-            unit_price=product.price,
-            status=OrderItemStatus.PENDING
+        # =========================
+        # 🔔 EVENTOS
+        # =========================
+
+        # 👉 cocina
+        event_service.emit_to_station(
+            order.restaurant_id,
+            product.station_id,
+            {
+                "type": "NEW_ITEM",
+                "order_id": order.id
+            }
         )
 
-        self.db.add(new_item)
+        # 👉 mozos (esto te faltaba)
+        event_service.emit_to_role(
+            order.restaurant_id,
+            UserRole.WAITER,
+            {
+                "type": "ORDER_UPDATED",
+                "order_id": order.id
+            }
+        )
 
+        return item
 
-        # =========================
-        # 🔥 NOTIFICAR A COCINA
-        # =========================
+    def recalculate_order_status(self, order: Order):
 
-        station_id = product.station_id
+        items = order.items
 
-        import asyncio
-        if existing_item:
-            existing_item.quantity += quantity
-            asyncio.create_task(
-                manager.send_to_station(
-                    order.restaurant_id,
-                    product.station_id,
-                    {
-                        "type": "ORDER_UPDATED",
-                        "order_id": order.id
-                    }
-                )
-            )
-            return existing_item
-        
-        return new_item
+        if not items:
+            return order
+
+        statuses = [item.status for item in items]
+
+        # 🔴 PRIORIDAD 1: algún item en preparación
+        if any(s == OrderItemStatus.IN_PROGRESS for s in statuses):
+            self.update_status(order, OrderStatus.IN_PROGRESS)
+            return order
+
+        # 🟠 PRIORIDAD 2: algún item enviado
+        if any(s == OrderItemStatus.SENT for s in statuses):
+            self.update_status(order, OrderStatus.SENT)
+            return order
+
+        # 🟡 PRIORIDAD 3: hay pendientes
+        if any(s == OrderItemStatus.PENDING for s in statuses):
+            self.update_status(order, OrderStatus.OPEN)
+            return order
+
+        # 🟢 PRIORIDAD 4: todos listos o entregados
+        if all(s in [OrderItemStatus.READY, OrderItemStatus.DELIVERED] for s in statuses):
+            self.update_status(order, OrderStatus.READY)
+            return order
+
+        return order
 ```
 
 ---
@@ -2161,10 +2483,13 @@ ORDER_ALLOWED_TRANSITIONS = {
         OrderStatus.CANCELLED
     ],
     OrderStatus.IN_PROGRESS: [
+        OrderStatus.SENT,
         OrderStatus.READY,
         OrderStatus.CANCELLED
     ],
     OrderStatus.READY: [
+        OrderStatus.OPEN,
+        OrderStatus.SENT,
         OrderStatus.CLOSED
     ],
     OrderStatus.CLOSED: [],
@@ -2180,6 +2505,128 @@ def is_valid_order_transition(
     allowed = ORDER_ALLOWED_TRANSITIONS.get(current_status, [])
 
     return new_status in allowed
+```
+
+---
+
+### .\backend\app\domain\zeroconf_service.py
+
+**Funciones (2):**
+- get_local_ip
+- __init__
+
+**Clases (1):**
+- ZeroconfService
+
+**Imports (3):**
+- zeroconf.asyncio.AsyncZeroconf
+- zeroconf.asyncio.AsyncServiceInfo
+- socket
+
+```python
+from zeroconf.asyncio import AsyncZeroconf, AsyncServiceInfo
+import socket
+
+
+def get_local_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(("8.8.8.8", 80))
+    ip = s.getsockname()[0]
+    s.close()
+    return ip
+
+
+class ZeroconfService:
+
+    def __init__(self):
+        self.zeroconf = None
+        self.info = None
+
+    async def start(self):
+
+        self.zeroconf = AsyncZeroconf()
+
+        hostname = socket.gethostname()
+        ip = get_local_ip()
+
+        self.info = AsyncServiceInfo(
+            "_pos._tcp.local.",
+            "restaurant-pos._pos._tcp.local.",
+            addresses=[socket.inet_aton(ip)],
+            port=8000,
+            properties={},
+            server=f"{hostname}.local."
+        )
+
+        await self.zeroconf.async_register_service(self.info)
+
+        print(f"Zeroconf POS service published at {ip}:8000")
+
+    async def stop(self):
+
+        if self.zeroconf and self.info:
+
+            await self.zeroconf.async_unregister_service(self.info)
+            await self.zeroconf.async_close()
+
+            print("Zeroconf service stopped")
+```
+
+---
+
+### .\backend\app\events\redis_listener.py
+
+**Funciones (0):**
+
+**Clases (0):**
+
+**Imports (4):**
+- asyncio
+- json
+- app.core.redis.redis_client
+- app.websocket.manager.manager
+
+```python
+import asyncio
+import json
+
+from app.core.redis import redis_client
+from app.websocket.manager import manager
+
+
+async def redis_event_listener():
+
+    pubsub = redis_client.pubsub()
+
+    await pubsub.subscribe("restaurant_events")
+
+    print("Redis listener started")
+
+    try:
+        async for message in pubsub.listen():
+
+            if message["type"] != "message":
+                continue
+
+            try:
+                data = json.loads(message["data"])
+
+                restaurant_id = data.get("restaurant_id")
+
+                if not restaurant_id:
+                    continue
+
+                await manager.broadcast(restaurant_id, data)
+
+            except Exception as e:
+                print("Redis event error:", e)
+
+    except asyncio.CancelledError:
+        print("Redis listener stopped")
+
+    finally:
+        await pubsub.unsubscribe("restaurant_events")
+        await pubsub.close()
 ```
 
 ---
@@ -2275,6 +2722,62 @@ class Category(Base):
     products = relationship("Product", back_populates="category")
 
 
+```
+
+---
+
+### .\backend\app\models\domain_event.py
+
+**Funciones (0):**
+
+**Clases (1):**
+- DomainEvent
+
+**Imports (9):**
+- sqlalchemy.Column
+- sqlalchemy.Integer
+- sqlalchemy.String
+- sqlalchemy.JSON
+- sqlalchemy.DateTime
+- sqlalchemy.func
+- sqlalchemy.ForeignKey
+- sqlalchemy.orm.relationship
+- app.db.base_class.Base
+
+```python
+from sqlalchemy import Column, Integer, String, JSON, DateTime, func, ForeignKey
+from sqlalchemy.orm import relationship
+
+from app.db.base_class import Base
+
+
+class DomainEvent(Base):
+
+    __tablename__ = "domain_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    restaurant_id = Column(
+        Integer,
+        ForeignKey("restaurants.id"),
+        nullable=False,
+        index=True
+    )
+
+    event_type = Column(String, nullable=False)
+
+    payload = Column(JSON)
+
+    created_at = Column(
+        DateTime,
+        server_default=func.now(),
+        nullable=False
+    )
+
+    restaurant = relationship(
+        "Restaurant",
+        back_populates="domain_events"
+    )
 ```
 
 ---
@@ -2655,6 +3158,7 @@ class Restaurant(Base):
     categories = relationship("Category", back_populates="restaurant", cascade="all, delete")
     order_items = relationship("OrderItem", back_populates="restaurant", cascade="all, delete")
     users = relationship("User", back_populates="restaurant")
+    domain_events = relationship("DomainEvent", back_populates="restaurant")
 
 
 
@@ -2823,7 +3327,7 @@ class User(Base):
 
 **Clases (0):**
 
-**Imports (10):**
+**Imports (11):**
 - table.Table
 - order.Order
 - product.Product
@@ -2834,6 +3338,7 @@ class User(Base):
 - production_station.ProductionStation
 - category.Category
 - user.User
+- domain_event.DomainEvent
 
 ```python
 from .table import Table
@@ -2846,7 +3351,75 @@ from .restaurant import Restaurant
 from .production_station import ProductionStation
 from .category import Category
 from .user import User
+from .domain_event import DomainEvent
 
+```
+
+---
+
+### .\backend\app\network\service_discovery.py
+
+**Funciones (4):**
+- get_lan_ip
+- __init__
+- start
+- stop
+
+**Clases (1):**
+- ServiceDiscovery
+
+**Imports (3):**
+- socket
+- zeroconf.Zeroconf
+- zeroconf.ServiceInfo
+
+```python
+import socket
+from zeroconf import Zeroconf, ServiceInfo
+
+
+def get_lan_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    try:
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+    finally:
+        s.close()
+
+    return ip
+
+
+class ServiceDiscovery:
+
+    def __init__(self, service_name="restaurant-pos", port=8000):
+        self.service_name = service_name
+        self.port = port
+        self.zeroconf = Zeroconf()
+        self.info = None
+
+    def start(self):
+
+        ip = get_lan_ip()
+
+        self.info = ServiceInfo(
+            "_http._tcp.local.",
+            f"{self.service_name}._http._tcp.local.",
+            addresses=[socket.inet_aton(ip)],
+            port=self.port,
+            properties={},
+        )
+
+        self.zeroconf.register_service(self.info)
+
+        print(f"POS disponible en http://{self.service_name}.local:{self.port}")
+
+    def stop(self):
+
+        if self.info:
+            self.zeroconf.unregister_service(self.info)
+
+        self.zeroconf.close()
 ```
 
 ---
@@ -2859,7 +3432,16 @@ from .user import User
 
 **Clases (0):**
 
-**Imports (13):**
+**Imports (22):**
+- fastapi.APIRouter
+- fastapi.Depends
+- fastapi.HTTPException
+- fastapi.status
+- sqlalchemy.orm.Session
+- fastapi.security.OAuth2PasswordRequestForm
+- app.db.session.get_db
+- app.models.user.User
+- app.schemas.auth.TokenResponse
 - fastapi.APIRouter
 - fastapi.Depends
 - fastapi.HTTPException
@@ -2870,9 +3452,9 @@ from .user import User
 - app.models.user.User
 - app.schemas.auth.TokenResponse
 - app.core.security.create_access_token
+- app.core.security.verify_password
 - app.dependencies.auth.get_current_user
 - app.schemas.user.UserOut
-- passlib.context.CryptContext
 
 ```python
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -2882,14 +3464,16 @@ from fastapi.security import OAuth2PasswordRequestForm
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.auth import TokenResponse
-from app.core.security import create_access_token
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from fastapi.security import OAuth2PasswordRequestForm
+
+from app.db.session import get_db
+from app.models.user import User
+from app.schemas.auth import TokenResponse
+from app.core.security import create_access_token, verify_password
 from app.dependencies.auth import get_current_user
-
 from app.schemas.user import UserOut
-
-from passlib.context import CryptContext
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -2903,13 +3487,10 @@ def login(
         User.username == form_data.username
     ).first()
 
-    if not user or not pwd_context.verify(
-        form_data.password,
-        user.password_hash
-    ):
+    if not user or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid credentials"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Credenciales inválidas"
         )
 
     token = create_access_token({
@@ -3476,7 +4057,7 @@ def add_item_to_order(
         raise HTTPException(404, "Producto no disponible")
 
     service = OrderService(db)
-    print(dir(service))
+
     try:
         new_item = service.add_item(order, product, item.quantity)
         db.commit()
@@ -3564,7 +4145,7 @@ def add_payment(
 
     cash_register = db.query(CashRegister).filter(
         CashRegister.restaurant_id == user.restaurant_id,
-        CashRegister.closed_at == None
+        CashRegister.is_open == True
     ).first()
 
     if not cash_register:
@@ -3625,15 +4206,6 @@ def delete_order_item(
 
     print("ITEM ID:", item_id)
     print("USER RESTAURANT:", user.restaurant_id)
-
-    item = db.query(OrderItem).filter(
-        OrderItem.id == item_id
-    ).first()
-
-    print("ITEM FOUND:", item)
-
-    if item:
-        print("ITEM RESTAURANT:", item.restaurant_id)
 
     item = db.query(OrderItem).filter(
         OrderItem.id == item_id,
@@ -3842,7 +4414,7 @@ def apply_discount(
 
 **Clases (0):**
 
-**Imports (14):**
+**Imports (15):**
 - fastapi.APIRouter
 - fastapi.Depends
 - fastapi.HTTPException
@@ -3851,6 +4423,7 @@ def apply_discount(
 - app.models.order_item.OrderItem
 - app.models.order_item.OrderItemStatus
 - app.models.user.User
+- app.models.user.UserRole
 - app.domain.order_service.OrderService
 - app.domain.order_item_service.change_item_status
 - app.domain.order_item_service.OrderItemDomainError
@@ -3863,7 +4436,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.order_item import OrderItem, OrderItemStatus
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.domain.order_service import OrderService
 from app.domain.order_item_service import change_item_status, OrderItemDomainError
 from app.schemas.order.order_item import OrderItemStatusUpdate
@@ -3871,27 +4444,6 @@ from app.dependencies.auth import get_current_user
 from app.websocket.manager import manager
 
 router = APIRouter(prefix="/order-items", tags=["order-items"])
-
-ALLOWED_ITEM_TRANSITIONS = {
-    OrderItemStatus.PENDING: [
-        OrderItemStatus.SENT,
-        OrderItemStatus.CANCELLED
-    ],
-    OrderItemStatus.SENT: [
-        OrderItemStatus.IN_PROGRESS,
-        OrderItemStatus.CANCELLED
-    ],
-    OrderItemStatus.IN_PROGRESS: [
-        OrderItemStatus.READY,
-        OrderItemStatus.CANCELLED
-    ],
-    OrderItemStatus.READY: [
-        OrderItemStatus.DELIVERED
-    ],
-    OrderItemStatus.DELIVERED: [],
-    OrderItemStatus.CANCELLED: []
-}
-
 
 @router.patch("/{item_id}/status")
 async def update_item_status(
@@ -3923,7 +4475,7 @@ async def update_item_status(
     if item.status == OrderItemStatus.READY:
         await manager.send_to_role(
             restaurant_id=user.restaurant_id,
-            role=user.role,
+            role=UserRole.WAITER,
             message={
                 "type": "ITEM_READY",
                 "table": item.order.table.number,
@@ -4753,91 +5305,6 @@ def toggle_user(
 
 ---
 
-### .\backend\app\routers\ws_kitchen.py
-
-**Funciones (0):**
-
-**Clases (0):**
-
-**Imports (4):**
-- fastapi.APIRouter
-- fastapi.WebSocket
-- fastapi.WebSocketDisconnect
-- app.websocket.manager.manager
-
-```python
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from app.websocket.manager import manager
-
-router = APIRouter()
-
-
-@router.websocket("/ws/kitchen/{restaurant_id}/{station_id}")
-async def kitchen_ws(websocket: WebSocket, restaurant_id: int, station_id: int):
-
-    await manager.connect(websocket, restaurant_id, station_id)
-
-    try:
-        while True:
-
-            message = await websocket.receive()
-
-            # si el cliente se desconecta
-            if message["type"] == "websocket.disconnect":
-                break
-
-            # si llega texto (no lo usamos, pero lo aceptamos)
-            if message["type"] == "websocket.receive":
-                pass
-
-    except WebSocketDisconnect:
-        pass
-
-    finally:
-
-        manager.disconnect(websocket, restaurant_id, station_id)
-
-        print(
-            "Kitchen clients:",
-            len(manager.connections[restaurant_id][station_id])
-        )
-```
-
----
-
-### .\backend\app\routers\ws_waiter.py
-
-**Funciones (0):**
-
-**Clases (0):**
-
-**Imports (4):**
-- fastapi.APIRouter
-- fastapi.WebSocket
-- fastapi.WebSocketDisconnect
-- app.websocket.manager.manager
-
-```python
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from app.websocket.manager import manager
-
-router = APIRouter()
-
-@router.websocket("/ws/waiter/{restaurant_id}")
-async def waiter_ws(websocket: WebSocket, restaurant_id: int):
-
-    await manager.connect_waiter(websocket, restaurant_id)
-
-    try:
-        while True:
-            await websocket.receive()
-
-    except WebSocketDisconnect:
-        manager.disconnect_waiter(websocket, restaurant_id)
-```
-
----
-
 ### .\backend\app\schemas\auth.py
 
 **Funciones (0):**
@@ -4891,7 +5358,6 @@ class BaseSchema(BaseModel):
 
 class TimestampSchema(BaseSchema):
     created_at: datetime
-    updated_at: datetime
 ```
 
 ---
@@ -5082,17 +5548,13 @@ class UserOut(BaseSchema):
 **Clases (1):**
 - WaiterItemOut
 
-**Imports (3):**
+**Imports (1):**
 - pydantic.BaseModel
-- typing.List
-- decimal.Decimal
 
 ```python
 # schemas/waiter.py
 
 from pydantic import BaseModel
-from typing import List
-from decimal import Decimal
 
 class WaiterItemOut(BaseModel):
     id: int
@@ -5268,13 +5730,15 @@ class PaymentOut(BaseSchema):
 **Clases (1):**
 - ConnectionManager
 
-**Imports (2):**
+**Imports (3):**
 - fastapi.WebSocket
 - collections.defaultdict
+- app.models.user.UserRole
 
 ```python
 from fastapi import WebSocket
 from collections import defaultdict
+from app.models.user import UserRole
 
 
 class ConnectionManager:
@@ -5309,7 +5773,7 @@ class ConnectionManager:
     # ENVÍOS
     # =========================
 
-    async def send_to_role(self, restaurant_id: int, role, message: dict):
+    async def send_to_role(self, restaurant_id: int, role: UserRole, message: dict):
 
         for c in self.connections[restaurant_id]:
             if c["user"].role == role:

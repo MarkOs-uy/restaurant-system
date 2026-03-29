@@ -10,5 +10,6 @@ from app.models.cash_register import CashRegister
 from app.models.user import User
 from app.models.category import Category
 from app.models.production_station import ProductionStation
+from app.models.domain_event import DomainEvent
 
 
