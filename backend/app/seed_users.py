@@ -18,7 +18,7 @@ def seed_users(db: Session):
     pass_hash = get_password_hash("1234")
 
     users = [
-        User(username="admin", role="ADMIN", password_hash = pass_hash, restaurant_id=restaurant.id),
+        User(username="admin", role="ADMIN", password_hash = pass_hash, restaurant_id=restaurant.id)
         #User(username="waiter", role="WAITER", password_hash = pass_hash, restaurant_id=restaurant.id),
         #User(username="kitchen", role="KITCHEN", password_hash = pass_hash, restaurant_id=restaurant.id),
         #User(username="cashier", role="CASHIER", password_hash = pass_hash, restaurant_id=restaurant.id),

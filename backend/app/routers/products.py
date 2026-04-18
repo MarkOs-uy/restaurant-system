@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 
 from app.models.user import User
-from app.schemas.product import ProductCreate
+from app.schemas.product import ProductCreate, ProductUpdate
 
 from app.dependencies.auth import get_current_user
 
@@ -19,8 +19,8 @@ def create_product(
 ):
 
     return service.create_product(
-        product,
-        user.restaurant_id
+        user.restaurant_id,
+        product
     )
 
 
@@ -36,15 +36,15 @@ def list_products(
 @router.patch("/{product_id}")
 def update_product(
     product_id: int,
-    product: ProductCreate,
+    product: ProductUpdate,
     user: User = Depends(get_current_user),
     service: ProductService = Depends(get_product_service)
 ):
 
     return service.update_product(
         product_id,
-        product,
-        user.restaurant_id
+        user.restaurant_id,
+        product
     )
 
 

@@ -66,7 +66,7 @@ function App() {
           {isAdmin && (
             <>
               {" | "}
-              <Link to="/tables/manage">Mesas</Link>
+              <Link to="/tables/manage">Administración de Mesas</Link>
               {" | "}
               <Link to="/admin/products">Productos</Link>
               {" | "}

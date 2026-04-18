@@ -18,14 +18,16 @@ interface Table {
 export default function ManageTables() {
 
     const [tables, setTables] = useState<Table[]>([])
+    const [originalTables, setOriginalTables] = useState<Table[]>([])
     const navigate = useNavigate()
 
     const loadTables = async () => {
-        const res = await fetch(`${API_URL}/tables`, {
+        const res = await fetch(`${API_URL}/tables/`, {
             headers: getAuthHeaders()
         })
         const data = await res.json()
         setTables(data)
+        setOriginalTables(data)
     }
 
     useEffect(() => {
@@ -35,10 +37,21 @@ export default function ManageTables() {
     const activeTables = tables.filter(t => t.active)
     const inactiveTables = tables.filter(t => !t.active)
 
+    const hasChanges = (t: Table) => {
+        const original = originalTables.find(o => o.id === t.id)
+
+        if (!original) return false
+
+        return (
+            original.capacity !== t.capacity ||
+            original.shape !== t.shape ||
+            original.active !== t.active
+        )
+    }
+
 
     const updateTable = async (t: Table) => {
         const payload = {
-            number: t.number,
             capacity: t.capacity,
             shape: t.shape,
             active: t.active
@@ -69,7 +82,7 @@ export default function ManageTables() {
     return (
     <div style={{ padding: 20 }}>
 
-        <button onClick={() => navigate("/tables")}>
+        <button onClick={() => navigate("/")}>
         ← Volver al plano
         </button>
 
@@ -77,14 +90,14 @@ export default function ManageTables() {
 
         <h2 style={{ marginTop: 20 }}>Mesas activas</h2>
 
-        <table style={{ width: "100%" }}>
+        <table style={{ width: "100%", textAlign: "center" }}>
         <thead>
             <tr>
-            <th>Número</th>
-            <th>Capacidad</th>
-            <th>Forma</th>
-            <th>Activa</th>
-            <th></th>
+                <th style={{ width: 120, textAlign: "center" }}>Número</th>
+                <th style={{ width: 120, textAlign: "center" }}>Capacidad</th>
+                <th style={{ width: 120, textAlign: "center" }}>Forma</th>
+                <th style={{ width: 120, textAlign: "center" }}>Activa</th>
+                <th style={{ width: 120, textAlign: "center" }}></th>
             </tr>
         </thead>
 
@@ -98,28 +111,24 @@ export default function ManageTables() {
             <tr key={t.id}>
 
                 <td>
-                <input
-                    type="number"
-                    value={t.number}
-                    onChange={(e) =>
-                    updateField(t.id, "number", Number(e.target.value))
-                    }
-                />
+                    <span>{t.number}</span>
                 </td>
 
                 <td>
-                <input
-                    type="number"
-                    value={t.capacity}
-                    onChange={(e) =>
-                    updateField(t.id, "capacity", Number(e.target.value))
-                    }
-                />
+                    <input
+                        type="number"
+                        value={t.capacity}
+                        style={{ textAlign: "center", width: 60 }}
+                        onChange={(e) =>
+                            updateField(t.id, "capacity", Number(e.target.value))
+                        }
+                    />
                 </td>
 
                 <td>
                 <select
                     value={t.shape}
+                    style={{ textAlign: "center" }}
                     onChange={(e) =>
                     updateField(t.id, "shape", e.target.value)
                     }
@@ -130,7 +139,7 @@ export default function ManageTables() {
                 </select>
                 </td>
 
-                <td>
+                <td style={{ textAlign: "center" }}>
                 <input
                     type="checkbox"
                     checked={t.active}
@@ -141,7 +150,14 @@ export default function ManageTables() {
                 </td>
 
                 <td>
-                <button onClick={() => updateTable(t)}>
+                <button
+                    onClick={() => updateTable(t)}
+                    disabled={!hasChanges(t)}
+                    style={{
+                        opacity: hasChanges(t) ? 1 : 0.5,
+                        cursor: hasChanges(t) ? "pointer" : "not-allowed"
+                    }}
+                >
                     Guardar
                 </button>
                 </td>
@@ -154,14 +170,14 @@ export default function ManageTables() {
 
         <h2 style={{ marginTop: 30 }}>Mesas inactivas</h2>
 
-        <table style={{ width: "100%" }}>
+        <table style={{ width: "100%", textAlign: "center" }}>
         <thead>
             <tr>
-            <th>Número</th>
-            <th>Capacidad</th>
-            <th>Forma</th>
-            <th>Activa</th>
-            <th></th>
+                <th style={{ width: 120, textAlign: "center" }}>Número</th>
+                <th style={{ width: 120, textAlign: "center" }}>Capacidad</th>
+                <th style={{ width: 120, textAlign: "center" }}>Forma</th>
+                <th style={{ width: 120, textAlign: "center" }}>Activa</th>
+                <th style={{ width: 120, textAlign: "center" }}></th>
             </tr>
         </thead>
 
@@ -175,52 +191,55 @@ export default function ManageTables() {
             <tr key={t.id}>
 
                 <td>
-                <input
-                    type="number"
-                    value={t.number}
-                    onChange={(e) =>
-                    updateField(t.id, "number", Number(e.target.value))
-                    }
-                />
+                    <span>{t.number}</span>
                 </td>
 
                 <td>
-                <input
-                    type="number"
-                    value={t.capacity}
-                    onChange={(e) =>
-                    updateField(t.id, "capacity", Number(e.target.value))
-                    }
-                />
+                    <input
+                        type="number"
+                        style={{ textAlign: "center", width: 60 }}
+                        value={t.capacity}
+                        onChange={(e) =>
+                        updateField(t.id, "capacity", Number(e.target.value))
+                        }
+                    />
                 </td>
 
                 <td>
-                <select
-                    value={t.shape}
-                    onChange={(e) =>
-                    updateField(t.id, "shape", e.target.value)
-                    }
-                >
-                    <option value="circle">Circular</option>
-                    <option value="square">Cuadrada</option>
-                    <option value="rectangle">Rectangular</option>
-                </select>
+                    <select
+                        value={t.shape}
+                        style={{ textAlign: "center" }}
+                        onChange={(e) =>
+                        updateField(t.id, "shape", e.target.value)
+                        }
+                    >
+                        <option value="circle">Circular</option>
+                        <option value="square">Cuadrada</option>
+                        <option value="rectangle">Rectangular</option>
+                    </select>
+                </td>
+
+                <td style={{ textAlign: "center" }}>
+                    <input
+                        type="checkbox"
+                        checked={t.active}
+                        onChange={(e) =>
+                        updateField(t.id, "active", e.target.checked)
+                        }
+                    />
                 </td>
 
                 <td>
-                <input
-                    type="checkbox"
-                    checked={t.active}
-                    onChange={(e) =>
-                    updateField(t.id, "active", e.target.checked)
-                    }
-                />
-                </td>
-
-                <td>
-                <button onClick={() => updateTable(t)}>
-                    Guardar
-                </button>
+                    <button
+                        onClick={() => updateTable(t)}
+                        disabled={!hasChanges(t)}
+                        style={{
+                            opacity: hasChanges(t) ? 1 : 0.5,
+                            cursor: hasChanges(t) ? "pointer" : "not-allowed"
+                        }}
+                    >
+                        Guardar
+                    </button>
                 </td>
 
             </tr>

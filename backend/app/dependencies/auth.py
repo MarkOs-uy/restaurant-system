@@ -17,7 +17,7 @@ def get_current_user(
     payload = decode_access_token(token)
 
     if payload is None:
-        raise HTTPException(401, "Invalid token")
+        raise HTTPException(401, "Token inválido")
 
     user_id = payload.get("sub")
 
@@ -26,6 +26,9 @@ def get_current_user(
     ).first()
 
     if not user:
-        raise HTTPException(401, "User not found")
+        raise HTTPException(401, "No se encuentra este usuario")
+    
+    if not user.active:
+        raise HTTPException(401, "Usuario inactivo")
 
     return user

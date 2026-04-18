@@ -18,16 +18,12 @@ export default function KitchenStations() {
   }, [])
 
   const fetchStations = async () => {
-
     const res = await fetch(
       `${API_URL}/stations/active`,
       { headers: getAuthHeaders() }
     )
-
     const data = await res.json()
-
     setStations(data)
-
   }
 
   return (

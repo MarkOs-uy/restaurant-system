@@ -1,6 +1,7 @@
 from typing import List
 from .base import BaseSchema
-from .product import ProductOut
+from .product import ProductMenu
+from decimal import Decimal
 
 class CategoryBase(BaseSchema):
     name: str
@@ -19,4 +20,4 @@ class CategoryResponse(CategoryBase):
 
 
 class CategoryWithProducts(CategoryResponse):
-    products: List[ProductOut] = []
+    products: List[ProductMenu] = []

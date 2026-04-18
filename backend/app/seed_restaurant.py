@@ -11,10 +11,7 @@ def seed_restaurant(db: Session):
         return restaurant
 
     print("Creando restaurant default...")
-
-    restaurant = Restaurant(
-        name=input("Ingrese el nombre del restaurant: ")
-    )
+    restaurant = Restaurant(name="Resto Demo")
 
     db.add(restaurant)
     db.commit()

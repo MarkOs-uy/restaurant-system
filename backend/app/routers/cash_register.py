@@ -1,21 +1,25 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func
-from decimal import Decimal
-
-from app.models.payment import Payment
-from app.models.cash_register import CashRegister
-from app.models.user import User
 
 from app.db.session import get_db
-
+from app.models.user import User
 from app.dependencies.auth import get_current_user
+from app.domain.errors import CashRegisterDomainError
 
 from app.schemas.cash_register import (
     CashRegisterOpen,
-    CashRegisterOut,
     CashRegisterSummary,
-    CashRegisterCloseOut
+    CashRegisterCloseOut,
+    CashMovementCreate,
+    CashRegisterClose,
+    CashRegisterDashboard
+)
+
+from app.domain.cash_register.cash_register_service import CashRegisterService
+from app.domain.cash_register.cash_movement_service import CashMovementService
+from app.domain.cash_register.dependencies import (
+    get_cash_register_service,
+    get_cash_movement_service
 )
 
 router = APIRouter(
@@ -23,120 +27,99 @@ router = APIRouter(
     tags=["cash-register"]
 )
 
-@router.post("/open", response_model=CashRegisterOut)
+
+@router.post("/open")
 def open_cash_register(
     data: CashRegisterOpen,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    service: CashRegisterService = Depends(get_cash_register_service),
+    user: User = Depends(get_current_user)
 ):
-
-    existing = db.query(CashRegister).filter(
-        CashRegister.is_open == True,
-        CashRegister.restaurant_id == user.restaurant_id
-    ).first()
-
-    if existing:
-        raise HTTPException(400, "Ya hay una caja abierta")
-
-    register = CashRegister(
-        restaurant_id=user.restaurant_id,
-        opening_amount=data.opening_amount,
-        opened_by_id=user.id,
-        is_open=True
-    )
-
-    db.add(register)
-    db.commit()
-    db.refresh(register)
-
-    return register
+    try:
+        return service.open_cash_register(
+            db=db,
+            restaurant_id=user.restaurant_id,
+            user_id=user.id,
+            opening_amount=data.opening_amount
+        )
+    except CashRegisterDomainError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/close", response_model=CashRegisterCloseOut)
 def close_cash_register(
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    payload: CashRegisterClose,
+    db: Session = Depends(get_db),
+    service: CashRegisterService = Depends(get_cash_register_service),
+    user: User = Depends(get_current_user)
 ):
+    try:
+        return service.close_cash_register(
+            db=db,
+            restaurant_id=user.restaurant_id,
+            user_id=user.id,
+            counted_cash=payload.counted_cash
+        )
+    except CashRegisterDomainError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-    cash_register = db.query(CashRegister).filter(
-        CashRegister.is_open == True,
-        CashRegister.restaurant_id == user.restaurant_id
-    ).first()
 
-    if not cash_register:
-        raise HTTPException(400, "No hay caja abierta")
+@router.post("/movements")
+def create_cash_movement(
+    payload: CashMovementCreate,
+    db: Session = Depends(get_db),
+    service: CashMovementService = Depends(get_cash_movement_service),
+    user: User = Depends(get_current_user)
+):
+    try:
+        return service.create_cash_movement(
+            db=db,
+            restaurant_id=user.restaurant_id,
+            user_id=user.id,
+            movement_type=payload.type,
+            amount=payload.amount,
+            reason=payload.reason
+        )
+    except CashRegisterDomainError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-    total = db.query(
-        func.coalesce(func.sum(Payment.amount), 0)
-    ).filter(
-        Payment.cash_register_id == cash_register.id
-    ).scalar()
 
-    cash_register.closing_amount = total
-    cash_register.closed_at = func.now()
-    cash_register.is_open = False
-    cash_register.closed_by_id = user.id
-
-    db.commit()
-
-    return {
-        "message": "Caja cerrada",
-        "total_vendido": float(total)
-    }
+@router.delete("/movements/{movement_id}")
+def delete_cash_movement(
+    movement_id: int,
+    db: Session = Depends(get_db),
+    service: CashMovementService = Depends(get_cash_movement_service),
+    user: User = Depends(get_current_user)
+):
+    try:
+        return service.delete_cash_movement(
+            db=db,
+            restaurant_id=user.restaurant_id,
+            movement_id=movement_id
+        )
+    except CashRegisterDomainError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/current", response_model=CashRegisterSummary | None)
 def current_cash_register(
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    service: CashRegisterService = Depends(get_cash_register_service),
+    user: User = Depends(get_current_user)
 ):
-
-    cash_register = db.query(CashRegister).filter(
-        CashRegister.is_open == True,
-        CashRegister.restaurant_id == user.restaurant_id
-    ).first()
-
-    if not cash_register:
-        return None
-    
-    total_sales = db.query(
-        func.coalesce(func.sum(Payment.amount), 0)
-    ).filter(
-        Payment.cash_register_id == cash_register.id
-    ).scalar()
-
-    orders_count = db.query(func.count(Payment.id)).filter(
-        Payment.cash_register_id == cash_register.id
-    ).scalar()
-
-    average_ticket = (
-        total_sales / orders_count
-        if orders_count
-        else Decimal("0")
+    return service.get_current_cash_register(
+        db=db,
+        restaurant_id=user.restaurant_id
     )
 
-    rows = db.query(
-        Payment.method,
-        func.sum(Payment.amount)
-    ).filter(
-        Payment.cash_register_id == cash_register.id
-    ).group_by(
-        Payment.method
-    ).all()
 
-    by_method = {
-        method.value: amount
-        for method, amount in rows
-    }
-
-    return {
-        "cash_register_id": cash_register.id,
-        "opened_at": cash_register.opened_at,
-        "total_sales": float(total_sales),
-        "orders_count": orders_count,
-        "average_ticket": float(average_ticket),
-        "by_method": {
-            method.value: float(amount)
-            for method, amount in rows
-        }
-    }
+@router.get("/dashboard", response_model=CashRegisterDashboard | None)
+def get_cash_register_dashboard(
+    db: Session = Depends(get_db),
+    service: CashRegisterService = Depends(get_cash_register_service),
+    user: User = Depends(get_current_user)
+):
+    return service.get_dashboard(
+        db=db,
+        restaurant_id=user.restaurant_id
+    )

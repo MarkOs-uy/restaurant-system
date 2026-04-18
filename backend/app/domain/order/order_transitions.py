@@ -35,7 +35,5 @@ def is_valid_order_transition(
     current_status: OrderStatus,
     new_status: OrderStatus
 ) -> bool:
-
     allowed = ORDER_ALLOWED_TRANSITIONS.get(current_status, [])
-
     return new_status in allowed

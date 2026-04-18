@@ -19,6 +19,7 @@ export default function Kitchen() {
   const navigate = useNavigate()
 
   const [items, setItems] = useState<KitchenItem[]>([])
+  const [stationName, setStationName] = useState("")
 
   const fetchItems = async () => {
     const res = await fetch(
@@ -34,10 +35,84 @@ export default function Kitchen() {
   useEffect(() => {
     if (!station) return
     fetchItems()
+    fetchStation()
   }, [station])
 
-  useEffect(() => {
+//-----------------------------------------------------------
 
+  const fetchStation = async () => {
+
+    const res = await fetch(
+      `${API_URL}/production-stations/${station}`,
+      { headers: getAuthHeaders() }
+    )
+
+    const data = await res.json()
+
+    setStationName(data.name)
+  }
+
+  //-----------------------------------------------------------
+
+  const updateStatus = async (
+    itemId: number,
+    newStatus: string
+  ) => {
+    await fetch(
+      `${API_URL}/order-items/${itemId}/status`,
+      {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status: newStatus })
+      }
+    )
+    fetchItems()
+  }
+
+//-----------------------------------------------------------
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "SENT": return "orange"
+      case "IN_PROGRESS": return "blue"
+      case "READY": return "green"
+      default: return "black"
+    }
+  }
+
+//-----------------------------------------------------------
+
+  const getWaitingTime = (createdAt: string) => {
+    const created = new Date(createdAt).getTime()
+    const now = Date.now()
+
+    const diff = Math.floor((now - created) / 1000)
+
+    const minutes = Math.floor(diff / 60)
+    const seconds = diff % 60
+
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`
+  }
+
+//-----------------------------------------------------------
+
+  const groupedOrders = items.reduce((acc, item) => {
+    if (!acc[item.order_id]) {
+      acc[item.order_id] = {
+        table: item.table_number,
+        created_at: item.created_at,
+        items: []
+      }
+    }
+
+    acc[item.order_id].items.push(item)
+
+    return acc
+  }, {} as Record<number, { table: number, created_at: string, items: KitchenItem[] }>)
+
+//-----------------------------------------------------------
+
+  useEffect(() => {
     let ws: WebSocket | null = null
     let reconnectTimer: any = null
     let shouldReconnect = true
@@ -122,61 +197,11 @@ export default function Kitchen() {
 
   }, [stationId])
 
-  const updateStatus = async (
-    itemId: number,
-    newStatus: string
-  ) => {
-    await fetch(
-      `${API_URL}/order-items/${itemId}/status`,
-      {
-        method: "PATCH",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ status: newStatus })
-      }
-    )
-    fetchItems()
-  }
+//-----------------------------------------------------------
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "SENT": return "orange"
-      case "IN_PROGRESS": return "blue"
-      case "READY": return "green"
-      default: return "black"
-    }
-  }
-
-  const getWaitingTime = (createdAt: string) => {
-    const created = new Date(createdAt).getTime()
-    const now = Date.now()
-
-    const diff = Math.floor((now - created) / 1000)
-
-    const minutes = Math.floor(diff / 60)
-    const seconds = diff % 60
-
-    return `${minutes}:${seconds.toString().padStart(2, "0")}`
-  }
-
-
-
-  const groupedOrders = items.reduce((acc, item) => {
-    if (!acc[item.order_id]) {
-      acc[item.order_id] = {
-        table: item.table_number,
-        created_at: item.created_at,
-        items: []
-      }
-    }
-
-    acc[item.order_id].items.push(item)
-
-    return acc
-  }, {} as Record<number, { table: number, created_at: string, items: KitchenItem[] }>)
-  
-  return (
+return (
     <div style={{ padding: 40 }}>
-      <h1>Estación #{station}</h1>
+      <h1>Estación {stationName} - (#{station})</h1>
 
       <button
         onClick={() => navigate("/kitchen")}

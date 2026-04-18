@@ -1,8 +1,10 @@
-from fastapi import HTTPException
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.product import Product
 from app.schemas.product import ProductCreate, ProductUpdate
+
+from app.domain.errors import ProductDomainError
+from app.domain.error_codes import ErrorCode
 
 
 class ProductService:
@@ -10,21 +12,28 @@ class ProductService:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_product(self, product_id: int, restaurant_id: int):
+    # -------------------------
+    # Obtener producto
+    # -------------------------
 
+    def get_product(self, product_id: int, restaurant_id: int):
         product = self.db.query(Product).filter(
             Product.id == product_id,
             Product.restaurant_id == restaurant_id
         ).first()
 
         if not product:
-            raise HTTPException(404, "Product not found")
-
+            raise ProductDomainError(
+                "Product not found",
+                ErrorCode.PRODUCT_NOT_FOUND,
+                context={"product_id": product_id})
         return product
 
+    # -------------------------
+    # Crear producto
+    # -------------------------
 
     def create_product(self, restaurant_id: int, data: ProductCreate):
-
         product = Product(
             name=data.name,
             price=data.price,
@@ -32,13 +41,14 @@ class ProductService:
             station_id=data.station_id,
             restaurant_id=restaurant_id
         )
-
         self.db.add(product)
         self.db.commit()
         self.db.refresh(product)
-
         return product
 
+    # -------------------------
+    # Listar productos
+    # -------------------------
 
     def list_products(self, restaurant_id: int):
 
@@ -52,36 +62,26 @@ class ProductService:
             .all()
         )
 
+    # -------------------------
+    # Actualizar producto
+    # -------------------------
 
     def update_product(self, product_id: int, restaurant_id: int, data: ProductUpdate):
-
         product = self.get_product(product_id, restaurant_id)
-
-        if data.name is not None:
-            product.name = data.name
-
-        if data.price is not None:
-            product.price = data.price
-
-        if data.category_id is not None:
-            product.category_id = data.category_id
-
-        if data.station_id is not None:
-            product.station_id = data.station_id
-
+        update_data = data.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(product, field, value)
         self.db.commit()
         self.db.refresh(product)
-
         return product
 
+    # -------------------------
+    # Cambiar producto - Activo/Inactivo
+    # -------------------------
 
     def toggle_product(self, product_id: int, restaurant_id: int):
-
         product = self.get_product(product_id, restaurant_id)
-
         product.active = not product.active
-
         self.db.commit()
         self.db.refresh(product)
-
         return product

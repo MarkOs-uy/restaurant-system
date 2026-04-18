@@ -24,3 +24,9 @@ class ProductOut(BaseSchema):
     category_id: int
     station_id: int
     active: bool
+
+
+class ProductMenu(BaseSchema):
+    id: int
+    name: str
+    price: Decimal

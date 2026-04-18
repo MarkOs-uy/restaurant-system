@@ -3,7 +3,7 @@ import json
 
 from app.core.redis import redis_client
 from app.websocket.manager import manager
-from backend.app.services.event_service import INSTANCE_ID
+from app.services.event_service import INSTANCE_ID
 
 
 async def redis_event_listener():
@@ -22,7 +22,7 @@ async def redis_event_listener():
 
             data = json.loads(message["data"])
 
-            # evitar duplicados
+            # ignorar eventos de esta misma instancia
             if data.get("origin") == INSTANCE_ID:
                 continue
 
@@ -31,13 +31,13 @@ async def redis_event_listener():
             target_id = data.get("target_id")
 
             if target == "broadcast":
-                await manager.broadcast(restaurant_id, data)
+                await manager.broadcast(restaurant_id, data["payload"])
 
             elif target == "role":
-                await manager.send_to_role(restaurant_id, target_id, data)
+                await manager.send_to_role(restaurant_id, target_id, data["payload"])
 
             elif target == "station":
-                await manager.send_to_station(restaurant_id, target_id, data)
+                await manager.send_to_station(restaurant_id, target_id, data["payload"])
 
     except asyncio.CancelledError:
         print("Redis listener stopped")

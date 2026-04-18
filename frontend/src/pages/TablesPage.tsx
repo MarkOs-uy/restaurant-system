@@ -7,12 +7,12 @@ interface Table {
   number: number
   x: number
   y: number
+  capacity: number
   shape: string
   status: string
   active: boolean
   order_id?: number | null
   order_status?: string | null
-  capacity: number
 }
 
 export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
@@ -32,14 +32,42 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
 
   const [showForm, setShowForm] = useState(false)
 
+  const loadLayout = async () => {
+    const res = await fetch(`${API_URL}/layout/`, {
+      headers: getAuthHeaders()
+    })
+    const data = await res.json()
+    setLayout(data)
+  }
+
+  useEffect(() => {
+    loadLayout()
+    loadTables()
+    const interval = setInterval(loadTables, 5000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const saveLayout = async () => {
+    const res = await fetch(`${API_URL}/layout/`, {
+      method: "PATCH",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(layout)
+    })
+    if (!res.ok) {
+      alert("Error guardando layout")
+      return
+    }
+    alert("Layout guardado")
+  }
+
   const [layout, setLayout] = useState({
     width: 900,
-    height: 500
+    height: 500,
+    grid_size: 40,
+    snap_to_grid: true
   })
 
   const TABLE_SIZE = 100
-  const FLOOR_WIDTH = 900
-  const FLOOR_HEIGHT = 500
 
   const loadTables = () => {
     fetch(`${API_URL}/tables/status`, { headers: getAuthHeaders() })
@@ -53,13 +81,6 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
         setLoading(false)
       })
   }
-
-  useEffect(() => {
-    loadTables()
-    const interval = setInterval(loadTables, 5000)
-
-    return () => clearInterval(interval)
-  }, [])
 
   const touchTable = async (tableId: number) => {
 
@@ -154,21 +175,80 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
   return (
 
     <div style={{ padding: 20 }}>
+      {isAdmin && (
+        <>
+          <button
+            onClick={() => setEditMode(!editMode)}
+            style={{ marginBottom: 20 }}
+          >
+            {editMode ? "Salir edición" : "Editar plano"}
+          </button>
 
-      <button
-        onClick={() => setEditMode(!editMode)}
-        style={{ marginBottom: 20 }}
-      >
-        {editMode ? "Salir edición" : "Editar plano"}
-      </button>
+          <button onClick={() => setShowForm(true)}>
+            + Mesa
+          </button>
 
-      <button onClick={() => setShowForm(true)}>
-        + Mesa
-      </button>
+          <button onClick={() => navigate("/tables/manage")}>
+            Administrar mesas
+          </button>
+        </>
+      )}
 
-      <button onClick={() => navigate("/tables/manage")}>
-        Administrar mesas
-      </button>
+      {isAdmin && (
+        <div style={{ marginBottom: 10 }}>
+
+          Plano:
+
+          <input
+            type="number"
+            value={layout.width}
+            onChange={(e) =>
+              setLayout({ ...layout, width: Number(e.target.value) })
+            }
+            style={{ width: 80, marginLeft: 10 }}
+          />
+
+          x
+
+          <input
+            type="number"
+            value={layout.height}
+            onChange={(e) =>
+              setLayout({ ...layout, height: Number(e.target.value) })
+            }
+            style={{ width: 80, marginLeft: 10 }}
+          />
+
+          Grid:
+
+          <input
+            type="number"
+            value={layout.grid_size}
+            onChange={(e) =>
+              setLayout({ ...layout, grid_size: Number(e.target.value) })
+            }
+            style={{ width: 60, marginLeft: 10 }}
+          />
+
+          <label style={{ marginLeft: 20 }}>
+            <input
+              type="checkbox"
+              checked={layout.snap_to_grid}
+              onChange={(e) =>
+                setLayout({ ...layout, snap_to_grid: e.target.checked })
+              }
+            />
+            Snap
+          </label>
+
+          <button
+            onClick={saveLayout}
+            style={{ marginLeft: 15 }}
+          >
+            Guardar
+          </button>
+        </div>
+      )}
 
       {editMode && (
         <div style={{
@@ -200,7 +280,7 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
               setNewTableForm({ ...newTableForm, shape: e.target.value })
             }
           >
-            <option value="circle">Redonda</option>
+            <option value="circle">Circular</option>
             <option value="square">Cuadrada</option>
             <option value="rectangle">Rectangular</option>
           </select>
@@ -238,22 +318,22 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
             linear-gradient(#ddd 1px, transparent 1px),
             linear-gradient(90deg, #ddd 1px, transparent 1px)
           `,
-          backgroundSize: "40px 40px",
+          backgroundSize: `${layout.grid_size}px ${layout.grid_size}px`
         }}
       >
 
-        {tables.map(t => {
+        {tables.filter(t => t.active).map(t => {
 
           const size = 60 + (t.capacity || 4) * 10
           let borderRadius = "12px"
           let width = size
           let height = size
 
-          if (t.shape === "Circular") {
+          if (t.shape === "circle") {
             borderRadius = "50%"
           }
 
-          if (t.shape === "Rectangular") {
+          if (t.shape === "rectangle") {
             width = size * 1.4
           }
 
@@ -297,8 +377,14 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
                 let x = Math.round(e.clientX - rect.left - TABLE_SIZE / 2)
                 let y = Math.round(e.clientY - rect.top - TABLE_SIZE / 2)
 
-                x = Math.max(0, Math.min(FLOOR_WIDTH - TABLE_SIZE, x))
-                y = Math.max(0, Math.min(FLOOR_HEIGHT - TABLE_SIZE, y))
+                if (layout.snap_to_grid) {
+                  const GRID = layout.grid_size || 40
+                  x = Math.round(x / GRID) * GRID
+                  y = Math.round(y / GRID) * GRID
+                }
+
+                x = Math.max(0, Math.min(layout.width - TABLE_SIZE, x))
+                y = Math.max(0, Math.min(layout.height - TABLE_SIZE, y))
 
                 moveTable(t.id, x, y)
 
@@ -355,17 +441,41 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
 
       {isAdmin && inactiveTables.length > 0 && (
         <div style={{ marginTop: 30 }}>
+
           <h3>Mesas inactivas</h3>
 
-          {inactiveTables.map(t => (
-            <div key={t.id}>
-              Mesa {t.number}
+          <table style={{ width: 400, textAlign: "center" }}>
+            <thead>
+              <tr>
+                <th>Número</th>
+                <th>Forma</th>
+                <th>Capacidad</th>
+                <th></th>
+              </tr>
+            </thead>
 
-              <button onClick={() => activateTable(t.id)}>
-                Reactivar
-              </button>
-            </div>
-          ))}
+            <tbody>
+
+              {inactiveTables.map(t => (
+
+                <tr key={t.id}>
+                  <td>{t.number}</td>
+                  <td>{t.shape}</td>
+                  <td>{t.capacity}</td>
+
+                  <td>
+                    <button onClick={() => activateTable(t.id)}>
+                      Reactivar
+                    </button>
+                  </td>
+                </tr>
+
+              ))}
+
+            </tbody>
+
+          </table>
+
         </div>
       )}
 

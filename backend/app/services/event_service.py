@@ -21,7 +21,12 @@ class EventService:
     # API PÚBLICA
     # =========================
 
+    def __init__(self):
+        self.loop = None
+
+
     def emit_to_role(self, restaurant_id: int, role: UserRole, message: dict):
+        print("EVENT emit_to_role", message)
         event = {
             "restaurant_id": restaurant_id,
             "target": "role",
@@ -31,9 +36,10 @@ class EventService:
             "type": message.get("type")
         }
         self._persist_event(restaurant_id, event)
-        self._dispatch(manager.send_to_role, restaurant_id, role, event)
+        self._dispatch(manager.send_to_role, restaurant_id, role, message)
 
     def emit_to_station(self, restaurant_id: int, station_id: int, message: dict):
+        print("EVENT emit_to_station", message)
         event = {
             "restaurant_id": restaurant_id,
             "target": "station",
@@ -43,9 +49,10 @@ class EventService:
             "type": message.get("type")
         }
         self._persist_event(restaurant_id, event)
-        self._dispatch(manager.send_to_station, restaurant_id, station_id, event)
+        self._dispatch(manager.send_to_station, restaurant_id, station_id, message)
 
     def broadcast(self, restaurant_id: int, message: dict):
+        print("EVENT broadcast", message)
         event = {
             "restaurant_id": restaurant_id,
             "target": "broadcast",
@@ -54,7 +61,7 @@ class EventService:
             "type": message.get("type")
         }
         self._persist_event(restaurant_id, event)
-        self._dispatch(manager.broadcast, restaurant_id, event)
+        self._dispatch(manager.broadcast, restaurant_id, message)
 
     # =========================
     # PERSISTENCIA
@@ -86,8 +93,12 @@ class EventService:
         Guarda referencia a cada tarea para evitar garbage collection
         y registra errores en el callback.
         """
+        logger.info("emit event type=%s", args[-1].get("type"))
         try:
-            loop = asyncio.get_running_loop()
+            loop = self.loop
+            if not loop:
+                logger.error("Event loop not initialized")
+                return
         except RuntimeError:
             # Nunca debería ocurrir en FastAPI, pero por seguridad:
             logger.error("_dispatch llamado fuera de un loop async. Evento descartado.")
@@ -97,6 +108,7 @@ class EventService:
 
         self._create_task(loop, func(*args))
         self._create_task(loop, self._publish_redis(event))
+
 
     def _create_task(self, loop: asyncio.AbstractEventLoop, coro):
         """

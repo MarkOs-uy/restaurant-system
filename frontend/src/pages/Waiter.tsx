@@ -54,18 +54,13 @@ export default function Waiter() {
     let pending = false
 
     const safeFetchOrders = async () => {
-
       if (fetching) {
         pending = true
         return
       }
-
       fetching = true
-
       await fetchOrders()
-
       fetching = false
-
       if (pending) {
         pending = false
         safeFetchOrders()
@@ -88,6 +83,23 @@ export default function Waiter() {
         const data = JSON.parse(event.data)
 
         switch (data.type) {
+
+          case "ITEM_STATUS_CHANGED":
+            setOrders(prev => prev.map(order => {
+              if (order.id !== data.order_id) return order
+              return {
+                ...order,
+                items: order.items.map(item =>
+                  item.id === data.item_id
+                    ? { ...item, status: "IN_PROGRESS" }
+                    : item
+                )
+              }
+            }))
+            setTimeout(() => {
+              safeFetchOrders()
+            }, 2000)
+            break
 
           case "ITEM_READY":
             playSound()
@@ -115,7 +127,7 @@ export default function Waiter() {
               ))
               break
 
-            case "ORDER_UPDATED":case "ORDER_UPDATED":
+            case "ORDER_UPDATED":
               safeFetchOrders()
             break   
 

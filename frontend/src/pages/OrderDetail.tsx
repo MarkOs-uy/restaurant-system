@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom"
 import { useEffect, useState } from "react"
-import { API_URL, getAuthHeaders } from "../api"
+import { API_URL, getAuthHeaders, WS_URL } from "../api"
 
 interface Item {
   id: number
@@ -43,46 +43,86 @@ interface Product {
 }
 
 export default function OrderDetail() {
+
   const { orderId, tableId } = useParams()
-  const id = Number(orderId)
+  const id = orderId ? Number(orderId) : null
+
   const navigate = useNavigate()
 
   const [order, setOrder] = useState<Order | null>(null)
+  const [loading, setLoading] = useState(true)
+
   const [categories, setCategories] = useState<Category[]>([])
   const [openCategory, setOpenCategory] = useState<number | null>(null)
+
   const [paymentAmount, setPaymentAmount] = useState("")
-  const [paymentMethod, setPaymentMethod] = useState("CASH")
+
   const [quantities, setQuantities] = useState<{ [key: number]: number }>({})
+
   const [discount, setDiscount] = useState("")
   const [discountType, setDiscountType] = useState<"amount" | "percent">("amount")
 
   useEffect(() => {
-    fetchOrder()
     fetchCategories()
+    if (id) {
+      console.log(`${id}`)
+      fetchOrder()
+    } else {
+      setLoading(false)
+    }
   }, [orderId])
 
+
+  useEffect(() => {
+    if (!id) return
+
+    const token = localStorage.getItem("token")
+    if (!token) return
+
+    const ws = new WebSocket(`${WS_URL}/ws?token=${token}`)
+
+    ws.onopen = () => console.log("OrderDetail WS se conectó")
+    ws.onmessage = (event) => fetchOrder()
+    ws.onclose = () => console.log("WS closed")
+    ws.onerror = () => ws.close()
+
+    return () => ws.close()
+  }, [id])
+
+  useEffect(() => {
+    if (!order) return
+
+    if (paymentAmount === "" || Number(paymentAmount) > order.remaining) {
+      setPaymentAmount(order.remaining.toFixed(2))
+    }
+
+  }, [order?.remaining])
+
+
   const fetchOrder = async () => {
-    const res = await fetch(`${API_URL}/orders/${id}`, {headers: getAuthHeaders()})
+    setLoading(true)
+    const res = await fetch(`${API_URL}/orders/${id}`, {
+      headers: getAuthHeaders()
+    })
     const data = await res.json()
     setOrder(data)
+    setLoading(false)
   }
 
+
   const fetchCategories = async () => {
-    const res = await fetch(`${API_URL}/categories/with-products`, {headers: getAuthHeaders()})
+    const res = await fetch(`${API_URL}/categories/with-products`, {
+      headers: getAuthHeaders()
+    })
     const data = await res.json()
     setCategories(data)
   }
 
+
   const addProduct = async (productId: number) => {
-
     const quantity = quantities[productId] || 1
-
-    // 🚫 orden cerrada
     if (order?.status === "CLOSED") return
-
-    // 🆕 NO hay orden → crearla
     if (!orderId) {
-
       const res = await fetch(
         `${API_URL}/tables/${tableId}/add-product`,
         {
@@ -94,16 +134,10 @@ export default function OrderDetail() {
           })
         }
       )
-
       const data = await res.json()
-
-      // 🔥 redirigir a la nueva orden
       navigate(`/orders/${data.order_id}`)
-
       return
     }
-
-    // 🧾 orden existente
     await fetch(`${API_URL}/orders/${orderId}/items`, {
       method: "POST",
       headers: getAuthHeaders(),
@@ -112,85 +146,135 @@ export default function OrderDetail() {
         quantity
       })
     })
-
-    fetchOrder()
   }
 
-  const registerPayment = async () => {
-    if (!paymentAmount) return
 
+  const removeItem = async (orderId: number, itemId: number) => {
+    const res = await fetch(
+      `${API_URL}/orders/${orderId}/items/${itemId}`,
+      {
+        method: "DELETE",
+        headers: getAuthHeaders()
+      }
+    )
+    if (!res.ok) {
+      const error = await res.json()
+      alert(error.detail)
+    }
+  }
+
+
+  const updateQuantity = async (itemId: number, quantity: number) => {
+    const res = await fetch(
+      `${API_URL}/orders/order-items/${itemId}?quantity=${quantity}`,
+      {
+        method: "PATCH",
+        headers: getAuthHeaders()
+      }
+    )
+    if (!res.ok) {
+      const error = await res.json()
+      alert(error.detail)
+    }
+  }
+
+
+  const markDelivered = async (itemId: number) => {
+    const res = await fetch(
+      `${API_URL}/order-items/${itemId}/status`,
+      {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status: "DELIVERED" })
+      }
+    )
+
+    if (!res.ok) {
+      const error = await res.json()
+      alert(error.detail)
+    }
+  }
+
+  const registerPayment = async (method: string) => {
+    if (!paymentAmount || !id) return
     const res = await fetch(`${API_URL}/orders/${id}/payments`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({
         amount: Number(paymentAmount),
-        method: paymentMethod
+        method
       })
     })
-
     if (!res.ok) {
       const error = await res.json()
       alert(error.detail)
       return
     }
-
-    setPaymentAmount("")
-    fetchOrder()
   }
 
+
+  const cancelPayment = async (paymentId: number) => {
+    const res = await fetch(
+      `${API_URL}/orders/payments/${paymentId}`,
+      {
+        method: "DELETE",
+        headers: getAuthHeaders()
+      }
+    )
+
+    if (!res.ok) {
+      const error = await res.json()
+      alert(error.detail)
+    }
+  }
+
+
   const closeOrder = async () => {
+    if (!id) return
     const res = await fetch(`${API_URL}/orders/${id}/close`, {
       method: "POST",
       headers: getAuthHeaders()
     })
-
     if (!res.ok) {
       const error = await res.json()
       alert(error.detail)
-      return
     }
-
-    fetchOrder()
   }
 
+
   const sendToKitchen = async () => {
+    if (!id) return
     const res = await fetch(`${API_URL}/orders/${id}/send-to-kitchen`, {
       method: "POST",
       headers: getAuthHeaders()
     })
-
     if (!res.ok) {
       const error = await res.json()
       alert(error.detail)
-      return
     }
-
-    fetchOrder()
   }
 
-  if (!order) return <p>Cargando...</p>
 
-  const o = order!
-  const items = o?.items ?? []
-  const remaining = o?.remaining ?? 0
-  const status = o?.status
-  const total = o?.total ?? 0
-  const subtotal = o?.subtotal ?? 0
-  const total_paid = o?.total_paid ?? 0
-  const payments = o?.payments ?? []
 
+  if (loading) return <p>Cargando...</p>
+
+
+  const items = order?.items ?? []
+  const remaining = order?.remaining ?? 0
+  const status = order?.status
+  const total = order?.total ?? 0
+  const subtotal = order?.subtotal ?? 0
+  const total_paid = order?.total_paid ?? 0
+  const payments = order?.payments ?? []
   const allDelivered =
     items.length > 0 &&
     items.every(i => i.status === "DELIVERED")
-
   const canClose =
     remaining === 0 &&
     allDelivered &&
     status !== "CLOSED"
-
   const hasPendingItems =
     items.some(i => i.status === "PENDING")
-
   const getStatusColor = () => {
     switch (status) {
       case "OPEN": return "green"
@@ -203,372 +287,400 @@ export default function OrderDetail() {
     }
   }
 
-  const removeItem = async (itemId: number) => {
-    const res = await fetch(
-      `${API_URL}/orders/order-items/${itemId}`,
-      {
-        method: "DELETE",
-        headers: getAuthHeaders()
-      }
-    )
-
-    if (!res.ok) {
-      const error = await res.json()
-      alert(error.detail)
-      return
-    }
-
-    fetchOrder()
-  }
-
-  const updateQuantity = async (itemId: number, quantity: number) => {
-
-    const res = await fetch(
-      `${API_URL}/orders/order-items/${itemId}?quantity=${quantity}`,
-      {
-        method: "PATCH",
-        headers: getAuthHeaders()
-      }
-    )
-
-    if (!res.ok) {
-      const error = await res.json()
-      alert(error.detail)
-      return
-    }
-
-    fetchOrder()
-  }
-
   const applyDiscount = async () => {
-    if (!discount) return
-
+    if (!discount || !order) return
     let finalDiscount = Number(discount)
-
     if (discountType === "percent") {
-      finalDiscount = (o.subtotal * finalDiscount) / 100
+      finalDiscount = (order.subtotal * finalDiscount) / 100
     }
-
     const res = await fetch(
-      `${API_URL}/orders/${id}/discount?discount=${finalDiscount}`,
+      `${API_URL}/orders/${order.id}/discount?discount=${finalDiscount}`,
       {
         method: "PUT",
         headers: getAuthHeaders()
       }
     )
-
     if (!res.ok) {
       const error = await res.json()
       alert(error.detail)
       return
     }
-
     setDiscount("")
-    fetchOrder()
   }
 
 
   return (
-    <div style={{ padding: 40, maxWidth: 900 }}>
-      <h1>{o ? `Orden #${o.id}` : `Nueva orden - Mesa ${tableId}`}</h1>
-      <p>Mesa: {order?.table_number || tableId}</p>
-      <p>
-        Estado:{" "}
-        <strong style={{ color: getStatusColor() }}>
-          {status}
-        </strong>
-      </p>
 
-      {o.status === "DRAFT" && (
-        <div style={{
-          background: "#333",
-          padding: 10,
-          borderRadius: 8,
-          marginBottom: 10
-        }}>
-          🧾 Agrega productos para iniciar la orden
-        </div>
-      )}
+    <div
+      style={{
+        padding: 40,
+        display: "grid",
+        gridTemplateColumns: "1fr 400px",
+        gap: 40
+      }}
+    >
+      <div>
+        <h1>{order ? `Orden #${order.id}` : `Nueva orden - Mesa ${tableId}`}</h1>
 
-      {/* ITEMS */}
-      <h2>Items</h2>
+        <p>Mesa: {order?.table_number || tableId}</p>
 
-      <ul style={{ listStyle: "none", padding: 0 }}>
-        {items.map((item) => (
-          <li
-            key={item.id}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "6px 0",
-              borderBottom: "1px solid #eee"
-            }}
-          >
-            <span style={{ flex: 1 }}>
-              {item.product_name}
-            </span>
+        <p>
+          Estado:{" "}
+          <strong style={{ color: getStatusColor() }}>
+            {status}
+          </strong>
+        </p>
 
-            {item.status === "PENDING" && (
-              <>
-                <button className="btn btn-icon"
-                  onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                >
-                  −
-                </button>
 
-                <strong>{item.quantity}</strong>
-
-                <button className="btn btn-icon"
-                  onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                >
-                  +
-                </button>
-              </>
-            )}
-
-            <span style={{ width: 80, textAlign: "right" }}>
-              ${(item.quantity * item.unit_price).toFixed(2)}
-            </span>
-
-            <strong
-              style={{
-                width: 80,
-                textAlign: "center",
-                color: item.status === "PENDING" ? "#b58900" : "#2a9d8f"
-              }}
-            >
-              {item.status}
-            </strong>
-
-            {item.status === "PENDING" && (
-              <button
-                onClick={() => removeItem(item.id)}
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                  fontSize: 16
-                }}
-              >
-                ❌
-              </button>
-            )}
-          </li>
-        ))}
-      </ul>
-      
-      <div style={{
-        background: "#fff",
-        color: "#111",
-        padding: 15,
-        borderRadius: 8,
-        marginTop: 10
-      }}>
-        <p>Subtotal: ${subtotal.toFixed(2)}</p>
-
-        {o.discount && o.discount > 0 && (
-          <p style={{ color: "red" }}>
-            Descuento: -${o.discount.toFixed(2)}
-          </p>
+        {order?.status === "DRAFT" && (
+          <div style={{
+            background: "#333",
+            padding: 10,
+            borderRadius: 8,
+            marginBottom: 10
+          }}>
+            🧾 Agrega productos para iniciar la orden
+          </div>
         )}
 
-        <h3>Total: ${total.toFixed(2)}</h3>
-      </div>
 
-      {/* ENVIAR A COCINA */}
-      {status !== "CLOSED" && hasPendingItems && (
-        <div style={{ marginTop: 20 }}>
-          <button
-            onClick={sendToKitchen}
-            style={{
-              padding: 10,
-              backgroundColor: "orange",
-              color: "white",
-              borderRadius: 8
-            }}
-          >
-            Enviar a Cocina
-          </button>
-        </div>
-      )}
+        {/* ITEMS */}
+        <h2>Items</h2>
 
-      <hr />
+        <ul style={{ listStyle: "none", padding: 0 }}>
+          {items.map((item) => (
+            <li
+              key={item.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "6px 0",
+                borderBottom: "1px solid #eee"
+              }}
+            >
+              <span style={{ flex: 1 }}>
+                {item.product_name}
+              </span>
 
-      <hr />
-
-      {o.status !== "DRAFT" && (
-        <>
-          <h2>Descuento</h2>
-
-          <select
-            value={discountType}
-            onChange={(e) => setDiscountType(e.target.value as "amount" | "percent")}
-            style={{ marginRight: 10, padding: 5 }}
-          >
-            <option value="amount">Monto</option>
-            <option value="percent">%</option>
-          </select>
-
-          <input
-            type="number"
-            placeholder="Monto descuento"
-            value={discount}
-            onChange={(e) => setDiscount(e.target.value)}
-            style={{ marginRight: 10, padding: 5 }}
-          />
-
-          <button className="btn btn-primary"
-            onClick={applyDiscount}
-            style={{ padding: 8, borderRadius: 6 }}
-          >
-            Aplicar Descuento
-          </button>
-        </>
-      )}
-
-      {/* PAGOS */}
-      <h2>Pagos</h2>
-
-      {payments.length === 0 && <p>No hay pagos registrados</p>}
-
-      <ul>
-        {payments.map(p => (
-          <li key={p.id}>
-            ${Number(p.amount).toFixed(2)} — {p.method}
-          </li>
-        ))}
-      </ul>
-
-      <p><strong>Total pagado:</strong> ${total_paid.toFixed(2)}</p>
-      <p><strong>Saldo pendiente:</strong> ${remaining.toFixed(2)}</p>
-
-      {/* FORMULARIO DE PAGO */}
-      {status !== "CLOSED" && (
-        <div style={{ marginTop: 20 }}>
-          <h3>Registrar Pago</h3>
-
-          <input
-            type="number"
-            placeholder="Monto"
-            value={paymentAmount}
-            onChange={(e) => setPaymentAmount(e.target.value)}
-            style={{ marginRight: 10, padding: 5 }}
-          />
-
-          <select
-            value={paymentMethod}
-            onChange={(e) => setPaymentMethod(e.target.value)}
-            style={{ marginRight: 10, padding: 5 }}
-          >
-            <option value="CASH">Efectivo</option>
-            <option value="CARD">Tarjeta</option>
-            <option value="TRANSFER">Transferencia</option>
-          </select>
-
-          <button className="btn btn-primary"
-            onClick={registerPayment}
-          >
-            Agregar Pago
-          </button>
-        </div>
-      )}
-
-      {/* CERRAR ORDEN SOLO SI CUMPLE REGLAS */}
-      {canClose && (
-        <div style={{ marginTop: 20 }}>
-          <p style={{ color: "green", fontWeight: "bold" }}>
-            ✔ Orden pagada y entregada. Puede cerrarse.
-          </p>
-
-          <button 
-            onClick={closeOrder}
-            style={{
-              padding: 10,
-              backgroundColor: "black",
-              color: "white",
-              borderRadius: 8
-            }}
-          >
-            Cerrar Orden
-          </button>
-        </div>
-      )}
-
-      <hr />
-
-      {/* PRODUCTOS */}
-      <h2>Agregar Productos</h2>
-
-      {categories.map(category => (
-        <div key={category.id} style={{ marginBottom: 15 }}>
-          <div
-            onClick={() =>
-              setOpenCategory(
-                openCategory === category.id ? null : category.id
-              )
-            }
-            style={{
-              cursor: "pointer",
-              fontWeight: "bold",
-              background: "#eee",
-              color: "#111",
-              padding: 10,
-              borderRadius: 6
-            }}
-          >
-            {category.name}
-          </div>
-
-          {openCategory === category.id && (
-            <div style={{ padding: 10 }}>
-              {category.products.map(p => (
-                <div key={p.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    marginBottom: 6
-                  }}
-                >
-
-                  <button className="btn btn-product"
-                    onClick={() => addProduct(p.id)}
-                  >
-                    {p.name} - ${p.price}
-                  </button>
-
-                  <button className="btn btn-primary"
-                    onClick={() =>
-                      setQuantities({
-                        ...quantities,
-                        [p.id]: Math.max((quantities[p.id] || 1) - 1, 1)
-                      })
-                    }
+              {item.status === "PENDING" && (
+                <>
+                  <button className="btn btn-icon"
+                    onClick={() => updateQuantity(item.id, item.quantity - 1)}
                   >
                     −
                   </button>
 
-                  <strong>{quantities[p.id] || 1}</strong>
+                  <strong>{item.quantity}</strong>
 
-                  <button className="btn btn-primary"
-                    onClick={() =>
-                      setQuantities({
-                        ...quantities,
-                        [p.id]: (quantities[p.id] || 1) + 1
-                      })
-                    }
+                  <button className="btn btn-icon"
+                    onClick={() => updateQuantity(item.id, item.quantity + 1)}
                   >
                     +
                   </button>
+                </>
+              )}
 
-                </div>
-              ))}
-            </div>
+              <span style={{ width: 80, textAlign: "right" }}>
+                ${(item.quantity * item.unit_price).toFixed(2)}
+              </span>
+              <strong
+                style={{
+                  width: 100,
+                  textAlign: "center",
+                  fontWeight: 600,
+                  color:
+                    item.status === "PENDING"
+                      ? "#b58900"
+                      : item.status === "READY"
+                      ? "#268bd2"
+                      : item.status === "DELIVERED"
+                      ? "#2a9d8f"
+                      : "#333",
+                  textDecoration:
+                    item.status === "DELIVERED"
+                      ? "line-through"
+                      : "none"
+                }}
+              >
+                {item.status}
+              </strong>
+              {item.status === "PENDING" && (
+                <button
+                  onClick={() => removeItem(order!.id, item.id)}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    cursor: "pointer",
+                    fontSize: 16
+                  }}
+                >
+                  ❌
+                </button>
+              )}
+              {item.status === "READY" && (
+                <button
+                  className="btn btn-primary"
+                  onClick={() => markDelivered(item.id)}
+                >
+                  Entregar
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+        
+        <div style={{
+          background: "#fff",
+          color: "#111",
+          padding: 15,
+          borderRadius: 8,
+          marginTop: 10
+        }}>
+          <p>Subtotal: ${subtotal.toFixed(2)}</p>
+
+          {order?.discount && order?.discount > 0 && (
+            <p style={{ color: "red" }}>
+              Descuento: -${order?.discount.toFixed(2)}
+            </p>
           )}
-        </div>
-      ))}
-    </div>
-  )
-}
 
+          <h3>Total: ${total.toFixed(2)}</h3>
+        </div>
+
+
+        {/* ENVIAR A COCINA */}
+        {status !== "CLOSED" && hasPendingItems && (
+          <div style={{ marginTop: 20 }}>
+            <button
+              onClick={sendToKitchen}
+              style={{
+                padding: 10,
+                backgroundColor: "orange",
+                color: "white",
+                borderRadius: 8
+              }}
+            >
+              Enviar a Cocina
+            </button>
+          </div>
+        )}
+
+        <hr />
+
+        <hr />
+
+        {order?.status !== "DRAFT" && (
+          <>
+            <h2>Descuento</h2>
+
+            <select
+              value={discountType}
+              onChange={(e) => setDiscountType(e.target.value as "amount" | "percent")}
+              style={{ marginRight: 10, padding: 5 }}
+            >
+              <option value="amount">Monto</option>
+              <option value="percent">%</option>
+            </select>
+
+            <input
+              type="text"
+              inputMode="decimal"
+              placeholder="Monto descuento"
+              value={discount}
+              onChange={(e) => setDiscount(e.target.value)}
+              style={{ marginRight: 10, padding: 5 }}
+            />
+
+            <button className="btn btn-primary"
+              onClick={applyDiscount}
+              style={{ padding: 8, borderRadius: 6 }}
+            >
+              Aplicar Descuento
+            </button>
+          </>
+        )}
+
+
+        {/* PAGOS */}
+        <h2>Pagos</h2>
+
+        {payments.length === 0 && <p>No hay pagos registrados</p>}
+
+        <ul style={{ listStyle: "none", padding: 0 }}>
+          {payments.map(p => (
+            <li
+              key={p.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "6px 0",
+                borderBottom: "1px solid #eee"
+              }}
+            >
+              <span>
+                ${Number(p.amount).toFixed(2)} — {p.method}
+              </span>
+
+              {status !== "CLOSED" && (
+                <button
+                  onClick={() => cancelPayment(p.id)}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    cursor: "pointer",
+                    fontSize: 16
+                  }}
+                >
+                  ❌
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+
+        <p><strong>Total pagado:</strong> ${total_paid.toFixed(2)}</p>
+        <p><strong>Saldo pendiente:</strong> ${remaining.toFixed(2)}</p>
+
+
+        {/* FORMULARIO DE PAGO */}
+        {status !== "CLOSED" && (
+          <div style={{ marginTop: 20 }}>
+            <h3>Registrar Pago</h3>
+
+            <input
+              type="text"
+              inputMode="decimal"
+              placeholder="Monto"
+              value={paymentAmount}
+              onChange={(e) => setPaymentAmount(e.target.value)}
+              style={{ marginRight: 10, padding: 5 }}
+            />
+
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+              <button
+                className="btn btn-primary"
+                onClick={() => registerPayment("CASH")}
+              >
+              💵 Efectivo
+              </button>
+
+              <button
+                className="btn btn-primary"
+                onClick={() => registerPayment("CARD")}
+              >
+              💳 Tarjeta
+              </button>
+
+              <button
+                className="btn btn-primary"
+                onClick={() => registerPayment("TRANSFER")}
+              >
+              🏦 Transferencia
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* CERRAR ORDEN SOLO SI CUMPLE REGLAS */}
+        {canClose && (
+          <div style={{ marginTop: 20 }}>
+            <p style={{ color: "green", fontWeight: "bold" }}>
+              ✔ Orden pagada y entregada. Puede cerrarse.
+            </p>
+
+            <button 
+              onClick={closeOrder}
+              style={{
+                padding: 10,
+                backgroundColor: "black",
+                color: "white",
+                borderRadius: 8
+              }}
+            >
+              Cerrar Orden
+            </button>
+          </div>
+        )}
+
+        <hr />
+      </div>
+      <div>
+        {/* PRODUCTOS */}
+        <h2>Agregar Productos</h2>
+
+        {categories.map(category => (
+          <div key={category.id} style={{ marginBottom: 15 }}>
+            <div
+              onClick={() =>
+                setOpenCategory(
+                  openCategory === category.id ? null : category.id
+                )
+              }
+              style={{
+                cursor: "pointer",
+                fontWeight: "bold",
+                background: "#eee",
+                color: "#111",
+                padding: 10,
+                borderRadius: 6
+              }}
+            >
+              {category.name}
+            </div>
+
+            {openCategory === category.id && (
+              <div style={{ padding: 10 }}>
+                {category.products.map(p => (
+                  <div key={p.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      marginBottom: 6
+                    }}
+                  >
+
+                    <button className="btn btn-product"
+                      onClick={() => addProduct(p.id)}
+                    >
+                      {p.name} - ${p.price}
+                    </button>
+
+                    <button className="btn btn-primary"
+                      onClick={() =>
+                        setQuantities({
+                          ...quantities,
+                          [p.id]: Math.max((quantities[p.id] || 1) - 1, 1)
+                        })
+                      }
+                    >
+                      −
+                    </button>
+
+                    <strong>{quantities[p.id] || 1}</strong>
+
+                    <button className="btn btn-primary"
+                      onClick={() =>
+                        setQuantities({
+                          ...quantities,
+                          [p.id]: (quantities[p.id] || 1) + 1
+                        })
+                      }
+                    >
+                      +
+                    </button>
+
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+
+  )
+
+}

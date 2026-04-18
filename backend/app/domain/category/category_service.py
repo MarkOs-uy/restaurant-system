@@ -7,14 +7,16 @@ from app.models.user import User
 
 class CategoryService:
 
-    @staticmethod
-    def _get_category(db: Session, user: User, category_id: int):
+    def __init__(self, db: Session):
+        self.db = db
+
+    def _get_category(self, restaurant_id: int, category_id: int):
 
         category = (
-            db.query(Category)
+            self.db.query(Category)
             .filter(
                 Category.id == category_id,
-                Category.restaurant_id == user.restaurant_id
+                Category.restaurant_id == restaurant_id
             )
             .first()
         )
@@ -25,62 +27,57 @@ class CategoryService:
         return category
 
 
-    @staticmethod
-    def list_categories(db: Session, user: User):
+    def list_categories(self, restaurant_id: int):
         return (
-            db.query(Category)
-            .filter(Category.restaurant_id == user.restaurant_id)
+            self.db.query(Category)
+            .filter(Category.restaurant_id == restaurant_id)
             .order_by(Category.name)
             .all()
         )
 
 
-    @staticmethod
-    def create_category(db: Session, user: User, name: str):
+    def create_category(self, restaurant_id: int, name: str):
 
         category = Category(
             name=name,
-            restaurant_id=user.restaurant_id
+            restaurant_id=restaurant_id
         )
 
-        db.add(category)
-        db.commit()
-        db.refresh(category)
+        self.db.add(category)
+        self.db.commit()
+        self.db.refresh(category)
 
         return category
 
 
-    @staticmethod
-    def update_category(db: Session, user: User, category_id: int, name: str):
+    def update_category(self, restaurant_id: int, category_id: int, name: str):
 
-        category = CategoryService._get_category(db, user, category_id)
+        category = self._get_category(restaurant_id, category_id)
 
         category.name = name
 
-        db.commit()
-        db.refresh(category)
+        self.db.commit()
+        self.db.refresh(category)
 
         return category
 
 
-    @staticmethod
-    def delete_category(db: Session, user: User, category_id: int):
+    def delete_category(self, restaurant_id: int, category_id: int):
 
-        category = CategoryService._get_category(db, user, category_id)
+        category = self._get_category(restaurant_id, category_id)
 
-        db.delete(category)
-        db.commit()
+        self.db.delete(category)
+        self.db.commit()
 
         return True
 
 
-    @staticmethod
-    def list_categories_with_products(db: Session, user: User):
+    def list_categories_with_products(self, restaurant_id: int):
 
         categories = (
-            db.query(Category)
+            self.db.query(Category)
             .options(joinedload(Category.products))
-            .filter(Category.restaurant_id == user.restaurant_id)
+            .filter(Category.restaurant_id == restaurant_id)
             .order_by(Category.name)
             .all()
         )
@@ -96,7 +93,7 @@ class CategoryService:
                     "price": p.price
                 }
                 for p in category.products
-                if p.active and p.restaurant_id == user.restaurant_id
+                if p.active
             ]
 
             result.append({

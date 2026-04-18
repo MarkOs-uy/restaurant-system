@@ -141,3 +141,21 @@ def list_active_stations(
     ).order_by(ProductionStation.name).all()
 
     return stations
+
+
+@router.get("/{station_id}")
+def get_station(
+    station_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    station = db.query(ProductionStation).filter(
+        ProductionStation.id == station_id,
+        ProductionStation.restaurant_id == user.restaurant_id
+    ).first()
+
+    if not station:
+        raise HTTPException(status_code=404, detail="Station not found")
+
+    return station

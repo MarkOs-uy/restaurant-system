@@ -14,6 +14,7 @@ class TableOut(BaseSchema):
     y: int
     capacity: int
     shape: str
+    active: bool
     status: TableStatus
     order_id: int | None
     order_status: OrderStatus | None
@@ -29,3 +30,15 @@ class TableUpdate(BaseSchema):
     capacity: Optional[int] = None
     shape: Optional[str] = None
     active: Optional[bool] = None
+
+
+class TableList(BaseSchema):
+    id: int
+    number: int
+    capacity: int
+    shape: str
+    active: bool
+
+class TablePositionUpdate(BaseSchema):
+    x: int
+    y: int
