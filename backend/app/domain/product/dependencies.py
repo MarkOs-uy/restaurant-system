@@ -8,5 +8,4 @@ from .product_service import ProductService
 def get_product_service(
     db: Session = Depends(get_db)
 ) -> ProductService:
-
     return ProductService(db)

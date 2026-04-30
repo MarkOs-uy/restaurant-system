@@ -1,7 +1,5 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
 
-from app.db.session import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user import User
 
@@ -13,6 +11,15 @@ from app.domain.category.dependencies import get_category_service
 router = APIRouter(prefix="/categories", tags=["categories"])
 
 
+@router.post("/", response_model=CategoryResponse)
+def create_category(
+    data: CategoryCreate,
+    user: User = Depends(get_current_user),
+    service: CategoryService = Depends(get_category_service)
+):
+    return service.create_category(user.restaurant_id, data.name)
+
+
 @router.get("/", response_model=list[CategoryResponse])
 def list_categories(
     user: User = Depends(get_current_user),
@@ -21,13 +28,12 @@ def list_categories(
     return service.list_categories(user.restaurant_id)
 
 
-@router.post("/", response_model=CategoryResponse)
-def create_category(
-    data: CategoryCreate,
+@router.get("/with-products", response_model=list[CategoryWithProducts])
+def list_categories_with_products(
     user: User = Depends(get_current_user),
     service: CategoryService = Depends(get_category_service)
 ):
-    return service.create_category(user.restaurant_id, data.name)
+    return service.list_categories_with_products(user.restaurant_id)
 
 
 @router.patch("/{category_id}", response_model=CategoryResponse)
@@ -50,9 +56,3 @@ def delete_category(
     return {"ok": True}
 
 
-@router.get("/with-products", response_model=list[CategoryWithProducts])
-def list_categories_with_products(
-    user: User = Depends(get_current_user),
-    service: CategoryService = Depends(get_category_service)
-):
-    return service.list_categories_with_products(user.restaurant_id)

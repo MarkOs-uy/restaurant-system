@@ -16,6 +16,8 @@ type ApiFetchOptions = Omit<RequestInit, "body"> & {
   body?: any
 }
 
+import { handleApiError } from "./utils/handleApiError"
+
 export async function apiFetch(
   url: string,
   options: ApiFetchOptions = {}
@@ -40,19 +42,28 @@ export async function apiFetch(
     }
   })
 
-  const data = await res.json().catch(() => null)
+  let data = null
+
+  try {
+    data = await res.json()
+  } catch {}
 
   if (res.status === 401) {
     logout()
   }
 
   if (!res.ok) {
-    throw {
-      message: data?.detail || "Server error",
-      code: data?.error,
-      context: data?.context
-    }
+    const error = new Error(data?.detail || `HTTP ${res.status}`) as any
+    error.code = data?.error
+    error.context = data?.context
+    error.status = res.status
+
+    handleApiError(error)
+
+    throw error
   }
 
   return data
 }
+
+

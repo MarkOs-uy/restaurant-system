@@ -30,7 +30,6 @@ def get_station_items(
     user: User = Depends(get_current_user),
     service: KitchenService = Depends(get_kitchen_service)
 ):
-
     return service.get_station_items(
         station_id=station_id,
         user=user
@@ -48,13 +47,11 @@ def update_item_status(
     user: User = Depends(get_current_user),
     service: KitchenService = Depends(get_kitchen_service)
 ):
-
     item = service.update_item_status(
         item_id=item_id,
         status=data.status,
         user=user
     )
-
     return OrderItemOut(
         id=item.id,
         product_name=item.product.name,

@@ -14,7 +14,7 @@ from app.routers import tables, orders, products, cash_register, category, order
 from app.routers import layout
 
 
-from app.domain.errors import DomainError
+from app.domain.errors.base import DomainError
 from app.websocket import ws
 
 from fastapi.middleware.cors import CORSMiddleware

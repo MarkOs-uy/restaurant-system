@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { API_URL, getAuthHeaders } from "../api"
+import { apiFetch } from "../api"
 
 interface Table {
   id: number
@@ -22,10 +22,7 @@ export default function ManageTables() {
     const navigate = useNavigate()
 
     const loadTables = async () => {
-        const res = await fetch(`${API_URL}/tables/`, {
-            headers: getAuthHeaders()
-        })
-        const data = await res.json()
+        const data = await apiFetch("/tables/")
         setTables(data)
         setOriginalTables(data)
     }
@@ -56,10 +53,9 @@ export default function ManageTables() {
             shape: t.shape,
             active: t.active
         }
-        await fetch(`${API_URL}/tables/${t.id}`, {
+        await apiFetch(`/tables/${t.id}`, {
             method: "PATCH",
-            headers: getAuthHeaders(),
-            body: JSON.stringify(payload)
+            body: payload
         })
         loadTables()
     }

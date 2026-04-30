@@ -6,8 +6,9 @@ from app.models.order import Order
 from app.schemas.table import TablePositionUpdate
 
 from app.domain.order.constants import ACTIVE_ORDER_STATUSES
-from app.domain.errors import TableDomainError
-from app.domain.error_codes import ErrorCode
+
+from app.domain.errors.base import DomainError
+from app.domain.errors.error_codes import ErrorCode
 
 
 class TableService:
@@ -103,10 +104,11 @@ class TableService:
             query = query.filter(Table.active.is_(True))
         table = query.first()
         if not table:
-            raise TableDomainError(
+            raise DomainError(
                 "Table not found",
-                ErrorCode.TABLE_NOT_FOUND,
-                context={"table_id": table_id})
+                code=ErrorCode.TABLE_NOT_FOUND,
+                context={"table_id": table_id}
+            )
         return table
 
     # -------------------------
@@ -188,10 +190,11 @@ class TableService:
     def touch_table(self, restaurant_id: int, table_id: int):
         table = self._get_table(restaurant_id, table_id, active_only=True)
         if not table:
-            raise TableDomainError(
+            raise DomainError(
                 "Table not found",
-                ErrorCode.TABLE_NOT_FOUND,
-                context={"table_id": table_id})
+                code=ErrorCode.TABLE_NOT_FOUND,
+                context={"table_id": table_id}
+            )
         order = self.db.query(Order).filter(
             Order.table_id == table_id,
             Order.restaurant_id == restaurant_id,

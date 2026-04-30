@@ -1,4 +1,6 @@
-class ErrorCode:
+from enum import Enum
+
+class ErrorCode(str, Enum):
 
     # GENERALES
     NOT_FOUND = "not_found"
@@ -31,8 +33,12 @@ class ErrorCode:
 
     # CASH REGISTER
     CASH_REGISTER_ALREADY_OPEN = "cash_register_already_open"
+    CASH_REGISTER_ALREADY_CLOSED = "cash_register_already_closed"
     CASH_REGISTER_NOT_OPEN = "cash_register_not_open"
     CASH_REGISTER_PENDING_ORDERS = "cash_register_pending_orders"
+    CASH_REGISTER_INVALID_COUNT = "cash_register_invalid_count"
+    CASH_MOVEMENT_NOT_FOUND = "cash_movement_not_found"
+
 
     # PRODUCTS
     PRODUCT_NOT_FOUND = "product_not_found"
@@ -40,3 +46,10 @@ class ErrorCode:
     # USERS
     USER_NOT_FOUND = "user_not_found"
     USERNAME_ALREADY_EXISTS = "username_already_exists"
+
+    # CATEGORIES
+    CATEGORY_NOT_FOUND = "category_not_found"
+
+    # STATIONS
+    STATION_NOT_FOUND = "station_not_found"
+    STATION_NAME_ALREADY_EXISTS = "station_name_already_exists"

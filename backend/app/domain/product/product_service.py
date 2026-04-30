@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session, joinedload
 from app.models.product import Product
 from app.schemas.product import ProductCreate, ProductUpdate
 
-from app.domain.errors import ProductDomainError
-from app.domain.error_codes import ErrorCode
+from app.domain.errors.base import DomainError
+from app.domain.errors.error_codes import ErrorCode
 
 
 class ProductService:
@@ -21,9 +21,8 @@ class ProductService:
             Product.id == product_id,
             Product.restaurant_id == restaurant_id
         ).first()
-
         if not product:
-            raise ProductDomainError(
+            raise DomainError(
                 "Product not found",
                 ErrorCode.PRODUCT_NOT_FOUND,
                 context={"product_id": product_id})
@@ -51,7 +50,6 @@ class ProductService:
     # -------------------------
 
     def list_products(self, restaurant_id: int):
-
         return (
             self.db.query(Product)
             .options(

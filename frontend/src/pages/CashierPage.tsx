@@ -107,6 +107,28 @@ const reducer = (state: State, action: Action): State => {
   }
 }
 
+
+function normalizeDashboard(data: any): CashRegisterDashboard {
+
+  return {
+    ...data,
+    opening_amount: Number(data.opening_amount),
+    total_sales: Number(data.total_sales),
+    average_ticket: Number(data.average_ticket),
+    expected_cash: Number(data.expected_cash),
+    by_method: Object.fromEntries(
+      Object.entries(data.by_method).map(
+        ([method, amount]) => [method, Number(amount)]
+      )
+    ),
+    cash_movements: data.cash_movements.map((m: any) => ({
+      ...m,
+      amount: Number(m.amount)
+    }))
+  }
+}
+
+
 export default function CashierPage() {
 
   const [state, dispatch] = useReducer(reducer, {
@@ -180,14 +202,22 @@ export default function CashierPage() {
     return "🔴"
   }
 
-  const fetchDashboard = async () => {
-    try {
-      const data = await apiFetch("/cash-register/dashboard")
-      dispatch({ type: "SET_DASHBOARD", payload: data })
-    } catch {
-      dispatch({ type: "SET_DASHBOARD", payload: null })
-    }
+
+const fetchDashboard = async () => {
+  try {
+    const data = await apiFetch("/cash-register/dashboard")
+    const normalized = normalizeDashboard(data)
+    dispatch({
+      type: "SET_DASHBOARD",
+      payload: normalized
+    })
+  } catch {
+    dispatch({
+      type: "SET_DASHBOARD",
+      payload: null
+    })
   }
+}
 
   const fetchActiveOrders = async () => {
     try {

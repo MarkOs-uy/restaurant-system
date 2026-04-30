@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { API_URL, WS_URL, getAuthHeaders } from "../api"
+import { apiFetch, WS_URL } from "../api"
 
 interface KitchenItem {
   item_id: number
@@ -22,13 +22,9 @@ export default function Kitchen() {
   const [stationName, setStationName] = useState("")
 
   const fetchItems = async () => {
-    const res = await fetch(
-      `${API_URL}/kitchen/stations/${station}/items`, {
-      headers: getAuthHeaders()
-    }
+    const data = await apiFetch(
+      `/kitchen/stations/${station}/items`
     )
-    const data = await res.json()
-
     setItems(data)
   }
 
@@ -41,14 +37,9 @@ export default function Kitchen() {
 //-----------------------------------------------------------
 
   const fetchStation = async () => {
-
-    const res = await fetch(
-      `${API_URL}/production-stations/${station}`,
-      { headers: getAuthHeaders() }
+    const data = await apiFetch(
+      `/production-stations/${station}`
     )
-
-    const data = await res.json()
-
     setStationName(data.name)
   }
 
@@ -58,12 +49,11 @@ export default function Kitchen() {
     itemId: number,
     newStatus: string
   ) => {
-    await fetch(
-      `${API_URL}/order-items/${itemId}/status`,
+    await apiFetch(
+      `/order-items/${itemId}/status`,
       {
         method: "PATCH",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ status: newStatus })
+        body: { status: newStatus }
       }
     )
     fetchItems()

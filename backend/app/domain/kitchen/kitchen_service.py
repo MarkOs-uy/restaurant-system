@@ -1,4 +1,3 @@
-from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.user import User
@@ -17,14 +16,15 @@ class KitchenService:
         self.db = db
         self.item_service = OrderItemService(db)
 
-    # ----------------------------------------
+    # -------------------------
+    # Obtener los items de una estación, filtrando por estado y restaurante
+    # -------------------------
 
     def get_station_items(
         self,
         station_id: int,
         user: User
     ) -> list[KitchenItemOut]:
-
         items = (
             self.db.query(OrderItem)
             .join(OrderItem.product)
@@ -58,7 +58,9 @@ class KitchenService:
 
         return result
 
-    # ----------------------------------------
+    # -------------------------
+    # Actualizar el estado de un item, validando que el usuario tenga permisos para hacerlo
+    # -------------------------
 
     def update_item_status(
         self,
@@ -66,7 +68,6 @@ class KitchenService:
         status: OrderItemStatus,
         user: User
     ):
-
         return OrderItemService.update_status(
             item_id=item_id,
             new_status=status,

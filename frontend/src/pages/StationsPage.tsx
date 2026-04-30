@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react"
-import { API_URL, getAuthHeaders } from "../api"
+import { apiFetch } from "../api"
 
 import Page from "../components/Page"
 import Card from "../components/Card"
 import DataTable from "../components/DataTable"
+import { showToast } from "../utils/showToast"
 
 interface Station {
   id: number
@@ -18,13 +19,7 @@ export default function StationsPage() {
   const [editingId, setEditingId] = useState<number | null>(null)
 
   const fetchStations = async () => {
-
-    const res = await fetch(
-      `${API_URL}/stations/`,
-      { headers: getAuthHeaders() }
-    )
-
-    const data = await res.json()
+    const data = await apiFetch(`/stations/`)
     setStations(data)
   }
 
@@ -33,42 +28,33 @@ export default function StationsPage() {
   }, [])
 
   const saveStation = async () => {
-
-    if (!name) return
-
+    if (!name.trim()) {
+      showToast("Ingrese un nombre de estación")
+      return
+    }
     const method = editingId ? "PATCH" : "POST"
-
     const url = editingId
-      ? `${API_URL}/stations/${editingId}`
-      : `${API_URL}/stations/`
-
-    await fetch(url, {
+      ? `/stations/${editingId}`
+      : `/stations/`
+    await apiFetch(url, {
       method,
-      headers: {
-        ...getAuthHeaders(),
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ name })
+      body: { name }
     })
-
     setName("")
     setEditingId(null)
-
-    fetchStations()
+    await fetchStations()
   }
+
 
   const toggleStation = async (id: number) => {
-
-    await fetch(
-      `${API_URL}/stations/${id}/toggle`,
+    await apiFetch(`/stations/${id}/toggle`,
       {
-        method: "PATCH",
-        headers: getAuthHeaders()
+        method: "PATCH"
       }
     )
-
-    fetchStations()
+    await fetchStations()
   }
+
 
   const editStation = (station: Station) => {
     setEditingId(station.id)

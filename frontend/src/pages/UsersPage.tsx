@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { API_URL, getAuthHeaders } from "../api"
+import { apiFetch } from "../api"
 
 import Page from "../components/Page"
 import Card from "../components/Card"
@@ -15,78 +15,73 @@ interface User {
 export default function UsersPage() {
 
   const [users, setUsers] = useState<User[]>([])
-
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [role, setRole] = useState("WAITER")
-
   const [editingId, setEditingId] = useState<number | null>(null)
 
+  const resetForm = () => {
+    setUsername("")
+    setPassword("")
+    setRole("WAITER")
+    setEditingId(null)
+  }
+
+  // -------------------------
+  // Recargar usuarios
+  // -------------------------
+
   const fetchUsers = async () => {
-
-    const res = await fetch(
-      `${API_URL}/users/`,
-      { headers: getAuthHeaders() }
-    )
-
-    const data = await res.json()
+    const data = await apiFetch("/users/")
     setUsers(data)
+  }
+
+  // -------------------------
+  // Guardar usuario
+  // -------------------------
+
+  const saveUser = async () => {
+    if (!username) return
+    const method = editingId ? "PATCH" : "POST"
+    const url = editingId
+      ? `/users/${editingId}`
+      : `/users/`
+    await apiFetch(url, {
+      method,
+      body: {
+        username,
+        ...(password && { password }),
+        role
+      }
+    })
+    resetForm()
+    await fetchUsers()
+  }
+
+  // -------------------------
+  // Activar/Desactivar usuarios
+  // -------------------------
+
+  const toggleUser = async (id: number) => {
+    await apiFetch(`/users/${id}/toggle`, {
+      method: "PATCH"
+    })
+    await fetchUsers()
+  }
+
+  // -------------------------
+  // Editar usuarios
+  // -------------------------
+
+  const editUser = (u: User) => {
+    setEditingId(u.id)
+    setUsername(u.username)
+    setRole(u.role)
   }
 
   useEffect(() => {
     fetchUsers()
   }, [])
-
-  const saveUser = async () => {
-
-    if (!username) return
-
-    const method = editingId ? "PATCH" : "POST"
-
-    const url = editingId
-      ? `${API_URL}/users/${editingId}`
-      : `${API_URL}/users/`
-
-    await fetch(url, {
-      method,
-      headers: {
-        ...getAuthHeaders(),
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        username,
-        password,
-        role
-      })
-    })
-
-    setUsername("")
-    setPassword("")
-    setRole("WAITER")
-    setEditingId(null)
-
-    fetchUsers()
-  }
-
-  const toggleUser = async (id: number) => {
-
-    await fetch(
-      `${API_URL}/users/${id}/toggle`,
-      {
-        method: "PATCH",
-        headers: getAuthHeaders()
-      }
-    )
-
-    fetchUsers()
-  }
-
-  const editUser = (u: User) => {
-
-    setEditingId(u.id)
-    setUsername(u.username)
-    setRole(u.role)
-  }
 
   return (
     <Page title="Usuarios">

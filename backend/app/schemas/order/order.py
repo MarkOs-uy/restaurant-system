@@ -9,6 +9,7 @@ class OrderOut(BaseSchema):
     id: int
     table_number: int
     status: OrderStatus
+    created_at: str
     items: list[OrderItemOut]
     payments: list[PaymentOut]
     subtotal: float
@@ -23,6 +24,7 @@ class WaiterOrderOut(BaseSchema):
     table_id: int
     table_number: int
     status: OrderStatus
+    created_at: str
     items: list[OrderItemOut]
     subtotal: float
     discount: float

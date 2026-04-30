@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { API_URL, getAuthHeaders } from "../api"
+import { apiFetch } from "../api"
+import { showToast } from "../utils/showToast"
 
 interface Table {
   id: number
@@ -31,34 +32,7 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
   })
 
   const [showForm, setShowForm] = useState(false)
-
-  const loadLayout = async () => {
-    const res = await fetch(`${API_URL}/layout/`, {
-      headers: getAuthHeaders()
-    })
-    const data = await res.json()
-    setLayout(data)
-  }
-
-  useEffect(() => {
-    loadLayout()
-    loadTables()
-    const interval = setInterval(loadTables, 5000)
-    return () => clearInterval(interval)
-  }, [])
-
-  const saveLayout = async () => {
-    const res = await fetch(`${API_URL}/layout/`, {
-      method: "PATCH",
-      headers: getAuthHeaders(),
-      body: JSON.stringify(layout)
-    })
-    if (!res.ok) {
-      alert("Error guardando layout")
-      return
-    }
-    alert("Layout guardado")
-  }
+  const positionTimers = useRef<Record<number, any>>({})
 
   const [layout, setLayout] = useState({
     width: 900,
@@ -69,34 +43,53 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
 
   const TABLE_SIZE = 100
 
-  const loadTables = () => {
-    fetch(`${API_URL}/tables/status`, { headers: getAuthHeaders() })
-      .then(res => res.json())
-      .then(data => {
-        setTables(data)
-        setLoading(false)
-      })
-      .catch(err => {
-        console.error("Error cargando mesas:", err)
-        setLoading(false)
-      })
+  // -------------------------
+  // Cargar layout y mesas
+  // -------------------------
+
+  const loadLayout = async () => {
+    const data = await apiFetch(`/layout/`)
+    setLayout(data)
   }
 
-  const touchTable = async (tableId: number) => {
+  // -------------------------
+  // Salvar layout (tamaño, grid, snap)
+  // -------------------------
 
-    const res = await fetch(`${API_URL}/tables/${tableId}/touch`, {
-      method: "POST",
-      headers: getAuthHeaders()
+  const saveLayout = async () => {
+    await apiFetch("/layout/", {
+      method: "PATCH",
+      body: layout
     })
+    showToast("Layout guardado")
+  }
 
-    const data = await res.json()
+  // -------------------------
+  // Cargar mesas y sus estados
+  // -------------------------
 
+  const loadTables = async () => {
+    try {
+      const data = await apiFetch("/tables/status")
+      setTables(data)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // -------------------------
+  // Tocar mesa: si tiene orden abierta, ir a la orden. Si no, crear nueva orden para esa mesa
+  // -------------------------
+
+  const touchTable = async (tableId: number) => {
+    const data = await apiFetch(`/tables/${tableId}/touch`, {
+      method: "POST"
+    })
     if (data.order_id) {
       navigate(`/orders/${data.order_id}`)
     } else {
       navigate(`/orders/table/${tableId}`)
     }
-
   }
 
   const getTableColor = (table: Table) => {
@@ -108,6 +101,10 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
     return "#95a5a6"
   }
 
+  // -------------------------
+  // Mover mesa (modo edición): actualizar posición en backend al soltar
+  // -------------------------
+
   const moveTable = (id: number, x: number, y: number) => {
     setTables(prev =>
       prev.map(t =>
@@ -116,58 +113,71 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
     )
   }
 
-  const savePosition = async (tableId: number, x: number, y: number) => {
-    await fetch(`${API_URL}/tables/${tableId}/position?x=${x}&y=${y}`, {
-      method: "PATCH",
-      headers: getAuthHeaders()
-    })
+  // -------------------------
+  // Salvar nueva posición de la mesa al soltar
+  // -------------------------
+
+  const savePosition = (tableId: number, x: number, y: number) => {
+    if (positionTimers.current[tableId]) {
+      clearTimeout(positionTimers.current[tableId])
+    }
+    positionTimers.current[tableId] = setTimeout(async () => {
+      await apiFetch(`/tables/${tableId}/position?x=${x}&y=${y}`, {
+        method: "PATCH",
+      })
+    }, 300)
   }
 
-  const createTable = async () => {
+  // -------------------------
+  // Crear nueva mesa con forma y capacidad seleccionada en el formulario
+  // -------------------------
 
-    const res = await fetch(`${API_URL}/tables/`, {
+  const createTable = async () => {
+    const table = await apiFetch("/tables/", {
       method: "POST",
-      headers: getAuthHeaders(),
-      body: JSON.stringify({
+      body: {
         x: 50,
         y: 50,
         shape: newTableForm.shape,
         capacity: newTableForm.capacity
-      })
+      }
     })
-
-    if (!res.ok) {
-      alert("Error creando mesa")
-      return
-    }
-
-    const table = await res.json()
-
     setTables(prev => [...prev, table])
     setShowForm(false)
   }
 
+  // -------------------------
+  // Eliminar mesa (modo edición, click derecho)
+  // -------------------------
 
   const deleteTable = async (id: number) => {
-    await fetch(`${API_URL}/tables/${id}`, {
-      method: "DELETE",
-      headers: getAuthHeaders()
+    await apiFetch(`/tables/${id}`, {
+      method: "DELETE"
     })
     setTables(prev => prev.filter(t => t.id !== id))
   }
 
+  // -------------------------
+  // Reactivar mesa inactiva desde la tabla de mesas inactivas
+  // -------------------------
 
   const activateTable = async (id: number) => {
-    await fetch(`${API_URL}/tables/${id}/activate`, {
-      method: "PATCH",
-      headers: getAuthHeaders()
+    await apiFetch(`/tables/${id}/activate`, {
+      method: "PATCH"
     })
-    loadTables()
+    await loadTables()
   }
 
 
   const inactiveTables = tables.filter(t => !t.active)
   
+  useEffect(() => {
+    loadLayout()
+    loadTables()
+    const interval = setInterval(loadTables, 5000)
+    return () => clearInterval(interval)
+  }, [])
+
   if (loading) {
     return <p>Cargando mesas...</p>
   }

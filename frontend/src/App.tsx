@@ -15,6 +15,7 @@ import KitchenStations from "./pages/KitchenStations"
 import ManageTables from "./pages/ManageTables"
 import { startHealthMonitor } from "./services/healthMonitor.ts"
 import { useState, useEffect } from "react"
+import { Toaster } from "react-hot-toast"
 
 function App() {
   const [role, setRole] = useState<string | null>(null)
@@ -23,7 +24,8 @@ function App() {
   const isCashier = role === "ADMIN" || role === "CASHIER"
   const isAdmin = role === "ADMIN"
   const logout = () => {
-    localStorage.clear()
+    localStorage.removeItem("token")
+    localStorage.removeItem("role")
     window.dispatchEvent(new Event("authChanged"))
     window.location.href = "/login"
   }
@@ -33,24 +35,25 @@ function App() {
   }, [])
 
   useEffect(() => {
-
     const loadRole = () => {
       const r = localStorage.getItem("role")
       setRole(r)
     }
-
     loadRole()
-
     window.addEventListener("authChanged", loadRole)
-
     return () => {
       window.removeEventListener("authChanged", loadRole)
     }
-
   }, [])
     
   return (
     <>
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 4000
+        }}
+      />
       {/* NAVBAR DINÁMICO */}
       {role && (
         <nav className="navbar" style={{ padding: 10 }}>

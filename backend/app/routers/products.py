@@ -17,7 +17,6 @@ def create_product(
     user: User = Depends(get_current_user),
     service: ProductService = Depends(get_product_service)
 ):
-
     return service.create_product(
         user.restaurant_id,
         product

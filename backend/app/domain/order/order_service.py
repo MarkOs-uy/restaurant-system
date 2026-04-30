@@ -12,8 +12,8 @@ from app.models.table import Table
 from app.services.event_service import event_service
 from app.domain.order.order_transitions import is_valid_order_transition
 from app.domain.order.constants import ACTIVE_ORDER_STATUSES
-from app.domain.errors import OrderDomainError
-from app.domain.error_codes import ErrorCode
+from app.domain.errors.base import DomainError
+from app.domain.errors.error_codes import ErrorCode
 
 
 class OrderService:
@@ -37,7 +37,7 @@ class OrderService:
             .first()
         )
         if not order:
-            raise OrderDomainError(
+            raise DomainError(
                 "Orden no encontrada",
                 ErrorCode.ORDER_NOT_FOUND
             )
@@ -80,6 +80,7 @@ class OrderService:
             "table_id": order.table_id,
             "table_number": order.table.number,
             "status": order.status.value,
+            "created_at": order.created_at,
             "items": [
                 {
                     "id": item.id,
@@ -120,6 +121,7 @@ class OrderService:
                 "table_id": order.table_id,
                 "table_number": order.table.number,
                 "status": order.status,
+                "created_at": order.created_at,
                 "items": [
                     {
                         "id": item.id,
@@ -160,12 +162,12 @@ class OrderService:
 
     def add_item(self, order: Order, product_id: int, quantity: int) -> OrderItem:
         if order.status == OrderStatus.CLOSED:
-            raise OrderDomainError(
+            raise DomainError(
                 "Cannot add items to closed order",
                 ErrorCode.ORDER_ALREADY_CLOSED
             )
         if quantity <= 0:
-            raise OrderDomainError(
+            raise DomainError(
                 "Quantity must be greater than zero",
                 ErrorCode.INVALID_OPERATION
             )
@@ -181,7 +183,7 @@ class OrderService:
             .first()
         )
         if not product:
-            raise OrderDomainError(
+            raise DomainError(
                 "Product not found",
                 ErrorCode.ITEM_NOT_FOUND,
                 context={"product_id": product_id}
@@ -249,7 +251,7 @@ class OrderService:
     def add_product_to_table(self, restaurant_id: int, table_id: int, product_id: int, quantity: int):
         table = self.db.query(Table).filter(Table.id == table_id, Table.restaurant_id == restaurant_id).first()
         if not table:
-            raise OrderDomainError(
+            raise DomainError(
                 "Table not found",
                 ErrorCode.TABLE_NOT_FOUND
             )
@@ -262,7 +264,7 @@ class OrderService:
 
         product = self.db.query(Product).filter(Product.id == product_id, Product.restaurant_id == restaurant_id, Product.active).first()
         if not product:
-            raise OrderDomainError(
+            raise DomainError(
                 "Product not found",
                 ErrorCode.ITEM_NOT_FOUND,
                 context={"product_id": product_id}
@@ -279,9 +281,8 @@ class OrderService:
     def update_status(self, order: Order, new_status: OrderStatus):
         if order.status == new_status:
             return order
-
         if not is_valid_order_transition(order.status, new_status):
-            raise OrderDomainError(
+            raise DomainError(
                 "Invalid order status transition",
                 ErrorCode.INVALID_TRANSITION,
                 context={
@@ -345,14 +346,14 @@ class OrderService:
 
     def send_to_kitchen(self, order: Order):
         if order.status == OrderStatus.CLOSED:
-            raise OrderDomainError(
+            raise DomainError(
                 "Order is closed",
                 ErrorCode.ORDER_ALREADY_CLOSED
             )
 
         pending_items = [i for i in order.items if i.status == OrderItemStatus.PENDING]
         if not pending_items:
-            raise OrderDomainError(
+            raise DomainError(
                 "No pending items to send",
                 ErrorCode.NO_PENDING_ITEMS_TO_SEND
             )
@@ -404,17 +405,17 @@ class OrderService:
         from app.domain.cash_register.cash_register_service import CashRegisterService
 
         if order.status == OrderStatus.CLOSED:
-            raise OrderDomainError(
+            raise DomainError(
                 "Order already closed",
                 ErrorCode.ORDER_ALREADY_CLOSED
             )
 
-        cash_service = CashRegisterService()
-        cash_register = cash_service.require_open_cash_register(self.db, order.restaurant_id)
+        cash_service = CashRegisterService(self.db)
+        cash_register = cash_service.require_open_cash_register(order.restaurant_id)
 
         subtotal, total, total_paid, remaining = self.calculate_totals(order)
         if amount > remaining:
-            raise OrderDomainError(
+            raise DomainError(
                 "Payment exceeds remaining balance",
                 ErrorCode.PAYMENT_EXCEEDS_REMAINING,
                 context={
@@ -462,13 +463,13 @@ class OrderService:
         )
 
         if not payment:
-            raise OrderDomainError(
+            raise DomainError(
                 "Pago no encontrado",
                 ErrorCode.PAYMENT_NOT_FOUND
                 )
 
         if payment.order.status == OrderStatus.CLOSED:
-            raise OrderDomainError(
+            raise DomainError(
                 "Cannot cancel payment from closed order",
                 ErrorCode.INVALID_OPERATION
             )
@@ -507,7 +508,7 @@ class OrderService:
     def close_order(self, order: Order):
 
         if order.status == OrderStatus.CLOSED:
-            raise OrderDomainError(
+            raise DomainError(
                 "La orden ya está cerrada",
                 ErrorCode.ORDER_ALREADY_CLOSED
             )
@@ -515,14 +516,14 @@ class OrderService:
         subtotal, total, total_paid, remaining = self.calculate_totals(order)
 
         if remaining > 0:
-            raise OrderDomainError(
+            raise DomainError(
                 f"La orden no está paga. Saldo: {remaining:.2f}",
                 ErrorCode.ORDER_HAS_REMAINING_BALANCE,
                 context={"remaining": float(remaining)}
             )
 
         if not order.items:
-            raise OrderDomainError(
+            raise DomainError(
                 "La orden no tiene items",
                 ErrorCode.ORDER_EMPTY
             )
@@ -530,7 +531,7 @@ class OrderService:
         not_delivered = [i for i in order.items if i.status != OrderItemStatus.DELIVERED]
 
         if not_delivered:
-            raise OrderDomainError(
+            raise DomainError(
                 "No se puede cerrar la orden. Hay items no entregados",
                 ErrorCode.ORDER_ITEMS_NOT_DELIVERED,
                 context={"items": [i.id for i in not_delivered]}
@@ -566,7 +567,6 @@ class OrderService:
         order_id: int,
         item_id: int,
     ):
-
         item = (
             self.db.query(OrderItem)
             .filter(
@@ -575,31 +575,27 @@ class OrderService:
             )
             .first()
         )
-
         if not item:
-            raise OrderDomainError(
+            raise DomainError(
                 "Item no encontrado",
                 ErrorCode.ITEM_NOT_FOUND,
                 context={"item": item_id}
             )
-
         if item.order_id != order_id:
-            raise OrderDomainError(
+            raise DomainError(
                 "Item no pertenece a la orden",
                 ErrorCode.ITEM_NOT_IN_ORDER,
                 context={
                     "item": item_id,
                     "order_id": order_id
                 }
-            )
-        
+            )       
         if item.status != OrderItemStatus.PENDING:
-            raise OrderDomainError(
+            raise DomainError(
                 "El item ya fue enviado a la cocina",
                 ErrorCode.ITEM_ALREADY_SENT,
                 context={"item": item.id}
             )
-
         order = (
             self.db.query(Order)
             .filter(
@@ -623,3 +619,46 @@ class OrderService:
             )
 
         return {"message": "Item eliminado"}
+
+    # -------------------------
+    # Actualizar cantidad por item de la orden
+    # -------------------------
+
+    def update_item_quantity(
+        self,
+        restaurant_id: int,
+        item_id: int,
+        quantity: int
+    ):
+        item = (
+            self.db.query(OrderItem)
+            .join(Order)
+            .filter(
+                OrderItem.id == item_id,
+                Order.restaurant_id == restaurant_id
+            )
+            .first()
+        )
+        if not item:
+            raise DomainError(
+                "order item not found",
+                ErrorCode.ITEM_NOT_FOUND
+            )
+
+        if item.status != OrderItemStatus.PENDING:
+            raise DomainError(
+                "cannot modify item already sent to kitchen",
+                ErrorCode.ITEM_ALREADY_SEND
+            )
+        if quantity <= 0:
+            return self.delete_order_item(
+                restaurant_id,
+                item.order_id,
+                item.id
+            )
+        item.quantity = quantity
+        self.db.commit()
+        return {
+            "id": item.id,
+            "quantity": item.quantity
+        }

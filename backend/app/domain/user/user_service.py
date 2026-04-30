@@ -4,8 +4,8 @@ from app.models.user import User
 from app.schemas.user import UserCreate, UserUpdate
 from app.core.security import get_password_hash
 
-from app.domain.errors import UserDomainError
-from app.domain.error_codes import ErrorCode
+from app.domain.errors.base import DomainError
+from app.domain.errors.error_codes import ErrorCode
 
 
 class UserService:
@@ -18,18 +18,15 @@ class UserService:
     # -------------------------
 
     def get_user(self, user_id: int, restaurant_id: int):
-
         user = self.db.query(User).filter(
             User.id == user_id,
             User.restaurant_id == restaurant_id
         ).first()
-
         if not user:
-            raise UserDomainError(
+            raise DomainError(
                 "User not found",
-                ErrorCode.USER_NOT_FOUND
+                code=ErrorCode.USER_NOT_FOUND
             )
-
         return user
 
 
@@ -38,7 +35,6 @@ class UserService:
     # -------------------------
 
     def list_users(self, restaurant_id: int):
-
         return (
             self.db.query(User)
             .filter(User.restaurant_id == restaurant_id)
@@ -52,21 +48,17 @@ class UserService:
     # -------------------------
 
     def create_user(self, restaurant_id: int, data: UserCreate):
-
         existing = self.db.query(User).filter(
             User.restaurant_id == restaurant_id,
             User.username == data.username
         ).first()
-
         if existing:
-            raise UserDomainError(
-                "El usuario ya existe",
+            raise DomainError(
+                "User exists",
                 ErrorCode.USERNAME_ALREADY_EXISTS,
                 context={"username": data.username}
             )
-
         hashed = get_password_hash(data.password)
-
         user = User(
             username=data.username,
             password_hash=hashed,
@@ -74,11 +66,9 @@ class UserService:
             restaurant_id=restaurant_id,
             active=True
         )
-
         self.db.add(user)
         self.db.commit()
         self.db.refresh(user)
-
         return user
 
 
@@ -87,35 +77,26 @@ class UserService:
     # -------------------------
 
     def update_user(self, user_id: int, restaurant_id: int, data: UserUpdate):
-
         user = self.get_user(user_id, restaurant_id)
-
         if data.username is not None:
-
             existing = self.db.query(User).filter(
                 User.restaurant_id == restaurant_id,
                 User.username == data.username,
                 User.id != user_id
             ).first()
-
             if existing:
-                raise UserDomainError(
-                    "El usuario ya existe",
+                raise DomainError(
+                    "User exists",
                     ErrorCode.USERNAME_ALREADY_EXISTS,
                     context={"username": data.username}
                 )
-
             user.username = data.username
-
         if data.role is not None:
             user.role = data.role
-
         if data.password is not None:
             user.password_hash = get_password_hash(data.password)
-
         self.db.commit()
         self.db.refresh(user)
-
         return user
 
 
@@ -124,12 +105,8 @@ class UserService:
     # -------------------------
 
     def toggle_user(self, user_id: int, restaurant_id: int):
-
         user = self.get_user(user_id, restaurant_id)
-
         user.active = not user.active
-
         self.db.commit()
         self.db.refresh(user)
-
         return user

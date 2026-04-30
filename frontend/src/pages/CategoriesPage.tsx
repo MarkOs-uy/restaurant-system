@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { API_URL, getAuthHeaders } from "../api"
+import { apiFetch } from "../api"
 
 import Page from "../components/Page"
 import Card from "../components/Card"
@@ -17,13 +17,7 @@ export default function CategoriesPage() {
   const [editingId, setEditingId] = useState<number | null>(null)
 
   const fetchCategories = async () => {
-
-    const res = await fetch(
-      `${API_URL}/categories/`,
-      { headers: getAuthHeaders() }
-    )
-
-    const data = await res.json()
+    const data = await apiFetch(`/categories/`)
     setCategories(data)
   }
 
@@ -35,36 +29,37 @@ export default function CategoriesPage() {
 
     if (!name) return
 
-    const method = editingId ? "PATCH" : "POST"
+    try {
 
-    const url = editingId
-      ? `${API_URL}/categories/${editingId}`
-      : `${API_URL}/categories/`
+      const method = editingId ? "PATCH" : "POST"
 
-    await fetch(url, {
-      method,
-      headers: {
-        ...getAuthHeaders(),
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ name })
-    })
+      const url = editingId
+        ? `/categories/${editingId}`
+        : `/categories/`
 
-    setName("")
-    setEditingId(null)
+      await apiFetch(url, {
+        method,
+        body: { name }
+      })
 
-    fetchCategories()
+      setName("")
+      setEditingId(null)
+
+      fetchCategories()
+
+    } catch (err:any) {
+      alert(err.message)
+    }
   }
 
   const deleteCategory = async (id: number) => {
 
     if (!confirm("Eliminar categoría?")) return
 
-    await fetch(
-      `${API_URL}/categories/${id}`,
+    await apiFetch(
+      `/categories/${id}`,
       {
         method: "DELETE",
-        headers: getAuthHeaders()
       }
     )
 

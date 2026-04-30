@@ -21,14 +21,14 @@ class CashRegisterOut(BaseSchema):
 class CashRegisterSummary(BaseSchema):
     cash_register_id: int
     opened_at: datetime
-    total_sales: float
+    total_sales: Decimal
     orders_count: int
-    average_ticket: float
-    by_method: dict[str, float]
+    average_ticket: Decimal
+    by_method: dict[str, Decimal]
 
 class PaymentBreakdown(BaseSchema):
     method: str
-    total: float
+    total: Decimal
 
 
 class CashRegisterCloseOut(BaseSchema):
@@ -48,23 +48,28 @@ class CashRegisterClose(BaseSchema):
 
 class CashMovementCreate(BaseSchema):
     type: str
-    amount: float
+    amount: Decimal
     reason: str
 
 
-class CashRegisterDashboard(BaseSchema):
+class CashMovementOut(BaseSchema):
+    id: int
+    type: str
+    amount: Decimal
+    reason: str | None
+    created_at: datetime
 
+
+class CashRegisterDashboard(BaseSchema):
     cash_register_id: int
     opened_at: datetime
-
     opening_amount: Decimal
-
-    total_sales: float
+    total_sales: Decimal
     orders_count: int
-    average_ticket: float
+    transactions_count: int
+    average_ticket: Decimal
+    by_method: dict[str, Decimal]
+    cash_movements: list[CashMovementOut]
+    expected_cash: Decimal
 
-    by_method: dict[str, float]
 
-    cash_movements: list[dict]
-
-    expected_cash: float

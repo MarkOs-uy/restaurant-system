@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { API_URL, getAuthHeaders } from "../api"
+import { apiFetch } from "../api"
 
 interface Station {
   id: number
@@ -18,11 +18,9 @@ export default function KitchenStations() {
   }, [])
 
   const fetchStations = async () => {
-    const res = await fetch(
-      `${API_URL}/stations/active`,
-      { headers: getAuthHeaders() }
+    const data = await apiFetch(
+      `/stations/active`
     )
-    const data = await res.json()
     setStations(data)
   }
 

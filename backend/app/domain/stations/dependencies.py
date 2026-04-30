@@ -2,10 +2,10 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from .category_service import CategoryService
+from .station_service import StationService
 
 
-def get_category_service(
+def get_station_service(
     db: Session = Depends(get_db)
-) -> CategoryService:
-    return CategoryService(db)
+) -> StationService:
+    return StationService(db)

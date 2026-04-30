@@ -9,7 +9,7 @@ from app.schemas.order.order_item import OrderItemCreate
 from app.schemas.order.payment import PaymentCreate
 from app.schemas.order.order import OrderStatusUpdate
 
-from app.domain.order.order_service import OrderService, OrderDomainError
+from app.domain.order.order_service import OrderService
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -100,6 +100,22 @@ def update_order_status(
 ):
     order = service.get_order(order_id, user.restaurant_id)
     return service.update_status(order, data.status)
+
+# -------------------------
+# Actualizar cantidad de item
+# -------------------------
+@router.patch("/order-items/{item_id}")
+def update_order_item_quantity(
+    item_id: int,
+    quantity: int,
+    service: OrderService = Depends(get_order_service),
+    user: User = Depends(get_current_user)
+):
+    return service.update_item_quantity(
+        restaurant_id=user.restaurant_id,
+        item_id=item_id,
+        quantity=quantity
+    )
 
 # -------------------------
 # Borrar item de orden

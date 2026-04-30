@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom"
-import { useEffect, useState } from "react"
-import { API_URL, getAuthHeaders, WS_URL } from "../api"
+import { useEffect, useState, useRef } from "react"
+import { apiFetch, WS_URL } from "../api"
 
 interface Item {
   id: number
@@ -56,11 +56,10 @@ export default function OrderDetail() {
   const [openCategory, setOpenCategory] = useState<number | null>(null)
 
   const [paymentAmount, setPaymentAmount] = useState("")
-
   const [quantities, setQuantities] = useState<{ [key: number]: number }>({})
-
   const [discount, setDiscount] = useState("")
   const [discountType, setDiscountType] = useState<"amount" | "percent">("amount")
+  const updating = useRef(false)
 
   useEffect(() => {
     fetchCategories()
@@ -75,46 +74,63 @@ export default function OrderDetail() {
 
   useEffect(() => {
     if (!id) return
-
     const token = localStorage.getItem("token")
     if (!token) return
-
     const ws = new WebSocket(`${WS_URL}/ws?token=${token}`)
-
-    ws.onopen = () => console.log("OrderDetail WS se conectó")
-    ws.onmessage = (event) => fetchOrder()
-    ws.onclose = () => console.log("WS closed")
-    ws.onerror = () => ws.close()
-
+    ws.onopen = () => {
+      console.log("OrderDetail WS conectado")
+    }
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        if (!data?.type) return
+        const relevantEvents = [
+          "ORDER_UPDATED",
+          "ORDER_STATUS_CHANGED",
+          "ITEM_STATUS_CHANGED",
+          "PAYMENT_ADDED"
+        ]
+        if (
+          relevantEvents.includes(data.type) &&
+          data.order_id === id
+        ) {
+          fetchOrder()
+        }
+      } catch (err) {
+        console.error("WS parse error", err)
+      }
+    }
+    ws.onclose = () => {
+      console.log("OrderDetail WS cerrado")
+    }
+    ws.onerror = () => {
+      ws.close()
+    }
     return () => ws.close()
   }, [id])
 
+  
   useEffect(() => {
     if (!order) return
-
-    if (paymentAmount === "" || Number(paymentAmount) > order.remaining) {
-      setPaymentAmount(order.remaining.toFixed(2))
-    }
-
+    //if (paymentAmount === "" || Number(paymentAmount) > order.remaining) {
+    setPaymentAmount(order.remaining.toFixed(2))
+    //}
   }, [order?.remaining])
 
 
   const fetchOrder = async () => {
     setLoading(true)
-    const res = await fetch(`${API_URL}/orders/${id}`, {
-      headers: getAuthHeaders()
-    })
-    const data = await res.json()
-    setOrder(data)
-    setLoading(false)
+    try {
+      const data = await apiFetch(`/orders/${id}`)
+      setOrder(data)
+    } finally {
+      setLoading(false)
+    }
   }
 
 
   const fetchCategories = async () => {
-    const res = await fetch(`${API_URL}/categories/with-products`, {
-      headers: getAuthHeaders()
-    })
-    const data = await res.json()
+    const data = await apiFetch(`/categories/with-products`)
     setCategories(data)
   }
 
@@ -123,141 +139,112 @@ export default function OrderDetail() {
     const quantity = quantities[productId] || 1
     if (order?.status === "CLOSED") return
     if (!orderId) {
-      const res = await fetch(
-        `${API_URL}/tables/${tableId}/add-product`,
+      const data = await apiFetch(
+        `/tables/${tableId}/add-product`,
         {
           method: "POST",
-          headers: getAuthHeaders(),
-          body: JSON.stringify({
+          body: {
             product_id: productId,
             quantity
-          })
+          }
         }
       )
-      const data = await res.json()
       navigate(`/orders/${data.order_id}`)
       return
     }
-    await fetch(`${API_URL}/orders/${orderId}/items`, {
+    await apiFetch(`/orders/${orderId}/items`, {
       method: "POST",
-      headers: getAuthHeaders(),
-      body: JSON.stringify({
+      body: {
         product_id: productId,
         quantity
-      })
+      }
     })
+    await fetchOrder()
   }
 
 
   const removeItem = async (orderId: number, itemId: number) => {
-    const res = await fetch(
-      `${API_URL}/orders/${orderId}/items/${itemId}`,
-      {
-        method: "DELETE",
-        headers: getAuthHeaders()
-      }
-    )
-    if (!res.ok) {
-      const error = await res.json()
-      alert(error.detail)
-    }
+    await apiFetch(`/orders/${orderId}/items/${itemId}`, {
+      method: "DELETE"
+    })
+    await fetchOrder()
   }
 
 
+
   const updateQuantity = async (itemId: number, quantity: number) => {
-    const res = await fetch(
-      `${API_URL}/orders/order-items/${itemId}?quantity=${quantity}`,
-      {
-        method: "PATCH",
-        headers: getAuthHeaders()
-      }
-    )
-    if (!res.ok) {
-      const error = await res.json()
-      alert(error.detail)
+    if (updating.current) return
+    updating.current = true
+    try {
+      await apiFetch(`/orders/order-items/${itemId}?quantity=${quantity}`, {
+        method: "PATCH"
+      })
+      await fetchOrder()
+    } finally {
+      updating.current = false
     }
   }
 
 
   const markDelivered = async (itemId: number) => {
-    const res = await fetch(
-      `${API_URL}/order-items/${itemId}/status`,
+    await apiFetch(
+      `/order-items/${itemId}/status`,
       {
         method: "PATCH",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ status: "DELIVERED" })
+        body: { status: "DELIVERED" }
       }
     )
-
-    if (!res.ok) {
-      const error = await res.json()
-      alert(error.detail)
-    }
+    await fetchOrder()
   }
 
+
   const registerPayment = async (method: string) => {
-    if (!paymentAmount || !id) return
-    const res = await fetch(`${API_URL}/orders/${id}/payments`, {
-      method: "POST",
-      headers: getAuthHeaders(),
-      body: JSON.stringify({
-        amount: Number(paymentAmount),
-        method
-      })
-    })
-    if (!res.ok) {
-      const error = await res.json()
-      alert(error.detail)
+    if (!id) return
+    const amount = Number(paymentAmount)
+    if (!amount || amount <= 0) {
+      alert("El pago debe ser mayor a 0")
       return
     }
+    await apiFetch(`/orders/${id}/payments`, {
+      method: "POST",
+      body: {
+        amount,
+        method
+      }
+    })
+    await fetchOrder()
   }
 
 
   const cancelPayment = async (paymentId: number) => {
-    const res = await fetch(
-      `${API_URL}/orders/payments/${paymentId}`,
+    await apiFetch(
+      `/orders/payments/${paymentId}`,
       {
         method: "DELETE",
-        headers: getAuthHeaders()
       }
     )
-
-    if (!res.ok) {
-      const error = await res.json()
-      alert(error.detail)
-    }
+    await fetchOrder()
   }
 
 
   const closeOrder = async () => {
     if (!id) return
-    const res = await fetch(`${API_URL}/orders/${id}/close`, {
+    await apiFetch(`/orders/${id}/close`, {
       method: "POST",
-      headers: getAuthHeaders()
     })
-    if (!res.ok) {
-      const error = await res.json()
-      alert(error.detail)
-    }
   }
 
 
   const sendToKitchen = async () => {
     if (!id) return
-    const res = await fetch(`${API_URL}/orders/${id}/send-to-kitchen`, {
+    await apiFetch(`/orders/${id}/send-to-kitchen`, {
       method: "POST",
-      headers: getAuthHeaders()
     })
-    if (!res.ok) {
-      const error = await res.json()
-      alert(error.detail)
-    }
+    await fetchOrder()
   }
 
 
-
   if (loading) return <p>Cargando...</p>
-
 
   const items = order?.items ?? []
   const remaining = order?.remaining ?? 0
@@ -293,18 +280,12 @@ export default function OrderDetail() {
     if (discountType === "percent") {
       finalDiscount = (order.subtotal * finalDiscount) / 100
     }
-    const res = await fetch(
-      `${API_URL}/orders/${order.id}/discount?discount=${finalDiscount}`,
+    await apiFetch(
+      `/orders/${order.id}/discount?discount=${finalDiscount}`,
       {
         method: "PUT",
-        headers: getAuthHeaders()
       }
     )
-    if (!res.ok) {
-      const error = await res.json()
-      alert(error.detail)
-      return
-    }
     setDiscount("")
   }
 
@@ -366,7 +347,7 @@ export default function OrderDetail() {
               {item.status === "PENDING" && (
                 <>
                   <button className="btn btn-icon"
-                    onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                    onClick={() => updateQuantity(item.id, Math.max(0, item.quantity - 1))}
                   >
                     −
                   </button>
@@ -550,8 +531,9 @@ export default function OrderDetail() {
             <h3>Registrar Pago</h3>
 
             <input
-              type="text"
-              inputMode="decimal"
+              type="number"
+              step="0.01"
+              min="0"
               placeholder="Monto"
               value={paymentAmount}
               onChange={(e) => setPaymentAmount(e.target.value)}
