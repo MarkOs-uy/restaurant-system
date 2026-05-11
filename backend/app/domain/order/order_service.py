@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
+import logging
 
 from app.models.order import Order, OrderStatus
 from app.models.order_item import OrderItem, OrderItemStatus
@@ -9,22 +10,27 @@ from app.models.user import UserRole
 from app.models.payment import Payment
 from app.models.table import Table
 
-from app.services.event_service import event_service
+from app.services.event_service import EventService
 from app.domain.order.order_transitions import is_valid_order_transition
 from app.domain.order.constants import ACTIVE_ORDER_STATUSES
 from app.domain.errors.base import DomainError
 from app.domain.errors.error_codes import ErrorCode
 
+logger = logging.getLogger("app.domain.order")
 
 class OrderService:
 
     def __init__(self, db: Session):
         self.db = db
+        self.events = EventService(db)
 
     # -------------------------
     # Getters
     # -------------------------
 
+    # -------------------------
+    # Obtener orden por id
+    # -------------------------
     def get_order(self, order_id: int, restaurant_id: int):
         order = (
             self.db.query(Order)
@@ -41,12 +47,12 @@ class OrderService:
                 "Orden no encontrada",
                 ErrorCode.ORDER_NOT_FOUND
             )
-
         subtotal, total, total_paid, remaining = self.calculate_totals(order)
-
         return order
 
-
+    # -------------------------
+    # Obtener ordenes activas
+    # -------------------------
     def get_active_orders(self, restaurant_id: int):
         return (
             self.db.query(Order)
@@ -60,7 +66,9 @@ class OrderService:
             .all()
         )
 
-
+    # -------------------------
+    # Obtener orden activa por mesa
+    # -------------------------
     def get_active_order(self, restaurant_id: int, table_id: int):
         return (
             self.db.query(Order)
@@ -72,7 +80,9 @@ class OrderService:
             .first()
         )
 
-
+    # -------------------------
+    # Serialización
+    # -------------------------
     def serialize_order(self, order: Order):
         subtotal, total, total_paid, remaining = self.calculate_totals(order)
         return {
@@ -107,7 +117,9 @@ class OrderService:
             "remaining": float(remaining)
         }
 
-
+    # -------------------------
+    # Serializar ordenes activas
+    # -------------------------
     def serialize_orders(self, restaurant_id: int):
         orders = self.get_active_orders(restaurant_id)
 
@@ -139,15 +151,14 @@ class OrderService:
                 "total_paid": total_paid,
                 "remaining": remaining
             })
-
         return result
-
-
 
     # -------------------------
     # Totales
     # -------------------------
-
+    # -------------------------
+    # Calcular totales de la orden
+    # -------------------------
     def calculate_totals(self, order: Order):
         subtotal = sum((item.quantity * item.unit_price for item in order.items), Decimal("0"))
         discount = order.discount or Decimal("0")
@@ -157,9 +168,61 @@ class OrderService:
         return subtotal, total, total_paid, remaining
 
     # -------------------------
+    # Descuentos
+    # -------------------------
+    # -------------------------
+    # Aplicar descuento a la orden
+    # -------------------------
+    def apply_discount(self, order: Order, discount: Decimal):
+        if order.status == OrderStatus.CLOSED:
+            raise DomainError(
+                "Cannot apply discount to closed order",
+                ErrorCode.ORDER_ALREADY_CLOSED
+            )
+        if order.status == OrderStatus.CANCELLED:
+            raise DomainError(
+                "Cannot apply discount to cancelled order",
+                ErrorCode.INVALID_OPERATION
+            )
+        discount = discount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        subtotal, _, total_paid, _ = self.calculate_totals(order)
+        if discount > subtotal:
+            raise DomainError(
+                "Discount cannot exceed order subtotal",
+                ErrorCode.INVALID_OPERATION,
+                context={
+                    "discount": float(discount),
+                    "subtotal": float(subtotal)
+                }
+            )
+        new_total = subtotal - discount
+        if new_total < total_paid:
+            raise DomainError(
+                "Discount would make paid amount exceed order total",
+                ErrorCode.INVALID_OPERATION,
+                context={
+                    "discount": float(discount),
+                    "new_total": float(new_total),
+                    "total_paid": float(total_paid)
+                }
+            )
+        logger.info("Descuento aplicado order_id=%s discount=%s", order.id, discount)
+        order.discount = discount
+        for role in [UserRole.WAITER, UserRole.CASHIER]:
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type="ORDER_UPDATED",
+                payload={"order_id": order.id},
+                target="role",
+                target_id=role.value
+            )
+        self.db.commit()
+        self.db.refresh(order)
+        return self.serialize_order(order)
+
+    # -------------------------
     # Crear / agregar items
     # -------------------------
-
     def add_item(self, order: Order, product_id: int, quantity: int) -> OrderItem:
         if order.status == OrderStatus.CLOSED:
             raise DomainError(
@@ -171,7 +234,6 @@ class OrderService:
                 "Quantity must be greater than zero",
                 ErrorCode.INVALID_OPERATION
             )
-
         # Buscar producto en la base
         product = (
             self.db.query(Product)
@@ -188,6 +250,8 @@ class OrderService:
                 ErrorCode.ITEM_NOT_FOUND,
                 context={"product_id": product_id}
             )
+        
+        previous_status = order.status
 
         existing_item = (
             self.db.query(OrderItem)
@@ -198,7 +262,6 @@ class OrderService:
             )
             .first()
         )
-
         if existing_item:
             existing_item.quantity += quantity
             item = existing_item
@@ -213,41 +276,48 @@ class OrderService:
             )
             self.db.add(item)
         
-        self.db.commit()
-        self.db.refresh(item)
-
-        previous_status = order.status
-        self.db.refresh(order)  # Trae la lista de items actualizada
-        self.recalculate_order_status(order)
-
+        self.db.flush()  # Asegura que item.id esté disponible  
+        self.recalculate_order_status(order)      
+        
         # =========================
         # 🔔 EVENTOS
         # =========================
-        event_service.emit_to_station(
-            order.restaurant_id,
-            product.station_id,
-            {"type": "NEW_ITEM", "order_id": order.id}
+        self.events.emit(
+            restaurant_id=order.restaurant_id,
+            event_type="NEW_ITEM",
+            payload={"order_id": order.id},
+            target="station",
+            target_id=str(product.station_id)
         )
 
         if order.status != previous_status:
             for role in [UserRole.WAITER, UserRole.CASHIER]:
-                event_service.emit_to_role(
-                    order.restaurant_id,
-                    role,
-                    {"type": "ORDER_STATUS_CHANGED", "order_id": order.id, "status": order.status.value}
+                self.events.emit(
+                    restaurant_id=order.restaurant_id,
+                    event_type="ORDER_STATUS_CHANGED",
+                    payload={"order_id": order.id, "status": order.status.value},
+                    target="role",
+                    target_id=role.value
                 )
 
         for role in [UserRole.WAITER, UserRole.CASHIER]:
-            print("EVENT emit_to_role en ADD ITEM ORDER_UPDATED")
-            event_service.emit_to_role(
-                order.restaurant_id,
-                role,
-                {"type": "ORDER_UPDATED", "order_id": order.id}
+            logger.debug("ORDER_UPDATED emit order_id=%s", order.id)
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type="ORDER_UPDATED",
+                payload={"order_id": order.id},
+                target="role",
+                target_id=role.value
             )
 
+        self.db.commit()
+        self.db.refresh(item)
+        self.db.refresh(order)
         return item
 
-
+    # -------------------------
+    # Agregar producto a la mesa (crear orden si no existe)
+    # -------------------------
     def add_product_to_table(self, restaurant_id: int, table_id: int, product_id: int, quantity: int):
         table = self.db.query(Table).filter(Table.id == table_id, Table.restaurant_id == restaurant_id).first()
         if not table:
@@ -277,7 +347,9 @@ class OrderService:
     # -------------------------
     # Estados
     # -------------------------
-
+    # -------------------------
+    # Actualizar estado de la orden
+    # -------------------------
     def update_status(self, order: Order, new_status: OrderStatus):
         if order.status == new_status:
             return order
@@ -291,29 +363,33 @@ class OrderService:
                     "order_id": order.id
                 }
             )
-
         previous_status = order.status
         order.status = new_status
-
-        self.db.commit()
-        self.db.refresh(order)
-
+        logger.info("Estado de orden actualizado order_id=%s from=%s to=%s", order.id, previous_status.value, new_status.value)
         # Emit events solo si cambio
         if previous_status != new_status:
-            event_service.emit_to_role(
-                order.restaurant_id,
-                UserRole.WAITER,
-                {"type": "ORDER_STATUS_CHANGED", "order_id": order.id, "status": new_status.value}
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type="ORDER_STATUS_CHANGED",
+                payload={"order_id": order.id, "status": new_status.value},
+                target="role",
+                target_id=UserRole.WAITER.value
             )
 
-        event_service.emit_to_role(
-            order.restaurant_id,
-            UserRole.WAITER,
-            {"type": "ORDER_UPDATED", "order_id": order.id}
+        self.events.emit(
+            restaurant_id=order.restaurant_id,
+            event_type="ORDER_UPDATED",
+            payload={"order_id": order.id},
+            target="role",
+            target_id=UserRole.WAITER.value
         )
+        self.db.commit()
+        self.db.refresh(order)
         return order
 
-
+    # -------------------------
+    # Recalcular estado de la orden basado en estados de los items
+    # -------------------------
     def recalculate_order_status(self, order: Order):
         active_items = [
             i for i in order.items
@@ -343,44 +419,42 @@ class OrderService:
     # -------------------------
     # Enviar a cocina
     # -------------------------
-
     def send_to_kitchen(self, order: Order):
         if order.status == OrderStatus.CLOSED:
             raise DomainError(
                 "Order is closed",
                 ErrorCode.ORDER_ALREADY_CLOSED
             )
-
         pending_items = [i for i in order.items if i.status == OrderItemStatus.PENDING]
         if not pending_items:
             raise DomainError(
                 "No pending items to send",
                 ErrorCode.NO_PENDING_ITEMS_TO_SEND
             )
-
         previous_status = order.status
         for item in pending_items:
             item.status = OrderItemStatus.SENT
-
+        logger.info("Orden enviada a cocina order_id=%s r=%s", order.id, order.restaurant_id)
         self.recalculate_order_status(order)
-        self.db.commit()
-
         # Agrupar por estación y emitir
         station_ids = {i.product.station_id for i in pending_items}
         for station_id in station_ids:
-            event_service.emit_to_station(
-                order.restaurant_id,
-                station_id,
-                {"type": "ORDER_UPDATED", "order_id": order.id}
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type="ORDER_UPDATED",
+                payload={"order_id": order.id},
+                target="station",
+                target_id=str(station_id)
             )
-
         if order.status != previous_status:
-            event_service.emit_to_role(
-                order.restaurant_id,
-                UserRole.WAITER,
-                {"type": "ORDER_STATUS_CHANGED", "order_id": order.id, "status": order.status.value}
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type="ORDER_STATUS_CHANGED",
+                payload={"order_id": order.id, "status": order.status.value},
+                target="role",
+                target_id=UserRole.WAITER.value
             )
-
+        self.db.commit()
         # 🔹 Convertir a JSON serializable
         result = [
             {
@@ -394,7 +468,6 @@ class OrderService:
             }
             for item in pending_items
         ]
-
         return result
 
     # -------------------------
@@ -423,7 +496,7 @@ class OrderService:
                     "remaining": float(remaining)
                 }
             )
-
+        logger.info("Pago agregado order_id=%s amount=%s method=%s", order.id, amount, method)
         payment = Payment(
             order_id=order.id,
             restaurant_id=order.restaurant_id,
@@ -432,27 +505,32 @@ class OrderService:
             cash_register_id=cash_register.id
         )
         self.db.add(payment)
-        self.db.commit()
-        self.db.refresh(payment)
 
         # Emitir eventos
         for role in [UserRole.WAITER, UserRole.CASHIER]:
-            event_service.emit_to_role(
-                order.restaurant_id,
-                role,
-                {"type": "PAYMENT_ADDED", "order_id": order.id, "amount": float(amount), "method": method}
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type="PAYMENT_ADDED",
+                payload={"order_id": order.id, "amount": float(amount), "method": method},
+                target="role",
+                target_id=role.value
             )
 
-        event_service.emit_to_role(
-            order.restaurant_id,
-            UserRole.CASHIER,
-            {"type": "CASH_REGISTER_UPDATED"}
+        self.events.emit(
+            restaurant_id=order.restaurant_id,
+            event_type="CASH_REGISTER_UPDATED",
+            payload={"order_id": order.id},
+            target="role",
+            target_id=UserRole.CASHIER.value
         )
+        self.db.commit()
+        self.db.refresh(payment)
         return payment
 
-
+    # -------------------------
+    # Cancelar pago
+    # -------------------------
     def cancel_payment(self, restaurant_id: int, payment_id: int):
-        print("Id: ",payment_id)
         payment = (
             self.db.query(Payment)
             .filter(
@@ -473,38 +551,39 @@ class OrderService:
                 "Cannot cancel payment from closed order",
                 ErrorCode.INVALID_OPERATION
             )
-
+        logger.info("Pago cancelado order_id=%s amount=%s method=%s", payment.order_id, payment.amount, payment.method)
         order_id = payment.order_id
         amount = payment.amount
         method = payment.method
 
         self.db.delete(payment)
-        self.db.commit()
 
         for role in [UserRole.WAITER, UserRole.CASHIER]:
-            event_service.emit_to_role(
-                restaurant_id,
-                role,
-                {
-                    "type": "PAYMENT_DELETED",
+            self.events.emit(
+                restaurant_id=restaurant_id,
+                event_type="PAYMENT_DELETED",
+                payload={
                     "order_id": order_id,
                     "amount": float(amount),
-                    "method": method                   
-                }
+                    "method": method
+                },
+                target="role",
+                target_id=role.value
             )
 
-        event_service.emit_to_role(
-            restaurant_id,
-            UserRole.CASHIER,
-            {"type": "CASH_REGISTER_UPDATED"}
+        self.events.emit(
+            restaurant_id=restaurant_id,
+            event_type="CASH_REGISTER_UPDATED",
+            payload={"order_id": order_id},
+            target="role",
+            target_id=UserRole.CASHIER.value
         )
-
+        self.db.commit()
         return {"deleted": payment_id}
 
     # -------------------------
     # Cerrar orden
     # -------------------------
-
     def close_order(self, order: Order):
 
         if order.status == OrderStatus.CLOSED:
@@ -536,31 +615,33 @@ class OrderService:
                 ErrorCode.ORDER_ITEMS_NOT_DELIVERED,
                 context={"items": [i.id for i in not_delivered]}
             )
-
+        logger.info("Orden cerrada order_id=%s r=%s total=%s", order.id, order.restaurant_id, total)
         self.update_status(order, OrderStatus.CLOSED)
         order.closed_at = func.now()
-        self.db.commit()
 
         # Emitir evento
         for role in [UserRole.WAITER, UserRole.CASHIER]:
-            event_service.emit_to_role(
-                order.restaurant_id,
-                role,
-                {"type": "ORDER_CLOSED", "order_id": order.id}
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type="ORDER_CLOSED",
+                payload={"order_id": order.id},
+                target="role",
+                target_id=role.value
             )
 
-        event_service.emit_to_role(
-            order.restaurant_id,
-            UserRole.CASHIER,
-            {"type": "CASH_REGISTER_UPDATED"}
+        self.events.emit(
+            restaurant_id=order.restaurant_id,
+            event_type="CASH_REGISTER_UPDATED",
+            payload={"order_id": order.id},
+            target="role",
+            target_id=UserRole.CASHIER.value
         )
-
+        self.db.commit()
         return order
 
     # -------------------------
     # Eliminar item de la orden
     # -------------------------
-
     def delete_order_item(
         self,
         restaurant_id: int,
@@ -606,24 +687,22 @@ class OrderService:
         )
 
         self.db.delete(item)
-        self.db.commit()
-
         self.recalculate_order_status(order)
-
         # 🔔 EVENTO
         for role in [UserRole.WAITER, UserRole.CASHIER]:
-            event_service.emit_to_role(
-                restaurant_id,
-                role,
-                {"type": "ORDER_UPDATED", "order_id": order_id}
+            self.events.emit(
+                restaurant_id=restaurant_id,
+                event_type="ORDER_UPDATED",
+                payload={"order_id": order_id},
+                target="role",
+                target_id=role.value
             )
-
+        self.db.commit()
         return {"message": "Item eliminado"}
 
     # -------------------------
     # Actualizar cantidad por item de la orden
     # -------------------------
-
     def update_item_quantity(
         self,
         restaurant_id: int,

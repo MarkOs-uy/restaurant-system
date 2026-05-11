@@ -1,10 +1,11 @@
 from datetime import datetime, timedelta, timezone
+from uuid import uuid4
+
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-SECRET_KEY = "super-secret-key-change-this"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+from app.core.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+
 
 pwd_context = CryptContext(
     schemes=["bcrypt"],
@@ -27,11 +28,17 @@ def create_access_token(data: dict):
 
     to_encode = data.copy()
 
-    expire = datetime.now(timezone.utc) + timedelta(
+    now = datetime.now(timezone.utc)
+
+    expire = now + timedelta(
         minutes=ACCESS_TOKEN_EXPIRE_MINUTES
     )
 
-    to_encode.update({"exp": expire})
+    to_encode.update({
+        "exp": expire,
+        "iat": now,
+        "jti": str(uuid4())
+    })
 
     return jwt.encode(
         to_encode,
@@ -50,6 +57,12 @@ def decode_access_token(token: str):
             SECRET_KEY,
             algorithms=[ALGORITHM]
         )
+
+        exp = payload.get("exp")
+
+        if exp:
+            if datetime.fromtimestamp(exp, tz=timezone.utc) < datetime.now(timezone.utc):
+                return None
 
         return payload
 

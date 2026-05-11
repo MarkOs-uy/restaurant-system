@@ -20,6 +20,7 @@ class TableOut(BaseSchema):
     order_status: OrderStatus | None
 
 class TableCreate(BaseSchema):
+    number: Optional[int] = None
     x: int = 0
     y: int = 0
     capacity: int = 4
@@ -40,5 +41,10 @@ class TableList(BaseSchema):
     active: bool
 
 class TablePositionUpdate(BaseSchema):
+    x: int
+    y: int
+
+class TablePositionOut(BaseSchema):
+    id: int
     x: int
     y: int

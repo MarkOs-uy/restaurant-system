@@ -121,7 +121,7 @@ class StationService:
 
     def toggle_station(self, restaurant_id: int, station_id: int):
         station = self.get_station(restaurant_id, station_id)
-        station.active = True if station.active is False else False
+        station.active = not station.active
         self.db.commit()
         self.db.refresh(station)
         return station

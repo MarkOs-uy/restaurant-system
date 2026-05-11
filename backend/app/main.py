@@ -1,47 +1,75 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+
 from contextlib import asynccontextmanager
 import asyncio
 import logging
 
 from app import models
+from app.services.event_worker import EventWorker
+from app.services.event_cleanup import EventCleanup
 from app.events.redis_listener import redis_event_listener
-
-from app.services.event_service import event_service
 
 # routers
 from app.routers import tables, orders, products, cash_register, category, order_items, stations, auth, users, kitchen
 from app.routers import layout
 
-
 from app.domain.errors.base import DomainError
 from app.websocket import ws
+from app.core.config import CORS_ORIGINS
 
-from fastapi.middleware.cors import CORSMiddleware
 
+logger = logging.getLogger("app.main")
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 
-    print("Backend arrancando...")
+    logger.info("Backend arrancando...")
 
-    # 🔥 REGISTRAR EVENT LOOP PARA EVENT SERVICE
-    event_service.loop = asyncio.get_running_loop()
-
-    print("EventService loop registrado")
+    # Event worker
+    worker = EventWorker()
+    worker_task = asyncio.create_task(worker.run())
+    logger.info("Event worker iniciado")
 
     # Redis listener
     redis_task = asyncio.create_task(redis_event_listener())
+    logger.info("Redis listener iniciado")
+
+    # Event cleanup
+    cleanup = EventCleanup(interval_seconds=3600)
+    cleanup_task = asyncio.create_task(cleanup.run())
+    logger.info("Event cleanup iniciado")
 
     yield
 
-    print("Backend apagándose...")
+    logger.info("Backend apagándose...")
 
+    # Cancelar redis
     redis_task.cancel()
     try:
         await redis_task
     except asyncio.CancelledError:
-        pass
+        logger.info("Redis listener detenido")
+
+    # Cancelar worker
+    worker_task.cancel()
+    try:
+        await worker_task
+    except asyncio.CancelledError:
+        logger.info("Event worker detenido")
+
+    # Cancelar cleanup
+    cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        logger.info("Event cleanup detenido")
 
 
 app = FastAPI(lifespan=lifespan, redirect_slashes=False)
@@ -49,7 +77,7 @@ app = FastAPI(lifespan=lifespan, redirect_slashes=False)
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -83,18 +111,10 @@ def health():
         "version": "1.0.0"
     }
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-)
-
-logger = logging.getLogger("app")
 
 @app.exception_handler(DomainError)
 async def domain_error_handler(request: Request, exc: DomainError):
-
     logger.warning(f"{exc.code}: {exc.message}")
-
     return JSONResponse(
         status_code=400,
         content={
@@ -106,9 +126,7 @@ async def domain_error_handler(request: Request, exc: DomainError):
 
 @app.exception_handler(Exception)
 async def unexpected_error_handler(request: Request, exc: Exception):
-
     logger.exception("Unexpected server error")
-
     return JSONResponse(
         status_code=500,
         content={

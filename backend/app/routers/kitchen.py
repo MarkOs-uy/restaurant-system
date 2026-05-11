@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends
 
 from app.models.user import User
-from app.dependencies.auth import get_current_user
+
+from app.dependencies.roles import kitchen_or_admin
 
 from app.schemas.order.order_item import (
     OrderItemStatusUpdate,
     OrderItemOut
 )
-
 from app.schemas.order.kitchen import KitchenItemOut
 
 from app.domain.kitchen.dependencies import get_kitchen_service
@@ -27,7 +27,7 @@ router = APIRouter(
 )
 def get_station_items(
     station_id: int,
-    user: User = Depends(get_current_user),
+    user: User = Depends(kitchen_or_admin),
     service: KitchenService = Depends(get_kitchen_service)
 ):
     return service.get_station_items(
@@ -44,7 +44,7 @@ def get_station_items(
 def update_item_status(
     item_id: int,
     data: OrderItemStatusUpdate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(kitchen_or_admin),
     service: KitchenService = Depends(get_kitchen_service)
 ):
     item = service.update_item_status(

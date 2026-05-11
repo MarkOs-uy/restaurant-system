@@ -18,7 +18,6 @@ class OrderItem(Base):
 
     id = Column(Integer, primary_key=True)
 
-    # 🔥 MULTI-TENANT
     restaurant_id = Column(
         Integer,
         ForeignKey("restaurants.id"),

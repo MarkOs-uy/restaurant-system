@@ -11,9 +11,11 @@ interface Order {
   id: number
   table_number: number
   status: string
+  subtotal: number
   total: number
   total_paid: number
   remaining: number
+  discount: number
   payments: Payment[]
 }
 
@@ -45,7 +47,7 @@ type Action =
   | { type: "PAYMENT_ADDED"; payload:{order_id:number, amount:number} }
   | { type: "PAYMENT_DELETED"; payload:{order_id:number, amount:number, method: string} }
   | { type: "ADD_MOVEMENT"; payload:CashMovement }
-  | { type: "DELETE_MOVEMENT"; payload:number }
+  | { type: "DELETE_MOVEMENT"; payload:{ movement_id: number; amount: number; movement_type: CashMovementType } }
 
 const reducer = (state: State, action: Action): State => {
   switch (action.type) {
@@ -81,10 +83,17 @@ const reducer = (state: State, action: Action): State => {
       }
     case "ADD_MOVEMENT":
       if (!state.dashboard) return state
+      if (state.dashboard.cash_movements.some(m => m.id === action.payload.id)) {
+        return state
+      }
       return {
         ...state,
         dashboard:{
           ...state.dashboard,
+          expected_cash:
+            action.payload.type === CashMovementType.CASH_IN
+              ? state.dashboard.expected_cash + action.payload.amount
+              : state.dashboard.expected_cash - action.payload.amount,
           cash_movements:[
             action.payload,
             ...state.dashboard.cash_movements
@@ -97,8 +106,12 @@ const reducer = (state: State, action: Action): State => {
         ...state,
         dashboard:{
           ...state.dashboard,
+          expected_cash:
+            action.payload.movement_type === CashMovementType.CASH_IN
+              ? state.dashboard.expected_cash - action.payload.amount
+              : state.dashboard.expected_cash + action.payload.amount,
           cash_movements: state.dashboard.cash_movements.filter(
-            m => m.id !== action.payload
+            m => m.id !== action.payload.movement_id
           )
         }
       }
@@ -146,6 +159,8 @@ export default function CashierPage() {
   const selectedOrderRef = useRef<Order | null>(null)
   const [movementAmount, setMovementAmount] = useState("")
   const [movementReason, setMovementReason] = useState("")
+  const [discount, setDiscount] = useState("")
+  const [discountType, setDiscountType] = useState<"amount" | "percent">("amount")
   const [closeModalOpen, setCloseModalOpen] = useState(false)
   const [realCash, setRealCash] = useState("")
   const [differenceReason, setDifferenceReason] = useState("")
@@ -154,19 +169,6 @@ export default function CashierPage() {
     useState<CashRegisterCloseSummary | null>(null)
   const [showCloseSummary, setShowCloseSummary] = useState(false)
 
-  // ✨ Helper elegante para actualizar dashboard
-  const updateDashboard = (
-    updater: (d: CashRegisterDashboard) => CashRegisterDashboard
-  ) => {
-    dispatch({
-      type: "SET_DASHBOARD",
-      payload: state.dashboard
-        ? updater(state.dashboard)
-        : null
-    })
-  }
-
-  // 🎨 Desestructuración elegante con valores por defecto
   const {
     opening_amount = 0,
     total_sales = 0,
@@ -203,21 +205,25 @@ export default function CashierPage() {
   }
 
 
-const fetchDashboard = async () => {
-  try {
-    const data = await apiFetch("/cash-register/dashboard")
-    const normalized = normalizeDashboard(data)
-    dispatch({
-      type: "SET_DASHBOARD",
-      payload: normalized
-    })
-  } catch {
-    dispatch({
-      type: "SET_DASHBOARD",
-      payload: null
-    })
+  const fetchDashboard = async () => {
+    try {
+      const data = await apiFetch("/cash-register/dashboard")
+      const normalized = normalizeDashboard(data)
+      dispatch({
+        type: "SET_DASHBOARD",
+        payload: normalized
+      })
+    } catch (err: any) {
+      if (err.code === "cash_register_not_open") {
+        dispatch({
+          type: "SET_DASHBOARD",
+          payload: null
+        })
+      } else {
+        console.error("No se pudo actualizar el dashboard de caja", err)
+      }
+    }
   }
-}
 
   const fetchActiveOrders = async () => {
     try {
@@ -228,6 +234,27 @@ const fetchDashboard = async () => {
     }
   }
 
+
+  const dashboardTimer = useRef<any>(null)
+  const ordersTimer = useRef<any>(null)
+
+
+  const scheduleDashboardRefresh = () => {
+    if (dashboardTimer.current) clearTimeout(dashboardTimer.current)
+    dashboardTimer.current = setTimeout(() => {
+      fetchDashboard()
+    }, 200)
+  }
+
+
+  const scheduleOrdersRefresh = () => {
+    if (ordersTimer.current) clearTimeout(ordersTimer.current)
+    ordersTimer.current = setTimeout(() => {
+      fetchActiveOrders()
+    }, 200)
+  }
+
+
   const selectOrder = async (orderId:number)=>{
     setPaymentAmount("")
     try {
@@ -237,6 +264,7 @@ const fetchDashboard = async () => {
         payload:data
       })
       setPaymentAmount(data.remaining.toString())
+      setDiscount("")
       setTimeout(()=>{
         paymentInputRef.current?.focus()
       },50)
@@ -247,19 +275,14 @@ const fetchDashboard = async () => {
 
   const registerPayment = async (method: string) => {
     if (!selectedOrder) return
-
-    if (processingPayment) return
-    
+    if (processingPayment) return    
     setProcessingPayment(true)  
-
     let amount = Number(paymentAmount)
-
-    if (!amount || amount <= 0) {
+    if (Number.isNaN(amount) || amount <= 0) {
       amount = selectedOrder.remaining
     }
-
+    if (amount <= 0) return
     amount = Math.min(amount, selectedOrder.remaining)
-
     try {
       await apiFetch(`/orders/${selectedOrder.id}/payments`, {
         method:"POST",
@@ -274,23 +297,58 @@ const fetchDashboard = async () => {
     }
   }
 
+  const setOrderDiscount = async (amount: number) => {
+    if (!selectedOrder) return
+    try {
+      await apiFetch(
+        `/orders/${selectedOrder.id}/discount?discount=${amount}`,
+        { method: "PUT" }
+      )
+      setDiscount("")
+      await selectOrder(selectedOrder.id)
+      await fetchActiveOrders()
+    } catch (err: any) {
+      alert(err.message)
+    }
+  }
+
+  const applyDiscount = async () => {
+    if (!selectedOrder || discount.trim() === "") return
+    let finalDiscount = Number(discount)
+    if (Number.isNaN(finalDiscount) || finalDiscount < 0) {
+      alert("Descuento invalido")
+      return
+    }
+    if (discountType === "percent") {
+      finalDiscount = (selectedOrder.subtotal * finalDiscount) / 100
+    }
+    await setOrderDiscount(finalDiscount)
+  }
+
+
+  const removeDiscount = async () => {
+    await setOrderDiscount(0)
+  }
+
+
   const openMovementModal = (type: "cash_in" | "cash_out") => {
     setMovementAmount("")
     setMovementReason("")
     dispatch({ type: "OPEN_MOVEMENT_MODAL", payload: type })
   }
 
+
   const registrarMovimiento = async () => {
+    if (!state.movementType) return
+
     if (!movementAmount || Number(movementAmount) <= 0) {
       alert("Monto inválido")
       return
     }
-
     if (!movementReason.trim()) {
       alert("Debe indicar un motivo")
       return
     }
-
     try {
       await apiFetch("/cash-register/movements", {
         method: "POST",
@@ -304,15 +362,50 @@ const fetchDashboard = async () => {
       alert(err.message)
       return
     }
-
+    await fetchDashboard()
     setMovementAmount("")
     setMovementReason("")
     dispatch({ type: "CLOSE_MOVEMENT_MODAL" })
-
     setTimeout(()=>{
       paymentInputRef.current?.focus()
     },50)
   }
+
+
+  const closeCashRegister = async () => {
+    if (!realCash) {
+      alert("Ingrese efectivo contado")
+      return
+    }
+    try {
+      const summary = await apiFetch("/cash-register/close", {
+        method: "POST",
+        body: {
+          counted_cash: Number(realCash),
+          difference_reason: differenceReason
+        }
+      })
+      setCloseModalOpen(false)
+      setCloseSummary(summary)
+      setShowCloseSummary(true)
+      dispatch({
+        type: "SET_DASHBOARD",
+        payload: null
+      })
+    } catch (err: any) {
+      switch (err.code) {
+        case "order_has_remaining_balance":
+          alert(`Falta pagar ${err.context.remaining}`)
+        break
+        case "order_items_not_delivered":
+          alert(`Platos pendientes: ${err.context.items.join(", ")}`)
+        break
+        default:
+          alert(err.message)
+      }
+    }
+  }
+
 
   useEffect(()=>{
     let ws:WebSocket | null = null
@@ -326,11 +419,9 @@ const fetchDashboard = async () => {
         pending = true
         return
       }
-
       fetching = true
       await fetchActiveOrders()
       fetching = false
-
       if (pending) {
         pending = false
         safeFetchOrders()
@@ -355,89 +446,51 @@ const fetchDashboard = async () => {
         console.log("Cashier WS connected")
       }
 
-      ws.onmessage = async (event)=>{
+      ws.onmessage = async (event) => {
+
+        console.log("WS MESSAGE", event.data)
+
         const evt = JSON.parse(event.data)
-        const data = evt.payload ?? evt
-        switch(data.type){
+
+        const type = evt.type
+        const data = evt.payload ?? {}
+
+        switch (type) {
+
           case WSEvent.CASH_MOVEMENT_ADDED:
             dispatch({
-              type:"ADD_MOVEMENT",
-              payload:data.movement
+              type: "ADD_MOVEMENT",
+              payload: data.movement
             })
-            updateDashboard(d => ({
-              ...d,
-              expected_cash:
-                data.movement.type === "cash_in"
-                  ? d.expected_cash + data.movement.amount
-                  : d.expected_cash - data.movement.amount
-            }))
           break
-          case "CASH_MOVEMENT_DELETED":
+
+          case WSEvent.CASH_MOVEMENT_DELETED:
             dispatch({
-              type:"DELETE_MOVEMENT",
-              payload:data.movement_id
-            })
-            updateDashboard(d => ({
-              ...d,
-              expected_cash:
-                data.movement_type === CashMovementType.CASH_IN
-                  ? d.expected_cash - data.amount
-                  : d.expected_cash + data.amount
-            }))
-          break
-          case WSEvent.PAYMENT_ADDED: {
-            dispatch({
-              type:WSEvent.PAYMENT_ADDED,
+              type: "DELETE_MOVEMENT",
               payload:{
-                order_id:data.order_id,
-                amount:data.amount
+                movement_id: data.movement_id,
+                amount: data.amount,
+                movement_type: data.movement_type
               }
             })
-            await safeFetchOrders()
-            if (selectedOrderRef.current?.id === data.order_id) {
-              selectOrder(data.order_id)
-            }
-            const method = data.method as PaymentMethod
-            updateDashboard(d => ({
-              ...d,
-              total_sales: d.total_sales + data.amount,
-              by_method: {
-                ...d.by_method,
-                [method]: (d.by_method[method] || 0) + data.amount
-              }
-            }))
           break
-          }
-          case "PAYMENT_DELETED":{
-            dispatch({
-              type:"PAYMENT_DELETED",
-              payload:{
-                order_id:data.order_id,
-                amount:data.amount,
-                method:data.method
-              }
-            })
-            await safeFetchOrders()
+
+          case WSEvent.PAYMENT_ADDED:
+          case WSEvent.PAYMENT_DELETED:
+            scheduleOrdersRefresh()
+            scheduleDashboardRefresh()
             if (selectedOrderRef.current?.id === data.order_id) {
-              selectOrder(data.order_id)
+              await selectOrder(data.order_id)
             }
-            const method = data.method as PaymentMethod
-            updateDashboard(d => ({
-              ...d,
-              total_sales: d.total_sales - data.amount,
-              by_method: {
-                ...d.by_method,
-                [method]: (d.by_method[method] || 0) - data.amount
-              }
-            }))
           break
-          }
+
           case WSEvent.ORDER_UPDATED:
-            safeFetchOrders()
-              if (selectedOrderRef.current?.id === data.order_id) {
-                selectOrder(data.order_id)
-              }
+            scheduleOrdersRefresh()
+            if (selectedOrderRef.current?.id === data.order_id) {
+              await selectOrder(data.order_id)
+            }
           break
+
           case "ORDER_STATUS_CHANGED":
             dispatch({
               type:"UPDATE_ORDER_STATUS",
@@ -447,16 +500,18 @@ const fetchDashboard = async () => {
               }
             })
           break
+
           case "ORDER_CLOSED":
             dispatch({
               type:"REMOVE_ORDER",
               payload:data.order_id
             })
-            await safeFetchOrders()
-            fetchDashboard()
+            scheduleOrdersRefresh()
+            scheduleDashboardRefresh()
           break
+
           case WSEvent.CASH_REGISTER_UPDATED:
-            fetchDashboard()
+            scheduleDashboardRefresh()
           break
         }
       }
@@ -512,9 +567,7 @@ const fetchDashboard = async () => {
                 method: "POST",
                 body: { opening_amount: openingAmount }
               })
-
-              location.reload()
-
+              await fetchDashboard()
             } catch (err: any) {
               alert(err.message)
             }
@@ -603,7 +656,15 @@ const fetchDashboard = async () => {
               color:"white",
               fontSize:18
             }}
-            onClick={()=>location.reload()}
+            onClick={async ()=>{
+              setShowCloseSummary(false)
+              setCloseSummary(null)
+              setRealCash("")
+              setDifferenceReason("")
+
+              await fetchDashboard()
+              await fetchActiveOrders()
+            }}
           >
             Finalizar
           </button>
@@ -673,6 +734,7 @@ const fetchDashboard = async () => {
                     await apiFetch(`/cash-register/movements/${m.id}`, {
                       method: "DELETE"
                     })
+                    await fetchDashboard()
                   } catch (err: any) {
                     alert(err.message)
                   }
@@ -931,40 +993,7 @@ const fetchDashboard = async () => {
                   color:"white",
                   borderRadius:6
                 }}
-                onClick={async()=>{
-
-                  if(!realCash){
-                    alert("Ingrese efectivo contado")
-                    return
-                  }
-
-                  let summary
-
-                  try {
-                    summary = await apiFetch("/cash-register/close", {
-                      method: "POST",
-                      body: {
-                        counted_cash: Number(realCash),
-                        difference_reason: differenceReason
-                      }
-                    })
-                  } catch (err: any) {                    
-                    switch (err.code) {
-                      case "order_has_remaining_balance":
-                        alert(`Falta pagar ${err.context.remaining}`)
-                        break
-                      case "order_items_not_delivered":
-                        alert(`Platos pendientes: ${err.context.items.join(", ")}`)
-                        break
-                      default:
-                        alert(err.message)
-                    }
-                    return
-                  }
-
-                  setCloseSummary(summary)
-                  setShowCloseSummary(true)
-                }}
+                onClick={closeCashRegister}
               >
                 Confirmar Cierre
               </button>
@@ -973,7 +1002,6 @@ const fetchDashboard = async () => {
           </div>
         </div>
       )}
-
 
 
       </div>
@@ -1014,9 +1042,83 @@ const fetchDashboard = async () => {
         {selectedOrder ? (
           <>
             <h2>Mesa {selectedOrder.table_number}</h2>
+            <p>Subtotal ${selectedOrder.subtotal.toFixed(2)}</p>
+            {selectedOrder.discount > 0 && (
+              <p style={{ color: "#ff8a80" }}>
+                Descuento -${selectedOrder.discount.toFixed(2)}
+              </p>
+            )}
             <p>Total ${selectedOrder.total.toFixed(2)}</p>
             <p>Pagado ${selectedOrder.total_paid.toFixed(2)}</p>
             <h1 style={{ color: "#ff4d4d", fontSize: 34 }}>Saldo ${selectedOrder.remaining.toFixed(2)}</h1>
+
+            <hr style={{marginTop:20}}/>
+
+            <h3>Descuento</h3>
+            <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 10 }}>
+              <select
+                value={discountType}
+                onChange={(e) => setDiscountType(e.target.value as "amount" | "percent")}
+                style={{ padding: 10, borderRadius: 6 }}
+              >
+                <option value="amount">Monto</option>
+                <option value="percent">%</option>
+              </select>
+
+              <input
+                type="number"
+                step="0.01"
+                placeholder="Descuento"
+                value={discount}
+                onChange={(e) => setDiscount(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    applyDiscount()
+                  }
+                }}
+                style={{ padding: 10, borderRadius: 6 }}
+              />
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: selectedOrder.discount > 0 ? "1fr 1fr" : "1fr", gap: 10, marginTop: 10 }}>
+              <button
+                disabled={selectedOrder.status === OrderStatus.CLOSED || selectedOrder.status === OrderStatus.CANCELLED}
+                onClick={applyDiscount}
+                style={{
+                  padding: 14,
+                  fontSize: 16,
+                  background: "#455a64",
+                  color: "white",
+                  borderRadius: 6,
+                  opacity:
+                    selectedOrder.status === OrderStatus.CLOSED || selectedOrder.status === OrderStatus.CANCELLED
+                      ? 0.4
+                      : 1
+                }}
+              >
+                Aplicar Descuento
+              </button>
+
+              {selectedOrder.discount > 0 && (
+                <button
+                  disabled={selectedOrder.status === OrderStatus.CLOSED || selectedOrder.status === OrderStatus.CANCELLED}
+                  onClick={removeDiscount}
+                  style={{
+                    padding: 14,
+                    fontSize: 16,
+                    background: "#6d4c41",
+                    color: "white",
+                    borderRadius: 6,
+                    opacity:
+                      selectedOrder.status === OrderStatus.CLOSED || selectedOrder.status === OrderStatus.CANCELLED
+                        ? 0.4
+                        : 1
+                  }}
+                >
+                  Quitar Descuento
+                </button>
+              )}
+            </div>
 
             <hr style={{marginTop:20}}/>
 
@@ -1079,7 +1181,8 @@ const fetchDashboard = async () => {
 
             <input
               ref={paymentInputRef}
-              type="text"
+              type="number"
+              step="0.01"
               value={paymentAmount}
               onChange={e => setPaymentAmount(e.target.value)}
               style={{ width: "100%", marginTop: 10, padding: 10, fontSize: 18, borderRadius: 6 }}
@@ -1106,10 +1209,20 @@ const fetchDashboard = async () => {
               ))}
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 20 }}>
+            <div style={{ marginTop: 20 }}>
               <button
+                disabled={processingPayment || selectedOrder.remaining <= 0}
                 onClick={() => registerPayment(PaymentMethod.CASH)}
-                style={{ padding: 14, fontSize: 16, background: "#2e7d32", color: "white", borderRadius: 6 }}
+                style={{
+                  width: "100%",
+                  padding: 16,
+                  fontSize: 18,
+                  background: "#2e7d32",
+                  color: "white",
+                  borderRadius: 6,
+                  opacity: selectedOrder.remaining <= 0 ? 0.4 : 1,
+                  cursor: selectedOrder.remaining <= 0 ? "not-allowed" : "pointer"
+                }}
               >
                 Pagar Total - (Efectivo)
               </button>

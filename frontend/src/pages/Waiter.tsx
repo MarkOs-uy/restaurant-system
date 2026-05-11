@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useReducer } from "react"
 import { apiFetch, WS_URL } from "../api"
 
 interface Item {
@@ -14,6 +14,20 @@ interface Order {
   status: string
   created_at: string
   items: Item[]
+}
+
+type Event =
+  | { type: "SET_ORDERS"; orders: Order[] }
+  | { type: "ITEM_STATUS_CHANGED"; order_id: number; item_id: number; status: string }
+  | { type: "ORDER_STATUS_CHANGED"; order_id: number; status: string }
+  | { type: "ORDER_UPDATED"; order_id: number }
+  | { type: "ORDER_CLOSED"; order_id: number }
+
+const bell = new Audio("/bell.mp3")
+
+const playSound = () => {
+  bell.currentTime = 0
+  bell.play().catch(() => {})
 }
 
 const statusColor = (status: string) => {
@@ -33,26 +47,11 @@ const statusColor = (status: string) => {
   }
 }
 
-const hasReadyItems = (order: Order) =>
-  order.items.some(item => item.status === "READY")
-
-const bell = new Audio("/bell.mp3")
-
-const playSound = () => {
-  bell.currentTime = 0
-  bell.play().catch(() => {})
-}
-
 function orderWaitingMinutes(created_at?: string) {
   if (!created_at) return 0
-
   const normalized = created_at.replace(" -", "-")
   const created = new Date(normalized)
-
-  console.log("parsed date:", created)
-
   if (isNaN(created.getTime())) return 0
-
   const diff = Date.now() - created.getTime()
   return Math.floor(diff / 60000)
 }
@@ -63,64 +62,85 @@ const waitingColor = (minutes: number) => {
   return "#666"
 }
 
+const hasReadyItems = (order: Order) =>
+  order.items.some(item => item.status === "READY")
 
-const deliverAllReady = async (order: Order) => {
-  const readyItems = order.items.filter(i => i.status === "READY")
-  if (readyItems.length === 0) return
-  await Promise.all(
-    readyItems.map(i =>
-      apiFetch(`/order-items/${i.id}/status`, {
-        method: "PATCH",
-        body: { status: "DELIVERED" }
+const hasActiveItems = (order: Order) =>
+  order.items.some(item => item.status !== "DELIVERED")
+
+/* =========================
+   REDUCER
+========================= */
+
+function ordersReducer(state: Order[], event: Event): Order[] {
+  switch (event.type) {
+    case "SET_ORDERS":
+      return event.orders
+
+    case "ITEM_STATUS_CHANGED":
+      return state.map(order => {
+        if (order.id !== event.order_id) return order
+        const updatedItems = order.items.map(item =>
+          item.id === event.item_id
+            ? { ...item, status: event.status }
+            : item
+        )
+        return {
+          ...order,
+          items: updatedItems
+        }
       })
-    )
-  )
+
+    case "ORDER_STATUS_CHANGED":
+      return state.map(order =>
+        order.id === event.order_id
+          ? { ...order, status: event.status }
+          : order
+      )
+
+    case "ORDER_CLOSED":
+      return state.filter(order => order.id !== event.order_id)
+    default:
+      return state
+  }
 }
 
+/* =========================
+   COMPONENT
+========================= */
 
 export default function Waiter() {
 
-  const [orders, setOrders] = useState<Order[]>([])
+  const [orders, dispatch] = useReducer(ordersReducer, [])
 
-  const fetchingRef = useRef(false)
-  const pendingRef = useRef(false)
+  /* =========================
+     FETCH
+  ========================= */
 
-  // FETCH PROTEGIDO
-  const fetchTimerRef = useRef<any>(null)
-
-  const safeFetchOrders = () => {
-    if (fetchTimerRef.current) {
-      clearTimeout(fetchTimerRef.current)
-    }
-    fetchTimerRef.current = setTimeout(async () => {
-      if (fetchingRef.current) {
-        pendingRef.current = true
-        return
-      }
-      fetchingRef.current = true
-      try {
-        const data = await apiFetch("/orders/active")
-        setOrders(data)
-      } finally {
-        fetchingRef.current = false
-        if (pendingRef.current) {
-          pendingRef.current = false
-          safeFetchOrders()
-        }
-      }
-    }, 300)
+  const fetchOrders = async () => {
+    const data = await apiFetch("/orders/active")
+    dispatch({
+      type: "SET_ORDERS",
+      orders: data
+    })
   }
+
+  /* =========================
+     WEBSOCKET
+  ========================= */
 
   useEffect(() => {
 
     let ws: WebSocket | null = null
     let reconnectTimer: any = null
 
-    safeFetchOrders()
+    fetchOrders()
 
     const connect = () => {
 
-      ws = new WebSocket(`${WS_URL}/ws?token=${localStorage.getItem("token")}`)
+      ws = new WebSocket(
+        `${WS_URL}/ws?token=${localStorage.getItem("token")}`
+      )
 
       ws.onopen = () => {
         console.log("Waiter WS connected")
@@ -136,76 +156,11 @@ export default function Waiter() {
           return
         }
 
-        switch (data.type) {
-
-          case "ITEM_STATUS_CHANGED":
-            setOrders(prev =>
-              prev.map(order => {
-                if (order.id !== data.order_id) return order
-                return {
-                  ...order,
-                  items: order.items.map(item => {
-                    if (item.id !== data.item_id) return item
-                    if (item.status === "DELIVERED") return item
-                    return { ...item, status: "IN_PROGRESS" }
-                  })
-                }
-              })
-            )
-
-            setTimeout(safeFetchOrders, 2000)
-
-          break
-
-          case "ITEM_READY":
-
-            playSound()
-
-            setOrders(prev =>
-              prev.map(order => {
-                if (order.id !== data.order_id) return order
-
-                return {
-                  ...order,
-                  items: order.items.map(item =>
-                    item.id === data.item_id
-                      ? { ...item, status: "READY" }
-                      : item
-                  )
-                }
-              })
-            )
-
-            setTimeout(safeFetchOrders, 2000)
-
-          break
-
-          case "ORDER_STATUS_CHANGED":
-
-            setOrders(prev =>
-              prev.map(order =>
-                order.id === data.order_id
-                  ? { ...order, status: data.status }
-                  : order
-              )
-            )
-
-          break
-
-          case "ORDER_UPDATED":
-
-            safeFetchOrders()
-
-          break
-
-          case "ORDER_CLOSED":
-
-            setOrders(prev =>
-              prev.filter(order => order.id !== data.order_id)
-            )
-
-          break
+        if (data.type === "ITEM_READY") {
+          playSound()
         }
+
+        dispatch(data)
       }
 
       ws.onclose = () => {
@@ -226,13 +181,41 @@ export default function Waiter() {
 
   }, [])
 
-  // FILTRAR ITEMS VISIBLES
-  const visibleOrders = orders.map(order => ({
-    ...order,
-    items: order.items.filter(i => i.status !== "DELIVERED")
-  }))
+  /* =========================
+     ACTIONS
+  ========================= */
 
-  // ORDENAR POR READY Y ANTIGÜEDAD
+  const markAsDelivered = async (itemId: number) => {
+    await apiFetch(`/order-items/${itemId}/status`, {
+      method: "PATCH",
+      body: { status: "DELIVERED" }
+    })
+  }
+
+  const deliverAllReady = async (order: Order) => {
+    const readyItems = order.items.filter(i => i.status === "READY")
+    if (readyItems.length === 0) return
+    await Promise.all(
+      readyItems.map(i =>
+        apiFetch(`/order-items/${i.id}/status`, {
+          method: "PATCH",
+          body: { status: "DELIVERED" }
+        })
+      )
+    )
+  }
+
+  /* =========================
+     FILTROS
+  ========================= */
+
+  const visibleOrders = orders
+    .map(order => ({
+      ...order,
+      items: order.items.filter(i => i.status !== "DELIVERED")
+    }))
+    .filter(hasActiveItems)
+
   const ordersSorted = [...visibleOrders].sort((a, b) => {
     const readyDiff =
       Number(hasReadyItems(b)) - Number(hasReadyItems(a))
@@ -243,29 +226,20 @@ export default function Waiter() {
     )
   })
 
-  // SEPARAR READY / COOKING
   const readyOrders = ordersSorted.filter(hasReadyItems)
 
   const cookingOrders = ordersSorted.filter(
     order => !hasReadyItems(order)
   )
 
-
-  const markAsDelivered = async (itemId: number) => {
-    await apiFetch(`/order-items/${itemId}/status`, {
-      method: "PATCH",
-      body: { status: "DELIVERED" }
-    })
-  }
-
+  /* =========================
+     RENDER
+  ========================= */
 
   const renderOrders = (ordersList: Order[]) =>
-
     ordersList.map(order => {
-
       const minutes = orderWaitingMinutes(order.created_at)
       const ready = hasReadyItems(order)
-
       return (
         <div
           key={order.id}
@@ -282,11 +256,9 @@ export default function Waiter() {
         >
           <h2>
             Mesa {order.table_number}
-
             {ready && (
               <span style={{ marginLeft: 10 }}>🔔</span>
             )}
-
             <span
               style={{
                 marginLeft: 12,
@@ -297,10 +269,9 @@ export default function Waiter() {
             >
               ⏱ {minutes} min
             </span>
-
           </h2>
 
-          {hasReadyItems(order) && (
+          {ready && (
             <button
               onClick={() => deliverAllReady(order)}
               style={{
@@ -317,13 +288,9 @@ export default function Waiter() {
           )}
 
           <ul>
-
             {order.items.map(item => (
-
               <li key={item.id} style={{ marginBottom: 5 }}>
-
                 {item.product_name} x {item.quantity}
-
                 <span
                   style={{
                     marginLeft: 10,
@@ -352,15 +319,14 @@ export default function Waiter() {
                   >
                     Entregar
                   </button>
-
                 )}
               </li>
             ))}
           </ul>
-       </div>
+        </div>
       )
     })
-  
+
   return (
 
     <div style={{ padding: 40 }}>
@@ -392,4 +358,5 @@ export default function Waiter() {
     </div>
 
   )
+
 }

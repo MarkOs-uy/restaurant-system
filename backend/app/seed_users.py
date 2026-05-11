@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from app.models.user import User
 from app.seed_restaurant import seed_restaurant
 from app.core.security import get_password_hash
+import os
 
 def seed_users(db: Session):
 
@@ -15,7 +16,12 @@ def seed_users(db: Session):
 
     print("Creando usuario admin...")
 
-    pass_hash = get_password_hash("1234")
+    if not admin_password:
+        admin_password = os.getenv("ADMIN_SEED_PASSWORD")
+        if not admin_password:
+            raise ValueError("ADMIN_SEED_PASSWORD debe estar configurado")
+    
+    pass_hash = get_password_hash(admin_password)
 
     users = [
         User(username="admin", role="ADMIN", password_hash = pass_hash, restaurant_id=restaurant.id)

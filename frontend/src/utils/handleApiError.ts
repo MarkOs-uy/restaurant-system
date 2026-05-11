@@ -10,8 +10,8 @@ export function handleApiError(error: any) {
   console.error("API ERROR:", error)
   const apiError = error?.response?.data
   const message = mapErrorToMessage({
-    code: apiError?.error,
-    message: apiError?.detail
+    code: apiError?.error ?? error?.code,
+    message: apiError?.detail ?? error?.message
   })
   showToast(message)
 }
@@ -71,6 +71,9 @@ function mapErrorToMessage(error: any) {
     // TABLES
     case "table_not_found":
       return "Mesa no encontrada"
+
+    case "table_number_already_exists":
+      return "Ya existe una mesa con ese número"
 
 
     // PRODUCTS

@@ -22,7 +22,11 @@ export default function ManageTables() {
     const navigate = useNavigate()
 
     const loadTables = async () => {
-        const data = await apiFetch("/tables/")
+        const [activeTables, inactiveTables] = await Promise.all([
+            apiFetch("/tables/?active=true"),
+            apiFetch("/tables/?active=false")
+        ])
+        const data = [...activeTables, ...inactiveTables]
         setTables(data)
         setOriginalTables(data)
     }
@@ -40,6 +44,7 @@ export default function ManageTables() {
         if (!original) return false
 
         return (
+            original.number !== t.number ||
             original.capacity !== t.capacity ||
             original.shape !== t.shape ||
             original.active !== t.active
@@ -48,7 +53,21 @@ export default function ManageTables() {
 
 
     const updateTable = async (t: Table) => {
+        if (!Number.isInteger(t.number) || t.number <= 0) {
+            alert("Número de mesa inválido")
+            return
+        }
+
+        const repeated = tables.some(
+            other => other.id !== t.id && other.number === t.number
+        )
+        if (repeated) {
+            alert(`Ya existe una mesa con el número ${t.number}`)
+            return
+        }
+
         const payload = {
+            number: t.number,
             capacity: t.capacity,
             shape: t.shape,
             active: t.active
@@ -107,7 +126,14 @@ export default function ManageTables() {
             <tr key={t.id}>
 
                 <td>
-                    <span>{t.number}</span>
+                    <input
+                        type="number"
+                        value={t.number}
+                        style={{ textAlign: "center", width: 60 }}
+                        onChange={(e) =>
+                            updateField(t.id, "number", Number(e.target.value))
+                        }
+                    />
                 </td>
 
                 <td>
@@ -187,7 +213,14 @@ export default function ManageTables() {
             <tr key={t.id}>
 
                 <td>
-                    <span>{t.number}</span>
+                    <input
+                        type="number"
+                        value={t.number}
+                        style={{ textAlign: "center", width: 60 }}
+                        onChange={(e) =>
+                            updateField(t.id, "number", Number(e.target.value))
+                        }
+                    />
                 </td>
 
                 <td>

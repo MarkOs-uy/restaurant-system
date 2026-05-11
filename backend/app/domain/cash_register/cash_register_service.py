@@ -1,6 +1,7 @@
 from decimal import Decimal
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+import logging
 
 from app.models.cash_register import CashRegister
 from app.models.payment import Payment
@@ -13,6 +14,7 @@ from app.domain.errors.base import DomainError
 from app.domain.errors.error_codes import ErrorCode
 from app.core.serialization import decimal_dict_to_float
 
+logger = logging.getLogger("app.domain.cash_register")
 
 class CashRegisterService:
 
@@ -25,23 +27,18 @@ class CashRegisterService:
         restaurant_id: int,
         for_update: bool = False
     ):
-
         query = self.db.query(CashRegister).filter(
             CashRegister.restaurant_id == restaurant_id,
             CashRegister.is_open == True
         )
-
         if for_update:
             query = query.with_for_update()
-
         cash_register = query.first()
-
         if not cash_register:
             raise DomainError(
                 "cash register not open",
                 ErrorCode.CASH_REGISTER_NOT_OPEN
             )
-
         return cash_register
 
 
@@ -70,6 +67,10 @@ class CashRegisterService:
 
 
     def _calculate_payment_breakdown(self, cash_register_id: int):
+        breakdown = {
+            method.value: Decimal("0")
+            for method in PaymentMethod
+        }
         rows = self.db.query(
             Payment.method,
             func.sum(Payment.amount)
@@ -78,10 +79,9 @@ class CashRegisterService:
         ).group_by(
             Payment.method
         ).all()
-        return {
-            method.value: total or Decimal("0")
-            for method, total in rows
-        }
+        for method, total in rows:
+            breakdown[method.value] = total or Decimal("0")
+        return breakdown
 
 
     def _calculate_cash_movements(self, cash_register_id: int):
@@ -109,6 +109,13 @@ class CashRegisterService:
         user_id: int,
         opening_amount: Decimal
     ):
+        if opening_amount < Decimal("0"):
+            raise DomainError(
+                "opening amount must be greater than or equal to zero",
+                ErrorCode.INVALID_OPERATION,
+                context={"opening_amount": float(opening_amount)}
+            )
+
         existing = self.db.query(CashRegister).filter(
             CashRegister.restaurant_id == restaurant_id,
             CashRegister.is_open == True
@@ -118,6 +125,7 @@ class CashRegisterService:
                 "Cash register already open", 
                 ErrorCode.CASH_REGISTER_ALREADY_OPEN
                 )
+        logger.info("Caja abierta r=%s user=%s amount=%s", restaurant_id, user_id, opening_amount)
         cash_register = CashRegister(
             restaurant_id=restaurant_id,
             opened_by_id=user_id,
@@ -136,6 +144,12 @@ class CashRegisterService:
         user_id: int,
         counted_cash: Decimal
     ):
+        if counted_cash < Decimal("0"):
+            raise DomainError(
+                "counted cash must be greater than or equal to zero",
+                ErrorCode.CASH_REGISTER_INVALID_COUNT,
+                context={"counted_cash": float(counted_cash)}
+            )
 
         cash_register = self._get_open_cash_register(
             restaurant_id,
@@ -144,7 +158,7 @@ class CashRegisterService:
 
         open_orders = self.db.query(Order).filter(
             Order.restaurant_id == restaurant_id,
-            Order.status.notin_([OrderStatus.CLOSED, OrderStatus.CANCELLED])
+            Order.status.notin_([OrderStatus.CLOSED, OrderStatus.CANCELLED, OrderStatus.DRAFT])
         ).count()
 
         if open_orders > 0:
@@ -177,22 +191,31 @@ class CashRegisterService:
             - cash_out
         )
 
+        closing_amount = (
+            cash_register.opening_amount
+            + total_sales
+            + cash_in
+            - cash_out
+        )
+
         difference = counted_cash - expected_cash
 
         cash_register.closed_at = func.now()
         cash_register.closed_by_id = user_id
         cash_register.is_open = False
         cash_register.total_sales = total_sales
+        cash_register.closing_amount = closing_amount
         cash_register.expected_cash = expected_cash
         cash_register.counted_cash = counted_cash
         cash_register.difference = difference
         cash_register.payments_snapshot = decimal_dict_to_float(payment_breakdown)
-
+        logger.info("Caja cerrada r=%s user=%s difference=%s", restaurant_id, user_id, difference)
         self.db.commit()
 
         return {
             "message": "Caja cerrada",
             "opening_amount": cash_register.opening_amount,
+            "closing_amount": cash_register.closing_amount,
             "total_sales": total_sales,
             "orders_count": orders_count,
             "transactions_count": transactions_count,
@@ -208,6 +231,8 @@ class CashRegisterService:
 
     def get_current_cash_register(self, restaurant_id: int):
         cash_register = self._get_open_cash_register(restaurant_id)
+        if not cash_register:
+            return None
         total_sales, transactions_count, orders_count, average_ticket = self._calculate_sales(
             cash_register.id
         )
@@ -230,9 +255,10 @@ class CashRegisterService:
 
 
     def get_dashboard(self, restaurant_id: int):
-
         cash_register = self._get_open_cash_register(restaurant_id)
-        print("DEBUG cash_register:", cash_register.id)
+        if not cash_register:
+            return None
+        logger.debug("get_dashboard cash_register_id=%s", cash_register.id)
         total_sales, transactions_count, orders_count, average_ticket = self._calculate_sales(
             cash_register.id
         )
@@ -267,11 +293,13 @@ class CashRegisterService:
             }
             for m in movements
         ]
-        print("DEBUG dashboard:", {
-            "opening_amount": cash_register.opening_amount,
-            "total_sales": total_sales,
-            "orders_count": orders_count
-        })
+        logger.debug(
+            "get_dashboard r=%s opening=%s sales=%s orders=%s",
+            cash_register.restaurant_id,
+            cash_register.opening_amount,
+            total_sales,
+            orders_count
+        )
         return {
             "cash_register_id": cash_register.id,
             "opened_at": cash_register.opened_at,

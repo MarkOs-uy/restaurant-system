@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { apiFetch } from "../api"
 import { showToast } from "../utils/showToast"
+import toast from "react-hot-toast"
 
 interface Table {
   id: number
@@ -16,9 +17,28 @@ interface Table {
   order_status?: string | null
 }
 
+interface InactiveTable {
+  id: number
+  number: number
+  capacity: number
+  shape: string
+  active: boolean
+}
+
+interface DragState {
+  id: number
+  offsetX: number
+  offsetY: number
+  width: number
+  height: number
+  x: number
+  y: number
+}
+
 export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
 
   const [tables, setTables] = useState<Table[]>([])
+  const [inactiveTables, setInactiveTables] = useState<InactiveTable[]>([])
   const [loading, setLoading] = useState(true)
 
   const navigate = useNavigate()
@@ -27,12 +47,15 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
   const [dragging, setDragging] = useState<number | null>(null)
 
   const [newTableForm, setNewTableForm] = useState({
+    number: "",
     shape: "circle",
     capacity: 4
   })
 
   const [showForm, setShowForm] = useState(false)
   const positionTimers = useRef<Record<number, any>>({})
+  const floorRef = useRef<HTMLDivElement | null>(null)
+  const draggingRef = useRef<DragState | null>(null)
 
   const [layout, setLayout] = useState({
     width: 900,
@@ -40,8 +63,6 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
     grid_size: 40,
     snap_to_grid: true
   })
-
-  const TABLE_SIZE = 100
 
   // -------------------------
   // Cargar layout y mesas
@@ -69,9 +90,14 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
   // -------------------------
 
   const loadTables = async () => {
+    if (draggingRef.current) return
     try {
-      const data = await apiFetch("/tables/status")
-      setTables(data)
+      const [activeData, inactiveData] = await Promise.all([
+        apiFetch("/tables/status"),
+        apiFetch("/tables/?active=false")
+      ])
+      setTables(activeData)
+      setInactiveTables(inactiveData)
     } finally {
       setLoading(false)
     }
@@ -122,10 +148,32 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
       clearTimeout(positionTimers.current[tableId])
     }
     positionTimers.current[tableId] = setTimeout(async () => {
-      await apiFetch(`/tables/${tableId}/position?x=${x}&y=${y}`, {
+      const updatedPosition = await apiFetch(`/tables/${tableId}/position`, {
         method: "PATCH",
+        body: { x, y }
       })
+      moveTable(updatedPosition.id, updatedPosition.x, updatedPosition.y)
     }, 300)
+  }
+
+  const getNextAvailableTableNumber = () => {
+    const usedNumbers = new Set([
+      ...tables.map(t => t.number),
+      ...inactiveTables.map(t => t.number)
+    ])
+    let number = 1
+    while (usedNumbers.has(number)) {
+      number += 1
+    }
+    return number
+  }
+
+  const getTableDimensions = (table: Pick<Table, "capacity" | "shape">) => {
+    const size = 60 + (table.capacity || 4) * 10
+    return {
+      width: table.shape === "rectangle" ? size * 1.4 : size,
+      height: size
+    }
   }
 
   // -------------------------
@@ -133,9 +181,26 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
   // -------------------------
 
   const createTable = async () => {
+    const number = Number(newTableForm.number)
+    const usedNumbers = new Set([
+      ...tables.map(t => t.number),
+      ...inactiveTables.map(t => t.number)
+    ])
+
+    if (!Number.isInteger(number) || number <= 0) {
+      showToast("Ingresá un número de mesa válido")
+      return
+    }
+
+    if (usedNumbers.has(number)) {
+      showToast(`La mesa ${number} ya está asignada`)
+      return
+    }
+
     const table = await apiFetch("/tables/", {
       method: "POST",
       body: {
+        number,
         x: 50,
         y: 50,
         shape: newTableForm.shape,
@@ -143,6 +208,11 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
       }
     })
     setTables(prev => [...prev, table])
+    setNewTableForm({
+      number: "",
+      shape: "circle",
+      capacity: 4
+    })
     setShowForm(false)
   }
 
@@ -155,6 +225,56 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
       method: "DELETE"
     })
     setTables(prev => prev.filter(t => t.id !== id))
+    await loadTables()
+  }
+
+  const requestDeleteTable = (table: Table) => {
+    toast.custom((t) => (
+      <div
+        style={{
+          background: "#1e1e1e",
+          color: "white",
+          padding: 16,
+          borderRadius: 8,
+          border: "1px solid #444",
+          width: 320,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.35)"
+        }}
+      >
+        <strong>Eliminar mesa {table.number}?</strong>
+        <p style={{ margin: "8px 0 14px", opacity: 0.8 }}>
+          La mesa quedará inactiva y podrás reactivarla luego.
+        </p>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            style={{ flex: 1, padding: 10, borderRadius: 6 }}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={async () => {
+              toast.dismiss(t.id)
+              try {
+                await deleteTable(table.id)
+                toast.success(`Mesa ${table.number} eliminada`)
+              } catch (err: any) {
+                alert(err.message)
+              }
+            }}
+            style={{
+              flex: 1,
+              padding: 10,
+              borderRadius: 6,
+              background: "#c62828",
+              color: "white"
+            }}
+          >
+            Eliminar
+          </button>
+        </div>
+      </div>
+    ))
   }
 
   // -------------------------
@@ -169,14 +289,52 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
   }
 
 
-  const inactiveTables = tables.filter(t => !t.active)
-  
   useEffect(() => {
     loadLayout()
     loadTables()
     const interval = setInterval(loadTables, 5000)
     return () => clearInterval(interval)
   }, [])
+
+  useEffect(() => {
+    const handlePointerMove = (e: PointerEvent) => {
+      const drag = draggingRef.current
+      const floor = floorRef.current
+      if (!drag || !floor) return
+
+      const rect = floor.getBoundingClientRect()
+      let x = Math.round(e.clientX - rect.left - drag.offsetX)
+      let y = Math.round(e.clientY - rect.top - drag.offsetY)
+
+      if (layout.snap_to_grid) {
+        const grid = layout.grid_size || 40
+        x = Math.round(x / grid) * grid
+        y = Math.round(y / grid) * grid
+      }
+
+      x = Math.max(0, Math.min(layout.width - drag.width, x))
+      y = Math.max(0, Math.min(layout.height - drag.height, y))
+
+      draggingRef.current = { ...drag, x, y }
+      moveTable(drag.id, x, y)
+    }
+
+    const handlePointerUp = () => {
+      const drag = draggingRef.current
+      if (drag) {
+        savePosition(drag.id, drag.x, drag.y)
+      }
+      draggingRef.current = null
+      setDragging(null)
+    }
+
+    window.addEventListener("pointermove", handlePointerMove)
+    window.addEventListener("pointerup", handlePointerUp)
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove)
+      window.removeEventListener("pointerup", handlePointerUp)
+    }
+  }, [layout])
 
   if (loading) {
     return <p>Cargando mesas...</p>
@@ -186,26 +344,51 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
 
     <div style={{ padding: 20 }}>
       {isAdmin && (
-        <>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            gap: 12,
+            marginBottom: 16,
+            flexWrap: "wrap"
+          }}
+        >
           <button
             onClick={() => setEditMode(!editMode)}
-            style={{ marginBottom: 20 }}
           >
             {editMode ? "Salir edición" : "Editar plano"}
           </button>
 
-          <button onClick={() => setShowForm(true)}>
+          <button
+            onClick={() => {
+              setNewTableForm({
+                ...newTableForm,
+                number: String(getNextAvailableTableNumber())
+              })
+              setShowForm(true)
+            }}
+          >
             + Mesa
           </button>
 
           <button onClick={() => navigate("/tables/manage")}>
             Administrar mesas
           </button>
-        </>
+        </div>
       )}
 
       {isAdmin && (
-        <div style={{ marginBottom: 10 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            gap: 12,
+            marginBottom: 10,
+            flexWrap: "wrap"
+          }}
+        >
 
           Plano:
 
@@ -215,7 +398,7 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
             onChange={(e) =>
               setLayout({ ...layout, width: Number(e.target.value) })
             }
-            style={{ width: 80, marginLeft: 10 }}
+            style={{ width: 80 }}
           />
 
           x
@@ -226,7 +409,7 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
             onChange={(e) =>
               setLayout({ ...layout, height: Number(e.target.value) })
             }
-            style={{ width: 80, marginLeft: 10 }}
+            style={{ width: 80 }}
           />
 
           Grid:
@@ -237,10 +420,16 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
             onChange={(e) =>
               setLayout({ ...layout, grid_size: Number(e.target.value) })
             }
-            style={{ width: 60, marginLeft: 10 }}
+            style={{ width: 60 }}
           />
 
-          <label style={{ marginLeft: 20 }}>
+          <label
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6
+            }}
+          >
             <input
               type="checkbox"
               checked={layout.snap_to_grid}
@@ -253,7 +442,6 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
 
           <button
             onClick={saveLayout}
-            style={{ marginLeft: 15 }}
           >
             Guardar
           </button>
@@ -283,6 +471,17 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
           color: "#111"
         }}>
           <h3>Nueva mesa</h3>
+
+          <input
+            type="number"
+            min="1"
+            placeholder="Número"
+            value={newTableForm.number}
+            onChange={(e) =>
+              setNewTableForm({ ...newTableForm, number: e.target.value })
+            }
+            style={{ width: 90, marginRight: 10 }}
+          />
 
           <select
             value={newTableForm.shape}
@@ -315,6 +514,7 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
       )}
 
       <div
+        ref={floorRef}
         style={{
           position: "relative",
           width: layout.width,
@@ -334,17 +534,11 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
 
         {tables.filter(t => t.active).map(t => {
 
-          const size = 60 + (t.capacity || 4) * 10
           let borderRadius = "12px"
-          let width = size
-          let height = size
+          const { width, height } = getTableDimensions(t)
 
           if (t.shape === "circle") {
             borderRadius = "50%"
-          }
-
-          if (t.shape === "rectangle") {
-            width = size * 1.4
           }
 
           return (
@@ -363,41 +557,20 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
                 e.currentTarget.style.transform = "scale(1)"
               }}
 
-              onMouseDown={() => {
+              onPointerDown={(e) => {
                 if (!editMode) return
+                e.preventDefault()
+                const tableRect = e.currentTarget.getBoundingClientRect()
                 setDragging(t.id)
-              }}
-
-              onMouseUp={() => {
-
-                if (dragging === t.id) {
-                  savePosition(t.id, t.x, t.y)
+                draggingRef.current = {
+                  id: t.id,
+                  offsetX: e.clientX - tableRect.left,
+                  offsetY: e.clientY - tableRect.top,
+                  width,
+                  height,
+                  x: t.x,
+                  y: t.y
                 }
-
-                setDragging(null)
-
-              }}
-
-              onMouseMove={(e) => {
-
-                if (dragging !== t.id) return
-
-                const rect = e.currentTarget.parentElement!.getBoundingClientRect()
-
-                let x = Math.round(e.clientX - rect.left - TABLE_SIZE / 2)
-                let y = Math.round(e.clientY - rect.top - TABLE_SIZE / 2)
-
-                if (layout.snap_to_grid) {
-                  const GRID = layout.grid_size || 40
-                  x = Math.round(x / GRID) * GRID
-                  y = Math.round(y / GRID) * GRID
-                }
-
-                x = Math.max(0, Math.min(layout.width - TABLE_SIZE, x))
-                y = Math.max(0, Math.min(layout.height - TABLE_SIZE, y))
-
-                moveTable(t.id, x, y)
-
               }}
 
               onContextMenu={(e) => {
@@ -406,7 +579,7 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
 
                 if (!editMode) return
 
-                deleteTable(t.id)
+                requestDeleteTable(t)
 
               }}
 
@@ -426,7 +599,8 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
                 cursor: dragging === t.id ? "grabbing" : editMode ? "grab" : "pointer",
                 boxShadow: "0 4px 10px rgba(0,0,0,0.2)",
                 userSelect: "none",
-                transition: "0.1s"
+                touchAction: "none",
+                transition: dragging === t.id ? "none" : "transform 0.1s"
               }}
 
             >

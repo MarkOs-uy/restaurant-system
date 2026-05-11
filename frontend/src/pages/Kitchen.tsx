@@ -38,7 +38,7 @@ export default function Kitchen() {
 
   const fetchStation = async () => {
     const data = await apiFetch(
-      `/production-stations/${station}`
+      `/stations/${station}`
     )
     setStationName(data.name)
   }
@@ -191,7 +191,7 @@ export default function Kitchen() {
 
 return (
     <div style={{ padding: 40 }}>
-      <h1>Estación {stationName} - (#{station})</h1>
+      <h1>Estación: {stationName}</h1>
 
       <button
         onClick={() => navigate("/kitchen")}
@@ -312,11 +312,8 @@ return (
                     Entregado
                   </button>
                 )}
-
               </div>
-
             </div>
-
           ))}
         </div>
       ))}

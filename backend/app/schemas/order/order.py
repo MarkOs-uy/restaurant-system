@@ -12,11 +12,11 @@ class OrderOut(BaseSchema):
     created_at: str
     items: list[OrderItemOut]
     payments: list[PaymentOut]
-    subtotal: float
-    discount: float
-    total: float
-    total_paid: float
-    remaining: float
+    subtotal: Decimal
+    discount: Decimal
+    total: Decimal
+    total_paid: Decimal
+    remaining: Decimal
 
 
 class WaiterOrderOut(BaseSchema):
@@ -26,11 +26,11 @@ class WaiterOrderOut(BaseSchema):
     status: OrderStatus
     created_at: str
     items: list[OrderItemOut]
-    subtotal: float
-    discount: float
-    total: float
-    total_paid: float
-    remaining: float
+    subtotal: Decimal
+    discount: Decimal
+    total: Decimal
+    total_paid: Decimal
+    remaining: Decimal
 
 
 class OrderStatusUpdate(BaseSchema):

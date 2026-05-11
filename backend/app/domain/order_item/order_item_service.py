@@ -10,7 +10,7 @@ from app.domain.order_item.order_item_transitions import can_transition
 from app.domain.errors.base import DomainError
 from app.domain.errors.error_codes import ErrorCode
 
-from app.services.event_service import event_service
+from app.services.event_service import EventService
 
 
 
@@ -18,6 +18,7 @@ class OrderItemService:
 
     def __init__(self, db: Session):
         self.db = db
+        self.events = EventService(db)
 
     # -------------------------
     # Obtener item
@@ -50,16 +51,19 @@ class OrderItemService:
         user: User
     ):
         item = self.get_item(item_id, user.restaurant_id)
+
+        order = item.order
         order_service = OrderService(self.db)
+
         previous_status = self.change_item_status(
             item,
             new_status,
             user,
             order_service
         )
+
         self.db.commit()
         self.db.refresh(item)
-        order = item.order
 
         # =========================
         # EVENTOS
@@ -76,44 +80,53 @@ class OrderItemService:
         }
 
         # cocina
-        event_service.emit_to_station(
-            order.restaurant_id,
-            item.product.station_id,
-            payload
+        self.events.emit(
+            restaurant_id=order.restaurant_id,
+            event_type="ITEM_STATUS_CHANGED",
+            payload=payload,
+            target="station",
+            target_id=item.product.station_id
         )
 
         # mozos
-        event_service.emit_to_role(
-            order.restaurant_id,
-            UserRole.WAITER,
-            payload
+        self.events.emit(
+            restaurant_id=order.restaurant_id,
+            event_type="ITEM_STATUS_CHANGED",
+            payload=payload,
+            target="role",
+            target_id=UserRole.WAITER.value
         )
 
-        # evento especial READY
+        # evento READY
         if new_status == OrderItemStatus.READY:
-            event_service.emit_to_role(
-                order.restaurant_id,
-                UserRole.WAITER,
-                {
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type="ITEM_READY",
+                payload={
                     "type": "ITEM_READY",
                     "order_id": order.id,
                     "table": order.table.number,
                     "product": item.product.name,
                     "quantity": item.quantity
-                }
+                },
+                target="role",
+                target_id=UserRole.WAITER.value
             )
 
-        # cambio de estado de orden
+        # cambio estado orden
         if order.status != previous_status:
-            event_service.emit_to_role(
-                order.restaurant_id,
-                UserRole.WAITER,
-                {
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type="ORDER_STATUS_CHANGED",
+                payload={
                     "type": "ORDER_STATUS_CHANGED",
                     "order_id": order.id,
                     "status": order.status.value
-                }
+                },
+                target="role",
+                target_id=UserRole.WAITER.value
             )
+
         return item
     
     # -------------------------

@@ -27,6 +27,7 @@ export interface CashRegisterCloseSummary {
     transactions_count: number
     by_method: Record<PaymentMethod, number>
     opening_amount: number
+    closing_amount: number
     cash_in: number
     cash_out: number
     expected_cash: number

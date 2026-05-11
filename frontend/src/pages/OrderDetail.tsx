@@ -82,20 +82,26 @@ export default function OrderDetail() {
     }
     ws.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data)
-        if (!data?.type) return
+
+        const evt = JSON.parse(event.data)
+        const data = evt.payload ?? evt
+
+        if (!evt?.type) return
+
         const relevantEvents = [
           "ORDER_UPDATED",
           "ORDER_STATUS_CHANGED",
           "ITEM_STATUS_CHANGED",
           "PAYMENT_ADDED"
         ]
+
         if (
-          relevantEvents.includes(data.type) &&
+          relevantEvents.includes(evt.type) &&
           data.order_id === id
         ) {
           fetchOrder()
         }
+
       } catch (err) {
         console.error("WS parse error", err)
       }
@@ -112,9 +118,7 @@ export default function OrderDetail() {
   
   useEffect(() => {
     if (!order) return
-    //if (paymentAmount === "" || Number(paymentAmount) > order.remaining) {
     setPaymentAmount(order.remaining.toFixed(2))
-    //}
   }, [order?.remaining])
 
 
@@ -169,7 +173,6 @@ export default function OrderDetail() {
     })
     await fetchOrder()
   }
-
 
 
   const updateQuantity = async (itemId: number, quantity: number) => {
@@ -274,19 +277,35 @@ export default function OrderDetail() {
     }
   }
 
-  const applyDiscount = async () => {
-    if (!discount || !order) return
-    let finalDiscount = Number(discount)
-    if (discountType === "percent") {
-      finalDiscount = (order.subtotal * finalDiscount) / 100
-    }
+  const setOrderDiscount = async (amount: number) => {
+    if (!order) return
     await apiFetch(
-      `/orders/${order.id}/discount?discount=${finalDiscount}`,
+      `/orders/${order.id}/discount?discount=${amount}`,
       {
         method: "PUT",
       }
     )
     setDiscount("")
+    await fetchOrder()
+  }
+
+
+  const applyDiscount = async () => {
+    if (!order || discount.trim() === "") return
+    let finalDiscount = Number(discount)
+    if (Number.isNaN(finalDiscount) || finalDiscount < 0) {
+      alert("Descuento inválido")
+      return
+    }
+    if (discountType === "percent") {
+      finalDiscount = (order.subtotal * finalDiscount) / 100
+    }
+    await setOrderDiscount(finalDiscount)
+  }
+
+
+  const removeDiscount = async () => {
+    await setOrderDiscount(0)
   }
 
 
@@ -312,7 +331,6 @@ export default function OrderDetail() {
           </strong>
         </p>
 
-
         {order?.status === "DRAFT" && (
           <div style={{
             background: "#333",
@@ -323,7 +341,6 @@ export default function OrderDetail() {
             🧾 Agrega productos para iniciar la orden
           </div>
         )}
-
 
         {/* ITEMS */}
         <h2>Items</h2>
@@ -420,15 +437,12 @@ export default function OrderDetail() {
         }}>
           <p>Subtotal: ${subtotal.toFixed(2)}</p>
 
-          {order?.discount && order?.discount > 0 && (
-            <p style={{ color: "red" }}>
-              Descuento: -${order?.discount.toFixed(2)}
-            </p>
-          )}
+          <p style={{ color: (order?.discount ?? 0) > 0 ? "red" : "#555" }}>
+            Descuento: {(order?.discount ?? 0) > 0 ? "-" : ""}${(order?.discount ?? 0).toFixed(2)}
+          </p>
 
           <h3>Total: ${total.toFixed(2)}</h3>
         </div>
-
 
         {/* ENVIAR A COCINA */}
         {status !== "CLOSED" && hasPendingItems && (
@@ -479,9 +493,18 @@ export default function OrderDetail() {
             >
               Aplicar Descuento
             </button>
+
+            {(order?.discount ?? 0) > 0 && (
+              <button
+                className="btn btn-primary"
+                onClick={removeDiscount}
+                style={{ padding: 8, borderRadius: 6, marginLeft: 10 }}
+              >
+                Quitar Descuento
+              </button>
+            )}
           </>
         )}
-
 
         {/* PAGOS */}
         <h2>Pagos</h2>
@@ -653,7 +676,6 @@ export default function OrderDetail() {
                     >
                       +
                     </button>
-
                   </div>
                 ))}
               </div>

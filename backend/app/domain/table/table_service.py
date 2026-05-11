@@ -10,6 +10,10 @@ from app.domain.order.constants import ACTIVE_ORDER_STATUSES
 from app.domain.errors.base import DomainError
 from app.domain.errors.error_codes import ErrorCode
 
+import logging
+
+logger = logging.getLogger("app.domain.table")
+
 
 class TableService:
 
@@ -116,10 +120,35 @@ class TableService:
     # -------------------------
 
     def create_table(self, restaurant_id, table_in):
-        max_number = self.db.query(func.max(Table.number)).filter(
-            Table.restaurant_id == restaurant_id
-        ).scalar()
-        new_number = (max_number or 0) + 1
+        new_number = table_in.number
+
+        if new_number is None:
+            max_number = self.db.query(func.max(Table.number)).filter(
+                Table.restaurant_id == restaurant_id
+            ).scalar()
+            new_number = (max_number or 0) + 1
+
+        if new_number <= 0:
+            raise DomainError(
+                "Table number must be greater than zero",
+                code=ErrorCode.INVALID_OPERATION,
+                context={"number": new_number}
+            )
+
+        existing = self.db.query(Table).filter(
+            Table.restaurant_id == restaurant_id,
+            Table.number == new_number
+        ).first()
+        if existing:
+            raise DomainError(
+                "Table number already exists",
+                code=ErrorCode.TABLE_NUMBER_ALREADY_EXISTS,
+                context={
+                    "number": new_number,
+                    "active": existing.active
+                }
+            )
+        logger.info("Mesa creada r=%s number=%s", restaurant_id, new_number)
         table = Table(
             restaurant_id=restaurant_id,
             number=new_number,
@@ -138,8 +167,32 @@ class TableService:
     # -------------------------
 
     def update_table(self, restaurant_id, table_id, table_in):
-        table = self._get_table(restaurant_id, table_id, active_only=True)
-        update_data = table_in.dict(exclude_unset=True)
+        table = self._get_table(restaurant_id, table_id)
+        update_data = table_in.model_dump(exclude_unset=True)
+
+        new_number = update_data.get("number")
+        if new_number is not None:
+            if new_number <= 0:
+                raise DomainError(
+                    "Table number must be greater than zero",
+                    code=ErrorCode.INVALID_OPERATION,
+                    context={"number": new_number}
+                )
+            existing = self.db.query(Table).filter(
+                Table.restaurant_id == restaurant_id,
+                Table.number == new_number,
+                Table.id != table_id
+            ).first()
+            if existing:
+                raise DomainError(
+                    "Table number already exists",
+                    code=ErrorCode.TABLE_NUMBER_ALREADY_EXISTS,
+                    context={
+                        "number": new_number,
+                        "active": existing.active
+                    }
+                )
+
         for field, value in update_data.items():
             setattr(table, field, value)
         self.db.commit()
@@ -155,13 +208,15 @@ class TableService:
         restaurant_id: int,
         table_id: int,
         data: TablePositionUpdate
-    ) -> None:
+    ) -> Table:
         table = self._get_table(restaurant_id, table_id, active_only=True)
 
         table.x = data.x
         table.y = data.y
 
         self.db.commit()
+        self.db.refresh(table)
+        return table
 
     # -------------------------
     # Desactivar mesa
@@ -169,6 +224,7 @@ class TableService:
 
     def deactivate_table(self, restaurant_id, table_id):
         table = self._get_table(restaurant_id, table_id, active_only=True)
+        logger.info("Mesa desactivada r=%s table_id=%s", restaurant_id, table_id)
         table.active = False
         self.db.commit()
         return {"message": "Table deactivated"}
@@ -178,7 +234,8 @@ class TableService:
     # -------------------------
 
     def activate_table(self, restaurant_id, table_id):
-        table = self._get_table(restaurant_id, table_id, active_only=True)
+        table = self._get_table(restaurant_id, table_id)
+        logger.info("Mesa activada r=%s table_id=%s", restaurant_id, table_id)
         table.active = True
         self.db.commit()
         return {"message": "Table activated"}    
@@ -189,12 +246,6 @@ class TableService:
 
     def touch_table(self, restaurant_id: int, table_id: int):
         table = self._get_table(restaurant_id, table_id, active_only=True)
-        if not table:
-            raise DomainError(
-                "Table not found",
-                code=ErrorCode.TABLE_NOT_FOUND,
-                context={"table_id": table_id}
-            )
         order = self.db.query(Order).filter(
             Order.table_id == table_id,
             Order.restaurant_id == restaurant_id,

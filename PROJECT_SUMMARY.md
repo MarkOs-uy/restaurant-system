@@ -1,5 +1,5 @@
 # 📊 Project Summary
-Generated: 2026-04-23 11:18:20.221299
+Generated: 2026-05-04 10:47:09.622171
 
 ## 📁 Estructura del proyecto
 
@@ -31,17 +31,18 @@ Generated: 2026-04-23 11:18:20.221299
       - seed_stations.py
       - seed_users.py
       - core/
+        - config.py
         - redis.py
         - security.py
+        - serialization.py
       - db/
         - base_class.py
         - session.py
         - tenant.py
       - dependencies/
         - auth.py
+        - permissions.py
       - domain/
-        - errors.py
-        - error_codes.py
         - cash_register/
           - cash_movement_service.py
           - cash_register_service.py
@@ -49,6 +50,9 @@ Generated: 2026-04-23 11:18:20.221299
         - category/
           - category_service.py
           - dependencies.py
+        - errors/
+          - base.py
+          - error_codes.py
         - kitchen/
           - dependencies.py
           - kitchen_service.py
@@ -132,6 +136,8 @@ Generated: 2026-04-23 11:18:20.221299
     - monthly/
     - weekly/
   - frontend/
+    - dist/
+      - assets/
     - public/
     - src/
       - assets/
@@ -1411,12 +1417,12 @@ def downgrade() -> None:
 - fastapi.FastAPI
 - fastapi.Request
 - fastapi.responses.JSONResponse
+- fastapi.middleware.cors.CORSMiddleware
 - contextlib.asynccontextmanager
 - asyncio
 - logging
 - app.models
 - app.events.redis_listener.redis_event_listener
-- app.services.event_service.event_service
 - app.routers.tables
 - app.routers.orders
 - app.routers.products
@@ -1428,13 +1434,15 @@ def downgrade() -> None:
 - app.routers.users
 - app.routers.kitchen
 - app.routers.layout
-- app.domain.errors.DomainError
+- app.domain.errors.base.DomainError
 - app.websocket.ws
-- fastapi.middleware.cors.CORSMiddleware
+- app.core.config.CORS_ORIGINS
 
 ```python
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+
 from contextlib import asynccontextmanager
 import asyncio
 import logging
@@ -1442,35 +1450,39 @@ import logging
 from app import models
 from app.events.redis_listener import redis_event_listener
 
-from app.services.event_service import event_service
-
 # routers
 from app.routers import tables, orders, products, cash_register, category, order_items, stations, auth, users, kitchen
 from app.routers import layout
 
-
-from app.domain.errors import DomainError
+from app.domain.errors.base import DomainError
 from app.websocket import ws
+from app.core.config import CORS_ORIGINS
 
-from fastapi.middleware.cors import CORSMiddleware
 
+logger = logging.getLogger("app.main")
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 
-    print("Backend arrancando...")
+    logger.info("Backend arrancando...")
 
     # 🔥 REGISTRAR EVENT LOOP PARA EVENT SERVICE
-    event_service.loop = asyncio.get_running_loop()
+    #event_service.loop = asyncio.get_running_loop()
 
-    print("EventService loop registrado")
+    #print("EventService loop registrado")
 
     # Redis listener
     redis_task = asyncio.create_task(redis_event_listener())
+    logger.info("Redis listener iniciado")
 
     yield
 
-    print("Backend apagándose...")
+    logger.info("Backend apagándose...")
 
     redis_task.cancel()
     try:
@@ -1484,7 +1496,7 @@ app = FastAPI(lifespan=lifespan, redirect_slashes=False)
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -1518,18 +1530,10 @@ def health():
         "version": "1.0.0"
     }
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-)
-
-logger = logging.getLogger("app")
 
 @app.exception_handler(DomainError)
 async def domain_error_handler(request: Request, exc: DomainError):
-
     logger.warning(f"{exc.code}: {exc.message}")
-
     return JSONResponse(
         status_code=400,
         content={
@@ -1541,9 +1545,7 @@ async def domain_error_handler(request: Request, exc: DomainError):
 
 @app.exception_handler(Exception)
 async def unexpected_error_handler(request: Request, exc: Exception):
-
     logger.exception("Unexpected server error")
-
     return JSONResponse(
         status_code=500,
         content={
@@ -1551,6 +1553,7 @@ async def unexpected_error_handler(request: Request, exc: Exception):
             "detail": "Error interno del servidor"
         }
     )
+
 ```
 
 ---
@@ -1849,6 +1852,46 @@ def seed_users(db: Session):
 
 ---
 
+### .\backend\app\core\config.py
+
+**Funciones (1):**
+- _get_csv_env
+
+**Clases (0):**
+
+**Imports (2):**
+- os
+- dotenv.load_dotenv
+
+```python
+import os
+
+from dotenv import load_dotenv
+
+
+load_dotenv()
+
+
+def _get_csv_env(name: str, default: str) -> list[str]:
+    value = os.getenv(name, default)
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY no está configurada. Defínela en el archivo .env")
+ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+
+CORS_ORIGINS = _get_csv_env(
+    "CORS_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173",
+)
+
+```
+
+---
+
 ### .\backend\app\core\redis.py
 
 **Funciones (0):**
@@ -1883,22 +1926,22 @@ redis_client = redis.Redis(
 
 **Clases (0):**
 
-**Imports (6):**
+**Imports (9):**
 - datetime.datetime
 - datetime.timedelta
 - datetime.timezone
 - jose.JWTError
 - jose.jwt
 - passlib.context.CryptContext
+- app.core.config.SECRET_KEY
+- app.core.config.ALGORITHM
+- app.core.config.ACCESS_TOKEN_EXPIRE_MINUTES
 
 ```python
 from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-
-SECRET_KEY = "super-secret-key-change-this"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+from app.core.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 
 pwd_context = CryptContext(
     schemes=["bcrypt"],
@@ -1949,6 +1992,32 @@ def decode_access_token(token: str):
 
     except JWTError:
         return None
+
+```
+
+---
+
+### .\backend\app\core\serialization.py
+
+**Funciones (2):**
+- decimal_to_float
+- decimal_dict_to_float
+
+**Clases (0):**
+
+**Imports (1):**
+- decimal.Decimal
+
+```python
+from decimal import Decimal
+
+def decimal_to_float(value):
+    if isinstance(value, Decimal):
+        return float(value)
+    return value
+
+def decimal_dict_to_float(data: dict):
+    return {k: decimal_to_float(v) for k, v in data.items()}
 ```
 
 ---
@@ -2072,201 +2141,133 @@ def get_current_user(
 
     payload = decode_access_token(token)
 
-    if payload is None:
-        raise HTTPException(401, "Token inválido")
+    if not payload:
+        raise HTTPException(
+            status_code=401,
+            detail="Token inválido"
+        )
 
-    user_id = payload.get("sub")
+    try:
+        user_id = int(payload.get("sub"))
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=401,
+            detail="Token inválido"
+        )
 
     user = db.query(User).filter(
-        User.id == int(user_id)
+        User.id == user_id
     ).first()
 
     if not user:
-        raise HTTPException(401, "No se encuentra este usuario")
-    
+        raise HTTPException(
+            status_code=401,
+            detail="Usuario no encontrado"
+        )
+
     if not user.active:
-        raise HTTPException(401, "Usuario inactivo")
+        raise HTTPException(
+            status_code=403,
+            detail="Usuario inactivo"
+        )
 
     return user
-
 ```
 
 ---
 
-### .\backend\app\domain\errors.py
+### .\backend\app\dependencies\permissions.py
 
-**Funciones (1):**
-- __init__
+**Funciones (2):**
+- require_roles
+- role_checker
 
-**Clases (10):**
-- DomainError
-- CashRegisterDomainError
-- PaymentDomainError
-- OrderDomainError
-- OrderItemDomainError
-- ProductDomainError
-- TableDomainError
-- UserDomainError
-- CategoryDomainError
-- StationDomainError
+**Clases (0):**
 
-**Imports (0):**
+**Imports (6):**
+- fastapi.Depends
+- app.domain.errors.base.DomainError
+- app.domain.errors.error_codes.ErrorCode
+- app.models.user.UserRole
+- app.models.user.User
+- app.dependencies.auth.get_current_user
 
 ```python
-class DomainError(Exception):
-
-    def __init__(self, message: str, code: str = "domain_error", context: dict | None = None):
-        self.message = message
-        self.code = code
-        self.context = context or {}
-        super().__init__(message)
-
-
-class CashRegisterDomainError(DomainError):
-    pass
+from fastapi import Depends
+from app.domain.errors.base import DomainError
+from app.domain.errors.error_codes import ErrorCode
+from app.models.user import UserRole
+from app.models.user import User
+from app.dependencies.auth import get_current_user
 
 
-class PaymentDomainError(DomainError):
-    pass
+def require_roles(*roles: UserRole):
+    def role_checker(user: User = Depends(get_current_user)) -> User:
+        if user.role not in roles:
+            raise DomainError(
+                "No tienes permisos para realizar esta acción",
+                ErrorCode.PERMISSION_DENIED,
+                context={
+                    "required_roles": [r.value for r in roles],
+                    "user_role": user.role.value
+                }
+            )
+        return user
 
-
-class OrderDomainError(DomainError):
-    pass
-
-
-class OrderItemDomainError(DomainError):
-    pass
-
-
-class ProductDomainError(DomainError):
-    pass
-
-
-class TableDomainError(DomainError):
-    pass
-
-
-class UserDomainError(DomainError):
-    pass
-
-
-class CategoryDomainError(DomainError):
-    pass
-
-
-class StationDomainError(DomainError):
-    pass
-```
-
----
-
-### .\backend\app\domain\error_codes.py
-
-**Funciones (0):**
-
-**Clases (1):**
-- ErrorCode
-
-**Imports (0):**
-
-```python
-class ErrorCode:
-
-    # GENERALES
-    NOT_FOUND = "not_found"
-    INVALID_OPERATION = "invalid_operation"
-    UNAUTHORIZED = "unauthorized"
-
-    # ORDERS
-    ORDER_NOT_FOUND = "order_not_found"
-    ORDER_ALREADY_CLOSED = "order_already_closed"
-    ORDER_ITEMS_NOT_DELIVERED = "order_items_not_delivered"
-    ORDER_EMPTY = "order_empty"
-    ORDER_HAS_REMAINING_BALANCE = "order_has_remaining_balance"
-    INVALID_TRANSITION = "invalid_transition"
-
-    # ORDER ITEMS
-    ITEM_NOT_FOUND = "item_not_found"
-    ITEM_NOT_IN_ORDER = "item_not_in_order"
-    ITEM_ALREADY_SEND = "item_already_send"
-    NOT_PENDING_ITEMS_TO_SEND = "not_pending_items_to_send"
-    ITEM_STATUS_ROLE_FORBIDDEN = "item_status_role_forbidden"
-    ITEM_INVALID_TRANSITION = "item_invalid_transition"
-
-    # TABLES
-    TABLE_NOT_FOUND = "table_not_found"
-
-    # PAYMENTS
-    PAYMENT_NOT_FOUND = "payment_not_found"
-    PAYMENT_INVALID_METHOD = "payment_invalid_method"
-    PAYMENT_EXCEEDS_REMAINING = "payment_exceeds_remaining"
-
-    # CASH REGISTER
-    CASH_REGISTER_ALREADY_OPEN = "cash_register_already_open"
-    CASH_REGISTER_ALREADY_CLOSED = "cash_register_already_closed"
-    CASH_REGISTER_NOT_OPEN = "cash_register_not_open"
-    CASH_REGISTER_PENDING_ORDERS = "cash_register_pending_orders"
-    CASH_REGISTER_INVALID_COUNT = "cash_register_invalid_count"
-    CASH_MOVEMENT_NOT_FOUND = "cash_movement_not_found"
-
-
-    # PRODUCTS
-    PRODUCT_NOT_FOUND = "product_not_found"
-
-    # USERS
-    USER_NOT_FOUND = "user_not_found"
-    USERNAME_ALREADY_EXISTS = "username_already_exists"
-
-    # CATEGORIES
-    CATEGORY_NOT_FOUND = "category_not_found"
-
-    # STATIONS
-    STATION_NOT_FOUND = "station_not_found"
-    STATION_NAME_ALREADY_EXISTS = "station_name_already_exists"
+    return role_checker
 ```
 
 ---
 
 ### .\backend\app\domain\cash_register\cash_movement_service.py
 
-**Funciones (2):**
+**Funciones (3):**
+- __init__
 - create_cash_movement
 - delete_cash_movement
 
 **Clases (1):**
 - CashMovementService
 
-**Imports (6):**
+**Imports (7):**
+- sqlalchemy.orm.Session
 - app.models.cash_movement.CashMovement
 - app.models.cash_register.CashRegister
-- app.domain.errors.CashRegisterDomainError
-- app.domain.error_codes.ErrorCode
+- app.domain.errors.base.DomainError
+- app.domain.errors.error_codes.ErrorCode
 - app.models.user.UserRole
 - app.services.event_service.event_service
 
 ```python
+from sqlalchemy.orm import Session
 from app.models.cash_movement import CashMovement
 from app.models.cash_register import CashRegister
-from app.domain.errors import CashRegisterDomainError
-from app.domain.error_codes import ErrorCode
+from app.domain.errors.base import DomainError
+from app.domain.errors.error_codes import ErrorCode
 from app.models.user import UserRole
 from app.services.event_service import event_service
 
 
 class CashMovementService:
 
+    def __init__(self, db: Session):
+        self.db = db
+
+
+    # -------------------------
+    # Crear movimiento de caja
+    # -------------------------
+
     def create_cash_movement(
         self,
-        db,
         restaurant_id,
         user_id,
         movement_type,
         amount,
         reason
     ):
-
         cash_register = (
-            db.query(CashRegister)
+            self.db.query(CashRegister)
             .filter(
                 CashRegister.restaurant_id == restaurant_id,
                 CashRegister.is_open == True
@@ -2274,13 +2275,11 @@ class CashMovementService:
             .with_for_update()
             .first()
         )
-
         if not cash_register:
-            raise CashRegisterDomainError(
+            raise DomainError(
                 "cash register not open",
                 ErrorCode.CASH_REGISTER_NOT_OPEN
             )
-
         movement = CashMovement(
             cash_register_id=cash_register.id,
             user_id=user_id,
@@ -2288,11 +2287,9 @@ class CashMovementService:
             amount=amount,
             reason=reason
         )
-
-        db.add(movement)
-        db.commit()
-        db.refresh(movement)
-
+        self.db.add(movement)
+        self.db.commit()
+        self.db.refresh(movement)
         event_service.emit_to_role(
             restaurant_id,
             UserRole.CASHIER,
@@ -2307,18 +2304,18 @@ class CashMovementService:
                 }
             }
         )
-
         return movement
 
+    # -------------------------
+    # Eliminar movimiento de caja
+    # -------------------------
 
     def delete_cash_movement(
         self,
-        db,
         restaurant_id,
         movement_id
     ):
-
-        movement = db.query(CashMovement).join(
+        movement = self.db.query(CashMovement).join(
             CashRegister,
             CashMovement.cash_register_id == CashRegister.id
         ).filter(
@@ -2327,7 +2324,7 @@ class CashMovementService:
         ).first()
 
         if not movement:
-            raise CashRegisterDomainError(
+            raise DomainError(
                 "Movement not found",
                 ErrorCode.CASH_MOVEMENT_NOT_FOUND
             )
@@ -2335,8 +2332,8 @@ class CashMovementService:
         amount = movement.amount
         movement_type = movement.type
 
-        db.delete(movement)
-        db.commit()
+        self.db.delete(movement)
+        self.db.commit()
 
         event_service.emit_to_role(
             restaurant_id,
@@ -2348,7 +2345,6 @@ class CashMovementService:
                 "movement_type": movement_type
             }
         )
-
         return {"ok": True}
 ```
 
@@ -2356,7 +2352,8 @@ class CashMovementService:
 
 ### .\backend\app\domain\cash_register\cash_register_service.py
 
-**Funciones (9):**
+**Funciones (10):**
+- __init__
 - _get_open_cash_register
 - _calculate_sales
 - _calculate_payment_breakdown
@@ -2370,10 +2367,12 @@ class CashMovementService:
 **Clases (1):**
 - CashRegisterService
 
-**Imports (12):**
+**Imports (15):**
 - decimal.Decimal
 - sqlalchemy.orm.Session
+- sqlalchemy.orm.query
 - sqlalchemy.func
+- logging
 - app.models.cash_register.CashRegister
 - app.models.payment.Payment
 - app.models.cash_movement.CashMovement
@@ -2381,13 +2380,15 @@ class CashMovementService:
 - app.models.order.OrderStatus
 - app.models.payment.PaymentMethod
 - app.models.cash_movement.CashMovementType
-- app.domain.errors.CashRegisterDomainError
-- app.domain.error_codes.ErrorCode
+- app.domain.errors.base.DomainError
+- app.domain.errors.error_codes.ErrorCode
+- app.core.serialization.decimal_dict_to_float
 
 ```python
 from decimal import Decimal
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, query
 from sqlalchemy import func
+import logging
 
 from app.models.cash_register import CashRegister
 from app.models.payment import Payment
@@ -2396,20 +2397,25 @@ from app.models.order import Order, OrderStatus
 from app.models.payment import PaymentMethod
 from app.models.cash_movement import CashMovementType
 
-from app.domain.errors import CashRegisterDomainError
-from app.domain.error_codes import ErrorCode
+from app.domain.errors.base import DomainError
+from app.domain.errors.error_codes import ErrorCode
+from app.core.serialization import decimal_dict_to_float
 
+logger = logging.getLogger("app.domain.cash_register")
 
 class CashRegisterService:
 
+    def __init__(self, db: Session):
+        self.db = db
+
+
     def _get_open_cash_register(
         self,
-        db: Session,
         restaurant_id: int,
         for_update: bool = False
     ):
 
-        query = db.query(CashRegister).filter(
+        query = self.db.query(CashRegister).filter(
             CashRegister.restaurant_id == restaurant_id,
             CashRegister.is_open == True
         )
@@ -2420,7 +2426,7 @@ class CashRegisterService:
         cash_register = query.first()
 
         if not cash_register:
-            raise CashRegisterDomainError(
+            raise DomainError(
                 "cash register not open",
                 ErrorCode.CASH_REGISTER_NOT_OPEN
             )
@@ -2428,18 +2434,18 @@ class CashRegisterService:
         return cash_register
 
 
-    def _calculate_sales(self, db: Session, cash_register_id: int):
-        total_sales = db.query(
+    def _calculate_sales(self, cash_register_id: int):
+        total_sales = self.db.query(
             func.coalesce(func.sum(Payment.amount), 0)
         ).filter(
             Payment.cash_register_id == cash_register_id
         ).scalar()
-        transactions_count = db.query(
+        transactions_count = self.db.query(
             func.count(Payment.id)
         ).filter(
             Payment.cash_register_id == cash_register_id
         ).scalar()
-        orders_count = db.query(
+        orders_count = self.db.query(
             func.count(func.distinct(Payment.order_id))
         ).filter(
             Payment.cash_register_id == cash_register_id
@@ -2452,8 +2458,12 @@ class CashRegisterService:
         return total_sales, transactions_count, orders_count, average_ticket
 
 
-    def _calculate_payment_breakdown(self, db: Session, cash_register_id: int):
-        rows = db.query(
+    def _calculate_payment_breakdown(self, cash_register_id: int):
+        breakdown = {
+            method.value: Decimal("0")
+            for method in PaymentMethod
+        }
+        rows = self.db.query(
             Payment.method,
             func.sum(Payment.amount)
         ).filter(
@@ -2461,14 +2471,13 @@ class CashRegisterService:
         ).group_by(
             Payment.method
         ).all()
-        return {
-            method.value: total or Decimal("0")
-            for method, total in rows
-        }
+        for method, total in rows:
+            breakdown[method.value] = total or Decimal("0")
+        return breakdown
 
 
-    def _calculate_cash_movements(self, db: Session, cash_register_id: int):
-        rows = db.query(
+    def _calculate_cash_movements(self, cash_register_id: int):
+        rows = self.db.query(
             CashMovement.type,
             func.sum(CashMovement.amount)
         ).filter(
@@ -2488,64 +2497,73 @@ class CashRegisterService:
 
     def open_cash_register(
         self,
-        db: Session,
         restaurant_id: int,
         user_id: int,
         opening_amount: Decimal
     ):
-        existing = db.query(CashRegister).filter(
+        if opening_amount < Decimal("0"):
+            raise DomainError(
+                "opening amount must be greater than or equal to zero",
+                ErrorCode.INVALID_OPERATION,
+                context={"opening_amount": float(opening_amount)}
+            )
+
+        existing = self.db.query(CashRegister).filter(
             CashRegister.restaurant_id == restaurant_id,
             CashRegister.is_open == True
         ).first()
         if existing:
-            raise CashRegisterDomainError(
+            raise DomainError(
                 "Cash register already open", 
                 ErrorCode.CASH_REGISTER_ALREADY_OPEN
                 )
+        logger.info("Caja abierta r=%s user=%s amount=%s", restaurant_id, user_id, opening_amount)
         cash_register = CashRegister(
             restaurant_id=restaurant_id,
             opened_by_id=user_id,
             opening_amount=opening_amount,
             is_open=True
         )
-        db.add(cash_register)
-        db.commit()
-        db.refresh(cash_register)
+        self.db.add(cash_register)
+        self.db.commit()
+        self.db.refresh(cash_register)
         return cash_register
 
 
     def close_cash_register(
         self,
-        db: Session,
         restaurant_id: int,
         user_id: int,
         counted_cash: Decimal
     ):
+        if counted_cash < Decimal("0"):
+            raise DomainError(
+                "counted cash must be greater than or equal to zero",
+                ErrorCode.CASH_REGISTER_INVALID_COUNT,
+                context={"counted_cash": float(counted_cash)}
+            )
 
         cash_register = self._get_open_cash_register(
-            db,
             restaurant_id,
             for_update=True
         )
 
-        open_orders = db.query(Order).filter(
+        open_orders = self.db.query(Order).filter(
             Order.restaurant_id == restaurant_id,
-            Order.status.notin_([OrderStatus.CLOSED, OrderStatus.CANCELLED])
+            Order.status.notin_([OrderStatus.CLOSED, OrderStatus.CANCELLED, OrderStatus.DRAFT])
         ).count()
 
         if open_orders > 0:
-            raise CashRegisterDomainError(
+            raise DomainError(
                 "cannot close cash register: there are open orders",
                 ErrorCode.CASH_REGISTER_PENDING_ORDERS
             )
 
         total_sales, transactions_count, orders_count, average_ticket = self._calculate_sales(
-            db,
             cash_register.id
         )
 
         payment_breakdown = self._calculate_payment_breakdown(
-            db,
             cash_register.id
         )
 
@@ -2555,7 +2573,6 @@ class CashRegisterService:
         )
 
         cash_in, cash_out = self._calculate_cash_movements(
-            db,
             cash_register.id
         )
 
@@ -2566,22 +2583,31 @@ class CashRegisterService:
             - cash_out
         )
 
+        closing_amount = (
+            cash_register.opening_amount
+            + total_sales
+            + cash_in
+            - cash_out
+        )
+
         difference = counted_cash - expected_cash
 
         cash_register.closed_at = func.now()
         cash_register.closed_by_id = user_id
         cash_register.is_open = False
         cash_register.total_sales = total_sales
+        cash_register.closing_amount = closing_amount
         cash_register.expected_cash = expected_cash
         cash_register.counted_cash = counted_cash
         cash_register.difference = difference
-        cash_register.payments_snapshot = payment_breakdown
-
-        db.commit()
+        cash_register.payments_snapshot = decimal_dict_to_float(payment_breakdown)
+        logger.info("Caja cerrada r=%s user=%s difference=%s", restaurant_id, user_id, difference)
+        self.db.commit()
 
         return {
             "message": "Caja cerrada",
             "opening_amount": cash_register.opening_amount,
+            "closing_amount": cash_register.closing_amount,
             "total_sales": total_sales,
             "orders_count": orders_count,
             "transactions_count": transactions_count,
@@ -2595,14 +2621,14 @@ class CashRegisterService:
         }
 
 
-    def get_current_cash_register(self, db: Session, restaurant_id: int):
-        cash_register = self._get_open_cash_register(db, restaurant_id)
+    def get_current_cash_register(self, restaurant_id: int):
+        cash_register = self._get_open_cash_register(restaurant_id)
+        if not cash_register:
+            return None
         total_sales, transactions_count, orders_count, average_ticket = self._calculate_sales(
-            db,
             cash_register.id
         )
         by_method = self._calculate_payment_breakdown(
-            db,
             cash_register.id
         )
         return {
@@ -2616,23 +2642,22 @@ class CashRegisterService:
         }
 
 
-    def require_open_cash_register(self, db: Session, restaurant_id: int):
-        return self._get_open_cash_register(db, restaurant_id)
+    def require_open_cash_register(self, restaurant_id: int):
+        return self._get_open_cash_register(restaurant_id)
 
 
-    def get_dashboard(self, db: Session, restaurant_id: int):
-
-        cash_register = self._get_open_cash_register(db, restaurant_id)
+    def get_dashboard(self, restaurant_id: int):
+        cash_register = self._get_open_cash_register(restaurant_id)
+        if not cash_register:
+            return None
+        logger.debug("get_dashboard cash_register_id=%s", cash_register.id)
         total_sales, transactions_count, orders_count, average_ticket = self._calculate_sales(
-            db,
             cash_register.id
         )
         by_method = self._calculate_payment_breakdown(
-            db,
             cash_register.id
         )
         cash_in, cash_out = self._calculate_cash_movements(
-            db,
             cash_register.id
         )
         cash_sales = by_method.get(
@@ -2645,7 +2670,7 @@ class CashRegisterService:
             + cash_in
             - cash_out
         )
-        movements = db.query(CashMovement).filter(
+        movements = self.db.query(CashMovement).filter(
             CashMovement.cash_register_id == cash_register.id
         ).order_by(
             CashMovement.created_at.desc()
@@ -2660,6 +2685,13 @@ class CashRegisterService:
             }
             for m in movements
         ]
+        logger.debug(
+            "get_dashboard r=%s opening=%s sales=%s orders=%s",
+            cash_register.restaurant_id,
+            cash_register.opening_amount,
+            total_sales,
+            orders_count
+        )
         return {
             "cash_register_id": cash_register.id,
             "opened_at": cash_register.opened_at,
@@ -2672,6 +2704,7 @@ class CashRegisterService:
             "cash_movements": movements_list,
             "expected_cash": expected_cash
         }
+
 ```
 
 ---
@@ -2684,20 +2717,31 @@ class CashRegisterService:
 
 **Clases (0):**
 
-**Imports (2):**
+**Imports (5):**
+- fastapi.Depends
+- sqlalchemy.orm.Session
+- app.db.session.get_db
 - app.domain.cash_register.cash_register_service.CashRegisterService
 - app.domain.cash_register.cash_movement_service.CashMovementService
 
 ```python
+from fastapi import Depends
+from sqlalchemy.orm import Session
+
+from app.db.session import get_db
 from app.domain.cash_register.cash_register_service import CashRegisterService
 from app.domain.cash_register.cash_movement_service import CashMovementService
 
+def get_cash_register_service(
+    db: Session = Depends(get_db)
+) -> CashRegisterService:
+    return CashRegisterService(db)
 
-def get_cash_register_service():
-    return CashRegisterService()
 
-def get_cash_movement_service():
-    return CashMovementService()
+def get_cash_movement_service(
+    db: Session = Depends(get_db)
+) -> CashMovementService:
+    return CashMovementService(db)
 ```
 
 ---
@@ -2720,15 +2764,14 @@ def get_cash_movement_service():
 - sqlalchemy.orm.Session
 - sqlalchemy.orm.joinedload
 - app.models.category.Category
-- app.domain.errors.CategoryDomainError
-- app.domain.error_codes.ErrorCode
+- app.domain.errors.base.DomainError
+- app.domain.errors.error_codes.ErrorCode
 
 ```python
 from sqlalchemy.orm import Session, joinedload
-
 from app.models.category import Category
-from app.domain.errors import CategoryDomainError
-from app.domain.error_codes import ErrorCode
+from app.domain.errors.base import DomainError
+from app.domain.errors.error_codes import ErrorCode
 
 class CategoryService:
 
@@ -2749,7 +2792,7 @@ class CategoryService:
             .first()
         )
         if not category:
-            raise CategoryDomainError(
+            raise DomainError(
                 "Category not found",
                 ErrorCode.CATEGORY_NOT_FOUND
             )
@@ -2860,6 +2903,108 @@ def get_category_service(
     db: Session = Depends(get_db)
 ) -> CategoryService:
     return CategoryService(db)
+```
+
+---
+
+### .\backend\app\domain\errors\base.py
+
+**Funciones (1):**
+- __init__
+
+**Clases (1):**
+- DomainError
+
+**Imports (0):**
+
+```python
+class DomainError(Exception):
+
+    def __init__(
+        self,
+        message: str,
+        code: str = "domain_error",
+        context: dict | None = None
+    ):
+        self.message = message
+        self.code = code
+        self.context = context or {}
+        super().__init__(message)
+```
+
+---
+
+### .\backend\app\domain\errors\error_codes.py
+
+**Funciones (0):**
+
+**Clases (1):**
+- ErrorCode
+
+**Imports (1):**
+- enum.Enum
+
+```python
+from enum import Enum
+
+class ErrorCode(str, Enum):
+
+    # GENERALES
+    NOT_FOUND = "not_found"
+    INVALID_OPERATION = "invalid_operation"
+    UNAUTHORIZED = "unauthorized"
+
+    # ORDERS
+    ORDER_NOT_FOUND = "order_not_found"
+    ORDER_ALREADY_CLOSED = "order_already_closed"
+    ORDER_ITEMS_NOT_DELIVERED = "order_items_not_delivered"
+    ORDER_EMPTY = "order_empty"
+    ORDER_HAS_REMAINING_BALANCE = "order_has_remaining_balance"
+    INVALID_TRANSITION = "invalid_transition"
+
+    # ORDER ITEMS
+    ITEM_NOT_FOUND = "item_not_found"
+    ITEM_NOT_IN_ORDER = "item_not_in_order"
+    ITEM_ALREADY_SEND = "item_already_send"
+    NOT_PENDING_ITEMS_TO_SEND = "not_pending_items_to_send"
+    ITEM_STATUS_ROLE_FORBIDDEN = "item_status_role_forbidden"
+    ITEM_INVALID_TRANSITION = "item_invalid_transition"
+
+    # TABLES
+    TABLE_NOT_FOUND = "table_not_found"
+    TABLE_NUMBER_ALREADY_EXISTS = "table_number_already_exists"
+
+    # PAYMENTS
+    PAYMENT_NOT_FOUND = "payment_not_found"
+    PAYMENT_INVALID_METHOD = "payment_invalid_method"
+    PAYMENT_EXCEEDS_REMAINING = "payment_exceeds_remaining"
+
+    # CASH REGISTER
+    CASH_REGISTER_ALREADY_OPEN = "cash_register_already_open"
+    CASH_REGISTER_ALREADY_CLOSED = "cash_register_already_closed"
+    CASH_REGISTER_NOT_OPEN = "cash_register_not_open"
+    CASH_REGISTER_PENDING_ORDERS = "cash_register_pending_orders"
+    CASH_REGISTER_INVALID_COUNT = "cash_register_invalid_count"
+    CASH_MOVEMENT_NOT_FOUND = "cash_movement_not_found"
+
+
+    # PRODUCTS
+    PRODUCT_NOT_FOUND = "product_not_found"
+
+    # USERS
+    USER_NOT_FOUND = "user_not_found"
+    USERNAME_ALREADY_EXISTS = "username_already_exists"
+
+    # CATEGORIES
+    CATEGORY_NOT_FOUND = "category_not_found"
+
+    # STATIONS
+    STATION_NOT_FOUND = "station_not_found"
+    STATION_NAME_ALREADY_EXISTS = "station_name_already_exists"
+
+    # PERMISSIONS
+    PERMISSION_DENIED = "Permission_denied"
+
 ```
 
 ---
@@ -3030,15 +3175,19 @@ def get_layout_service(db: Session = Depends(get_db)):
 **Clases (1):**
 - LayoutService
 
-**Imports (3):**
+**Imports (4):**
 - sqlalchemy.orm.Session
 - app.models.restaurant_layout.RestaurantLayout
 - app.schemas.layout.LayoutUpdate
+- logging
 
 ```python
 from sqlalchemy.orm import Session
 from app.models.restaurant_layout import RestaurantLayout
 from app.schemas.layout import LayoutUpdate
+import logging
+
+logger = logging.getLogger("app.domain.layout")
 
 
 class LayoutService:
@@ -3073,7 +3222,7 @@ class LayoutService:
 
 
     def update_layout(self, restaurant_id: int, data: LayoutUpdate):
-
+        logger.info("Layout actualizado r=%s", restaurant_id)
         layout = self.get_layout(restaurant_id)
 
         layout.width = data.width
@@ -3135,7 +3284,6 @@ from .order_service import OrderService
 def get_order_service(
     db: Session = Depends(get_db)
 ) -> OrderService:
-
     return OrderService(db)
 ```
 
@@ -3143,7 +3291,7 @@ def get_order_service(
 
 ### .\backend\app\domain\order\order_service.py
 
-**Funciones (16):**
+**Funciones (18):**
 - __init__
 - get_order
 - get_active_orders
@@ -3151,6 +3299,7 @@ def get_order_service(
 - serialize_order
 - serialize_orders
 - calculate_totals
+- apply_discount
 - add_item
 - add_product_to_table
 - update_status
@@ -3160,15 +3309,18 @@ def get_order_service(
 - cancel_payment
 - close_order
 - delete_order_item
+- update_item_quantity
 
 **Clases (1):**
 - OrderService
 
-**Imports (18):**
+**Imports (20):**
 - sqlalchemy.orm.Session
 - sqlalchemy.orm.joinedload
 - sqlalchemy.func
 - decimal.Decimal
+- decimal.ROUND_HALF_UP
+- logging
 - app.models.order.Order
 - app.models.order.OrderStatus
 - app.models.order_item.OrderItem
@@ -3180,14 +3332,15 @@ def get_order_service(
 - app.services.event_service.event_service
 - app.domain.order.order_transitions.is_valid_order_transition
 - app.domain.order.constants.ACTIVE_ORDER_STATUSES
-- app.domain.errors.OrderDomainError
-- app.domain.error_codes.ErrorCode
+- app.domain.errors.base.DomainError
+- app.domain.errors.error_codes.ErrorCode
 - app.domain.cash_register.cash_register_service.CashRegisterService
 
 ```python
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
+import logging
 
 from app.models.order import Order, OrderStatus
 from app.models.order_item import OrderItem, OrderItemStatus
@@ -3199,9 +3352,10 @@ from app.models.table import Table
 from app.services.event_service import event_service
 from app.domain.order.order_transitions import is_valid_order_transition
 from app.domain.order.constants import ACTIVE_ORDER_STATUSES
-from app.domain.errors import OrderDomainError
-from app.domain.error_codes import ErrorCode
+from app.domain.errors.base import DomainError
+from app.domain.errors.error_codes import ErrorCode
 
+logger = logging.getLogger("app.domain.order")
 
 class OrderService:
 
@@ -3224,7 +3378,7 @@ class OrderService:
             .first()
         )
         if not order:
-            raise OrderDomainError(
+            raise DomainError(
                 "Orden no encontrada",
                 ErrorCode.ORDER_NOT_FOUND
             )
@@ -3344,17 +3498,69 @@ class OrderService:
         return subtotal, total, total_paid, remaining
 
     # -------------------------
+    # Descuentos
+    # -------------------------
+
+    def apply_discount(self, order: Order, discount: Decimal):
+        if order.status == OrderStatus.CLOSED:
+            raise DomainError(
+                "Cannot apply discount to closed order",
+                ErrorCode.ORDER_ALREADY_CLOSED
+            )
+        if order.status == OrderStatus.CANCELLED:
+            raise DomainError(
+                "Cannot apply discount to cancelled order",
+                ErrorCode.INVALID_OPERATION
+            )
+        discount = discount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        subtotal, _, total_paid, _ = self.calculate_totals(order)
+        if discount > subtotal:
+            raise DomainError(
+                "Discount cannot exceed order subtotal",
+                ErrorCode.INVALID_OPERATION,
+                context={
+                    "discount": float(discount),
+                    "subtotal": float(subtotal)
+                }
+            )
+
+        new_total = subtotal - discount
+        if new_total < total_paid:
+            raise DomainError(
+                "Discount would make paid amount exceed order total",
+                ErrorCode.INVALID_OPERATION,
+                context={
+                    "discount": float(discount),
+                    "new_total": float(new_total),
+                    "total_paid": float(total_paid)
+                }
+            )
+        logger.info("Descuento aplicado order_id=%s discount=%s", order.id, discount)
+        order.discount = discount
+        self.db.commit()
+        self.db.refresh(order)
+
+        for role in [UserRole.WAITER, UserRole.CASHIER]:
+            event_service.emit_to_role(
+                order.restaurant_id,
+                role,
+                {"type": "ORDER_UPDATED", "order_id": order.id}
+            )
+
+        return self.serialize_order(order)
+
+    # -------------------------
     # Crear / agregar items
     # -------------------------
 
     def add_item(self, order: Order, product_id: int, quantity: int) -> OrderItem:
         if order.status == OrderStatus.CLOSED:
-            raise OrderDomainError(
+            raise DomainError(
                 "Cannot add items to closed order",
                 ErrorCode.ORDER_ALREADY_CLOSED
             )
         if quantity <= 0:
-            raise OrderDomainError(
+            raise DomainError(
                 "Quantity must be greater than zero",
                 ErrorCode.INVALID_OPERATION
             )
@@ -3370,7 +3576,7 @@ class OrderService:
             .first()
         )
         if not product:
-            raise OrderDomainError(
+            raise DomainError(
                 "Product not found",
                 ErrorCode.ITEM_NOT_FOUND,
                 context={"product_id": product_id}
@@ -3404,7 +3610,7 @@ class OrderService:
         self.db.refresh(item)
 
         previous_status = order.status
-        self.db.refresh(order)  # Trae la lista de items actualizada
+        self.db.refresh(order)
         self.recalculate_order_status(order)
 
         # =========================
@@ -3425,7 +3631,7 @@ class OrderService:
                 )
 
         for role in [UserRole.WAITER, UserRole.CASHIER]:
-            print("EVENT emit_to_role en ADD ITEM ORDER_UPDATED")
+            logger.debug("ORDER_UPDATED emit order_id=%s", order.id)
             event_service.emit_to_role(
                 order.restaurant_id,
                 role,
@@ -3438,7 +3644,7 @@ class OrderService:
     def add_product_to_table(self, restaurant_id: int, table_id: int, product_id: int, quantity: int):
         table = self.db.query(Table).filter(Table.id == table_id, Table.restaurant_id == restaurant_id).first()
         if not table:
-            raise OrderDomainError(
+            raise DomainError(
                 "Table not found",
                 ErrorCode.TABLE_NOT_FOUND
             )
@@ -3451,7 +3657,7 @@ class OrderService:
 
         product = self.db.query(Product).filter(Product.id == product_id, Product.restaurant_id == restaurant_id, Product.active).first()
         if not product:
-            raise OrderDomainError(
+            raise DomainError(
                 "Product not found",
                 ErrorCode.ITEM_NOT_FOUND,
                 context={"product_id": product_id}
@@ -3468,9 +3674,8 @@ class OrderService:
     def update_status(self, order: Order, new_status: OrderStatus):
         if order.status == new_status:
             return order
-
         if not is_valid_order_transition(order.status, new_status):
-            raise OrderDomainError(
+            raise DomainError(
                 "Invalid order status transition",
                 ErrorCode.INVALID_TRANSITION,
                 context={
@@ -3534,14 +3739,14 @@ class OrderService:
 
     def send_to_kitchen(self, order: Order):
         if order.status == OrderStatus.CLOSED:
-            raise OrderDomainError(
+            raise DomainError(
                 "Order is closed",
                 ErrorCode.ORDER_ALREADY_CLOSED
             )
 
         pending_items = [i for i in order.items if i.status == OrderItemStatus.PENDING]
         if not pending_items:
-            raise OrderDomainError(
+            raise DomainError(
                 "No pending items to send",
                 ErrorCode.NO_PENDING_ITEMS_TO_SEND
             )
@@ -3549,7 +3754,7 @@ class OrderService:
         previous_status = order.status
         for item in pending_items:
             item.status = OrderItemStatus.SENT
-
+        logger.info("Orden enviada a cocina order_id=%s r=%s", order.id, order.restaurant_id)
         self.recalculate_order_status(order)
         self.db.commit()
 
@@ -3593,17 +3798,17 @@ class OrderService:
         from app.domain.cash_register.cash_register_service import CashRegisterService
 
         if order.status == OrderStatus.CLOSED:
-            raise OrderDomainError(
+            raise DomainError(
                 "Order already closed",
                 ErrorCode.ORDER_ALREADY_CLOSED
             )
 
-        cash_service = CashRegisterService()
-        cash_register = cash_service.require_open_cash_register(self.db, order.restaurant_id)
+        cash_service = CashRegisterService(self.db)
+        cash_register = cash_service.require_open_cash_register(order.restaurant_id)
 
         subtotal, total, total_paid, remaining = self.calculate_totals(order)
         if amount > remaining:
-            raise OrderDomainError(
+            raise DomainError(
                 "Payment exceeds remaining balance",
                 ErrorCode.PAYMENT_EXCEEDS_REMAINING,
                 context={
@@ -3611,7 +3816,7 @@ class OrderService:
                     "remaining": float(remaining)
                 }
             )
-
+        logger.info("Pago agregado order_id=%s amount=%s method=%s", order.id, amount, method)
         payment = Payment(
             order_id=order.id,
             restaurant_id=order.restaurant_id,
@@ -3640,7 +3845,6 @@ class OrderService:
 
 
     def cancel_payment(self, restaurant_id: int, payment_id: int):
-        print("Id: ",payment_id)
         payment = (
             self.db.query(Payment)
             .filter(
@@ -3651,23 +3855,25 @@ class OrderService:
         )
 
         if not payment:
-            raise OrderDomainError(
+            raise DomainError(
                 "Pago no encontrado",
                 ErrorCode.PAYMENT_NOT_FOUND
                 )
 
         if payment.order.status == OrderStatus.CLOSED:
-            raise OrderDomainError(
+            raise DomainError(
                 "Cannot cancel payment from closed order",
                 ErrorCode.INVALID_OPERATION
             )
-
+        logger.info("Pago cancelado order_id=%s amount=%s method=%s", payment.order_id, payment.amount, payment.method)
         order_id = payment.order_id
         amount = payment.amount
         method = payment.method
 
         self.db.delete(payment)
         self.db.commit()
+
+        logger.debug("cancel_payment payment_id=%s", payment_id)
 
         for role in [UserRole.WAITER, UserRole.CASHIER]:
             event_service.emit_to_role(
@@ -3696,7 +3902,7 @@ class OrderService:
     def close_order(self, order: Order):
 
         if order.status == OrderStatus.CLOSED:
-            raise OrderDomainError(
+            raise DomainError(
                 "La orden ya está cerrada",
                 ErrorCode.ORDER_ALREADY_CLOSED
             )
@@ -3704,14 +3910,14 @@ class OrderService:
         subtotal, total, total_paid, remaining = self.calculate_totals(order)
 
         if remaining > 0:
-            raise OrderDomainError(
+            raise DomainError(
                 f"La orden no está paga. Saldo: {remaining:.2f}",
                 ErrorCode.ORDER_HAS_REMAINING_BALANCE,
                 context={"remaining": float(remaining)}
             )
 
         if not order.items:
-            raise OrderDomainError(
+            raise DomainError(
                 "La orden no tiene items",
                 ErrorCode.ORDER_EMPTY
             )
@@ -3719,12 +3925,12 @@ class OrderService:
         not_delivered = [i for i in order.items if i.status != OrderItemStatus.DELIVERED]
 
         if not_delivered:
-            raise OrderDomainError(
+            raise DomainError(
                 "No se puede cerrar la orden. Hay items no entregados",
                 ErrorCode.ORDER_ITEMS_NOT_DELIVERED,
                 context={"items": [i.id for i in not_delivered]}
             )
-
+        logger.info("Orden cerrada order_id=%s r=%s total=%s", order.id, order.restaurant_id, total)
         self.update_status(order, OrderStatus.CLOSED)
         order.closed_at = func.now()
         self.db.commit()
@@ -3755,7 +3961,6 @@ class OrderService:
         order_id: int,
         item_id: int,
     ):
-
         item = (
             self.db.query(OrderItem)
             .filter(
@@ -3764,31 +3969,27 @@ class OrderService:
             )
             .first()
         )
-
         if not item:
-            raise OrderDomainError(
+            raise DomainError(
                 "Item no encontrado",
                 ErrorCode.ITEM_NOT_FOUND,
                 context={"item": item_id}
             )
-
         if item.order_id != order_id:
-            raise OrderDomainError(
+            raise DomainError(
                 "Item no pertenece a la orden",
                 ErrorCode.ITEM_NOT_IN_ORDER,
                 context={
                     "item": item_id,
                     "order_id": order_id
                 }
-            )
-        
+            )       
         if item.status != OrderItemStatus.PENDING:
-            raise OrderDomainError(
+            raise DomainError(
                 "El item ya fue enviado a la cocina",
                 ErrorCode.ITEM_ALREADY_SENT,
                 context={"item": item.id}
             )
-
         order = (
             self.db.query(Order)
             .filter(
@@ -3812,6 +4013,49 @@ class OrderService:
             )
 
         return {"message": "Item eliminado"}
+
+    # -------------------------
+    # Actualizar cantidad por item de la orden
+    # -------------------------
+
+    def update_item_quantity(
+        self,
+        restaurant_id: int,
+        item_id: int,
+        quantity: int
+    ):
+        item = (
+            self.db.query(OrderItem)
+            .join(Order)
+            .filter(
+                OrderItem.id == item_id,
+                Order.restaurant_id == restaurant_id
+            )
+            .first()
+        )
+        if not item:
+            raise DomainError(
+                "order item not found",
+                ErrorCode.ITEM_NOT_FOUND
+            )
+
+        if item.status != OrderItemStatus.PENDING:
+            raise DomainError(
+                "cannot modify item already sent to kitchen",
+                ErrorCode.ITEM_ALREADY_SEND
+            )
+        if quantity <= 0:
+            return self.delete_order_item(
+                restaurant_id,
+                item.order_id,
+                item.id
+            )
+        item.quantity = quantity
+        self.db.commit()
+        return {
+            "id": item.id,
+            "quantity": item.quantity
+        }
 
 ```
 
@@ -3922,8 +4166,8 @@ def get_order_item_service(
 - app.models.order.OrderStatus
 - app.domain.order.order_service.OrderService
 - app.domain.order_item.order_item_transitions.can_transition
-- app.domain.errors.OrderItemDomainError
-- app.domain.error_codes.ErrorCode
+- app.domain.errors.base.DomainError
+- app.domain.errors.error_codes.ErrorCode
 - app.services.event_service.event_service
 
 ```python
@@ -3936,8 +4180,8 @@ from app.models.order import OrderStatus
 
 from app.domain.order.order_service import OrderService
 from app.domain.order_item.order_item_transitions import can_transition
-from app.domain.errors import OrderItemDomainError
-from app.domain.error_codes import ErrorCode
+from app.domain.errors.base import DomainError
+from app.domain.errors.error_codes import ErrorCode
 
 from app.services.event_service import event_service
 
@@ -3953,7 +4197,6 @@ class OrderItemService:
     # -------------------------
     
     def get_item(self, item_id: int, restaurant_id: int):
-
         item = (
             self.db.query(OrderItem)
             .filter(
@@ -3962,13 +4205,11 @@ class OrderItemService:
             )
             .first()
         )
-
         if not item:
-            raise OrderItemDomainError(
+            raise DomainError(
                 "Item no encontrado",
                 ErrorCode.ITEM_NOT_FOUND,
                 context={"Item:": item_id })
-
         return item
 
     # -------------------------
@@ -3982,16 +4223,19 @@ class OrderItemService:
         user: User
     ):
         item = self.get_item(item_id, user.restaurant_id)
+
+        order = item.order
         order_service = OrderService(self.db)
+
         previous_status = self.change_item_status(
             item,
             new_status,
             user,
             order_service
         )
+
         self.db.commit()
         self.db.refresh(item)
-        order = item.order
 
         # =========================
         # EVENTOS
@@ -4021,7 +4265,7 @@ class OrderItemService:
             payload
         )
 
-        # evento especial READY
+        # evento READY
         if new_status == OrderItemStatus.READY:
             event_service.emit_to_role(
                 order.restaurant_id,
@@ -4035,7 +4279,7 @@ class OrderItemService:
                 }
             )
 
-        # cambio de estado de orden
+        # cambio estado orden
         if order.status != previous_status:
             event_service.emit_to_role(
                 order.restaurant_id,
@@ -4046,6 +4290,7 @@ class OrderItemService:
                     "status": order.status.value
                 }
             )
+
         return item
     
     # -------------------------
@@ -4061,7 +4306,7 @@ class OrderItemService:
     ):
         order = item.order
         if order.status == OrderStatus.CLOSED:
-            raise OrderItemDomainError(
+            raise DomainError(
                 "No se pueden modificar items en una orden cerrada",
                 ErrorCode.ORDER_ALREADY_CLOSED,
                 context={"order_id": order.id}
@@ -4069,28 +4314,28 @@ class OrderItemService:
 
         # reglas por rol
         if new_status == OrderItemStatus.IN_PROGRESS and user.role != UserRole.KITCHEN:
-            raise OrderItemDomainError(
+            raise DomainError(
                 "Sólo COCINA puede comenzar items",
                 ErrorCode.ITEM_STATUS_ROLE_FORBIDDEN,
                 context={"required_role": "KITCHEN"}
             )
 
         if new_status == OrderItemStatus.READY and user.role != UserRole.KITCHEN:
-            raise OrderItemDomainError(
+            raise DomainError(
                 "Sólo COCINA puede marcar items como listos",
                 ErrorCode.ITEM_STATUS_ROLE_FORBIDDEN,
                 context={"required_role": "KITCHEN"}
             )
 
         if new_status == OrderItemStatus.DELIVERED and user.role != UserRole.WAITER:
-            raise OrderItemDomainError(
+            raise DomainError(
                 "Sólo MOZO puede entregar items",
                 ErrorCode.ITEM_STATUS_ROLE_FORBIDDEN,
                 context={"required_role": "WAITER"}
             )
 
         if not can_transition(item.status, new_status):
-            raise OrderItemDomainError(
+            raise DomainError(
                 f"Transición inválida desde {item.status.value} a {new_status.value}",
                 ErrorCode.ITEM_INVALID_TRANSITION,
                 context={
@@ -4201,8 +4446,8 @@ def get_product_service(
 - app.models.product.Product
 - app.schemas.product.ProductCreate
 - app.schemas.product.ProductUpdate
-- app.domain.errors.ProductDomainError
-- app.domain.error_codes.ErrorCode
+- app.domain.errors.base.DomainError
+- app.domain.errors.error_codes.ErrorCode
 
 ```python
 from sqlalchemy.orm import Session, joinedload
@@ -4210,8 +4455,8 @@ from sqlalchemy.orm import Session, joinedload
 from app.models.product import Product
 from app.schemas.product import ProductCreate, ProductUpdate
 
-from app.domain.errors import ProductDomainError
-from app.domain.error_codes import ErrorCode
+from app.domain.errors.base import DomainError
+from app.domain.errors.error_codes import ErrorCode
 
 
 class ProductService:
@@ -4229,7 +4474,7 @@ class ProductService:
             Product.restaurant_id == restaurant_id
         ).first()
         if not product:
-            raise ProductDomainError(
+            raise DomainError(
                 "Product not found",
                 ErrorCode.PRODUCT_NOT_FOUND,
                 context={"product_id": product_id})
@@ -4325,7 +4570,7 @@ def get_station_service(
 
 ### .\backend\app\domain\stations\station_service.py
 
-**Funciones (7):**
+**Funciones (8):**
 - __init__
 - create_station
 - list_stations
@@ -4333,22 +4578,32 @@ def get_station_service(
 - get_station
 - update_station
 - toggle_station
+- get_station_items
 
 **Clases (1):**
 - StationService
 
-**Imports (5):**
+**Imports (9):**
 - sqlalchemy.orm.Session
 - sqlalchemy.orm.joinedload
 - app.models.production_station.ProductionStation
-- app.domain.errors.StationDomainError
-- app.domain.error_codes.ErrorCode
+- app.models.order_item.OrderItem
+- app.models.order_item.OrderItemStatus
+- app.models.product.Product
+- app.models.order.Order
+- app.domain.errors.base.DomainError
+- app.domain.errors.error_codes.ErrorCode
 
 ```python
 from sqlalchemy.orm import Session, joinedload
 from app.models.production_station import ProductionStation
-from app.domain.errors import StationDomainError
-from app.domain.error_codes import ErrorCode
+
+from app.models.order_item import OrderItem, OrderItemStatus
+from app.models.product import Product
+from app.models.order import Order
+
+from app.domain.errors.base import DomainError
+from app.domain.errors.error_codes import ErrorCode
 
 
 class StationService:
@@ -4370,7 +4625,7 @@ class StationService:
             .first()
         )
         if existing:
-            raise StationDomainError(
+            raise DomainError(
                 "Station name already exists",
                 code=ErrorCode.STATION_NAME_ALREADY_EXISTS,
                 context={"name": name}
@@ -4406,7 +4661,7 @@ class StationService:
             self.db.query(ProductionStation)
             .filter(
                 ProductionStation.restaurant_id == restaurant_id,
-                ProductionStation.active == True
+                ProductionStation.active.is_(True)
             )
             .order_by(ProductionStation.name)
             .all()
@@ -4426,7 +4681,7 @@ class StationService:
             .first()
         )
         if not station:
-            raise StationDomainError(
+            raise DomainError(
                 "Station not found",
                 code=ErrorCode.STATION_NOT_FOUND
             )
@@ -4448,7 +4703,7 @@ class StationService:
             .first()
         )
         if existing:
-            raise StationDomainError(
+            raise DomainError(
                 "Station name already exists",
                 code=ErrorCode.STATION_NAME_ALREADY_EXISTS
             )
@@ -4467,6 +4722,43 @@ class StationService:
         self.db.commit()
         self.db.refresh(station)
         return station
+
+    # -------------------------
+    # Para cambiar a otro service a la brevedad
+    # -------------------------
+
+    def get_station_items(self, restaurant_id: int, station_id: int):
+        items = (
+            self.db.query(OrderItem)
+            .join(OrderItem.product)
+            .join(Product.station)
+            .join(OrderItem.order)
+            .join(Order.table)
+            .filter(
+                Product.station_id == station_id,
+                OrderItem.restaurant_id == restaurant_id,
+                OrderItem.status.in_([
+                    OrderItemStatus.SENT,
+                    OrderItemStatus.IN_PROGRESS
+                ])
+            )
+            .order_by(Order.created_at)
+            .all()
+        )
+
+        result = []
+
+        for item in items:
+            result.append({
+                "item_id": item.id,
+                "product_name": item.product.name,
+                "quantity": item.quantity,
+                "status": item.status,
+                "table_number": item.order.table.number,
+                "order_id": item.order.id
+            })
+
+        return result
 ```
 
 ---
@@ -4515,7 +4807,7 @@ def get_table_service(db: Session = Depends(get_db)):
 **Clases (1):**
 - TableService
 
-**Imports (9):**
+**Imports (10):**
 - sqlalchemy.orm.Session
 - sqlalchemy.orm.joinedload
 - sqlalchemy.func
@@ -4523,8 +4815,9 @@ def get_table_service(db: Session = Depends(get_db)):
 - app.models.order.Order
 - app.schemas.table.TablePositionUpdate
 - app.domain.order.constants.ACTIVE_ORDER_STATUSES
-- app.domain.errors.TableDomainError
-- app.domain.error_codes.ErrorCode
+- app.domain.errors.base.DomainError
+- app.domain.errors.error_codes.ErrorCode
+- logging
 
 ```python
 from sqlalchemy.orm import Session, joinedload
@@ -4535,8 +4828,13 @@ from app.models.order import Order
 from app.schemas.table import TablePositionUpdate
 
 from app.domain.order.constants import ACTIVE_ORDER_STATUSES
-from app.domain.errors import TableDomainError
-from app.domain.error_codes import ErrorCode
+
+from app.domain.errors.base import DomainError
+from app.domain.errors.error_codes import ErrorCode
+
+import logging
+
+logger = logging.getLogger("app.domain.table")
 
 
 class TableService:
@@ -4632,10 +4930,11 @@ class TableService:
             query = query.filter(Table.active.is_(True))
         table = query.first()
         if not table:
-            raise TableDomainError(
+            raise DomainError(
                 "Table not found",
-                ErrorCode.TABLE_NOT_FOUND,
-                context={"table_id": table_id})
+                code=ErrorCode.TABLE_NOT_FOUND,
+                context={"table_id": table_id}
+            )
         return table
 
     # -------------------------
@@ -4643,10 +4942,35 @@ class TableService:
     # -------------------------
 
     def create_table(self, restaurant_id, table_in):
-        max_number = self.db.query(func.max(Table.number)).filter(
-            Table.restaurant_id == restaurant_id
-        ).scalar()
-        new_number = (max_number or 0) + 1
+        new_number = table_in.number
+
+        if new_number is None:
+            max_number = self.db.query(func.max(Table.number)).filter(
+                Table.restaurant_id == restaurant_id
+            ).scalar()
+            new_number = (max_number or 0) + 1
+
+        if new_number <= 0:
+            raise DomainError(
+                "Table number must be greater than zero",
+                code=ErrorCode.INVALID_OPERATION,
+                context={"number": new_number}
+            )
+
+        existing = self.db.query(Table).filter(
+            Table.restaurant_id == restaurant_id,
+            Table.number == new_number
+        ).first()
+        if existing:
+            raise DomainError(
+                "Table number already exists",
+                code=ErrorCode.TABLE_NUMBER_ALREADY_EXISTS,
+                context={
+                    "number": new_number,
+                    "active": existing.active
+                }
+            )
+        logger.info("Mesa creada r=%s number=%s", restaurant_id, new_number)
         table = Table(
             restaurant_id=restaurant_id,
             number=new_number,
@@ -4665,8 +4989,32 @@ class TableService:
     # -------------------------
 
     def update_table(self, restaurant_id, table_id, table_in):
-        table = self._get_table(restaurant_id, table_id, active_only=True)
-        update_data = table_in.dict(exclude_unset=True)
+        table = self._get_table(restaurant_id, table_id)
+        update_data = table_in.model_dump(exclude_unset=True)
+
+        new_number = update_data.get("number")
+        if new_number is not None:
+            if new_number <= 0:
+                raise DomainError(
+                    "Table number must be greater than zero",
+                    code=ErrorCode.INVALID_OPERATION,
+                    context={"number": new_number}
+                )
+            existing = self.db.query(Table).filter(
+                Table.restaurant_id == restaurant_id,
+                Table.number == new_number,
+                Table.id != table_id
+            ).first()
+            if existing:
+                raise DomainError(
+                    "Table number already exists",
+                    code=ErrorCode.TABLE_NUMBER_ALREADY_EXISTS,
+                    context={
+                        "number": new_number,
+                        "active": existing.active
+                    }
+                )
+
         for field, value in update_data.items():
             setattr(table, field, value)
         self.db.commit()
@@ -4682,13 +5030,15 @@ class TableService:
         restaurant_id: int,
         table_id: int,
         data: TablePositionUpdate
-    ) -> None:
+    ) -> Table:
         table = self._get_table(restaurant_id, table_id, active_only=True)
 
         table.x = data.x
         table.y = data.y
 
         self.db.commit()
+        self.db.refresh(table)
+        return table
 
     # -------------------------
     # Desactivar mesa
@@ -4696,6 +5046,7 @@ class TableService:
 
     def deactivate_table(self, restaurant_id, table_id):
         table = self._get_table(restaurant_id, table_id, active_only=True)
+        logger.info("Mesa desactivada r=%s table_id=%s", restaurant_id, table_id)
         table.active = False
         self.db.commit()
         return {"message": "Table deactivated"}
@@ -4705,7 +5056,8 @@ class TableService:
     # -------------------------
 
     def activate_table(self, restaurant_id, table_id):
-        table = self._get_table(restaurant_id, table_id, active_only=True)
+        table = self._get_table(restaurant_id, table_id)
+        logger.info("Mesa activada r=%s table_id=%s", restaurant_id, table_id)
         table.active = True
         self.db.commit()
         return {"message": "Table activated"}    
@@ -4716,11 +5068,6 @@ class TableService:
 
     def touch_table(self, restaurant_id: int, table_id: int):
         table = self._get_table(restaurant_id, table_id, active_only=True)
-        if not table:
-            raise TableDomainError(
-                "Table not found",
-                ErrorCode.TABLE_NOT_FOUND,
-                context={"table_id": table_id})
         order = self.db.query(Order).filter(
             Order.table_id == table_id,
             Order.restaurant_id == restaurant_id,
@@ -4731,6 +5078,7 @@ class TableService:
             "table_number": table.number,
             "order_id": order.id if order else None
         }
+
 ```
 
 ---
@@ -4784,8 +5132,8 @@ def get_user_service(
 - app.schemas.user.UserCreate
 - app.schemas.user.UserUpdate
 - app.core.security.get_password_hash
-- app.domain.errors.UserDomainError
-- app.domain.error_codes.ErrorCode
+- app.domain.errors.base.DomainError
+- app.domain.errors.error_codes.ErrorCode
 
 ```python
 from sqlalchemy.orm import Session
@@ -4794,8 +5142,8 @@ from app.models.user import User
 from app.schemas.user import UserCreate, UserUpdate
 from app.core.security import get_password_hash
 
-from app.domain.errors import UserDomainError
-from app.domain.error_codes import ErrorCode
+from app.domain.errors.base import DomainError
+from app.domain.errors.error_codes import ErrorCode
 
 
 class UserService:
@@ -4808,18 +5156,15 @@ class UserService:
     # -------------------------
 
     def get_user(self, user_id: int, restaurant_id: int):
-
         user = self.db.query(User).filter(
             User.id == user_id,
             User.restaurant_id == restaurant_id
         ).first()
-
         if not user:
-            raise UserDomainError(
+            raise DomainError(
                 "User not found",
-                ErrorCode.USER_NOT_FOUND
+                code=ErrorCode.USER_NOT_FOUND
             )
-
         return user
 
 
@@ -4828,7 +5173,6 @@ class UserService:
     # -------------------------
 
     def list_users(self, restaurant_id: int):
-
         return (
             self.db.query(User)
             .filter(User.restaurant_id == restaurant_id)
@@ -4842,21 +5186,17 @@ class UserService:
     # -------------------------
 
     def create_user(self, restaurant_id: int, data: UserCreate):
-
         existing = self.db.query(User).filter(
             User.restaurant_id == restaurant_id,
             User.username == data.username
         ).first()
-
         if existing:
-            raise UserDomainError(
+            raise DomainError(
                 "User exists",
                 ErrorCode.USERNAME_ALREADY_EXISTS,
                 context={"username": data.username}
             )
-
         hashed = get_password_hash(data.password)
-
         user = User(
             username=data.username,
             password_hash=hashed,
@@ -4864,11 +5204,9 @@ class UserService:
             restaurant_id=restaurant_id,
             active=True
         )
-
         self.db.add(user)
         self.db.commit()
         self.db.refresh(user)
-
         return user
 
 
@@ -4877,35 +5215,26 @@ class UserService:
     # -------------------------
 
     def update_user(self, user_id: int, restaurant_id: int, data: UserUpdate):
-
         user = self.get_user(user_id, restaurant_id)
-
         if data.username is not None:
-
             existing = self.db.query(User).filter(
                 User.restaurant_id == restaurant_id,
                 User.username == data.username,
                 User.id != user_id
             ).first()
-
             if existing:
-                raise UserDomainError(
+                raise DomainError(
                     "User exists",
                     ErrorCode.USERNAME_ALREADY_EXISTS,
                     context={"username": data.username}
                 )
-
             user.username = data.username
-
         if data.role is not None:
             user.role = data.role
-
         if data.password is not None:
             user.password_hash = get_password_hash(data.password)
-
         self.db.commit()
         self.db.refresh(user)
-
         return user
 
 
@@ -4914,14 +5243,10 @@ class UserService:
     # -------------------------
 
     def toggle_user(self, user_id: int, restaurant_id: int):
-
         user = self.get_user(user_id, restaurant_id)
-
         user.active = not user.active
-
         self.db.commit()
         self.db.refresh(user)
-
         return user
 ```
 
@@ -5140,6 +5465,11 @@ class CashRegister(Base):
         nullable=False
     )
 
+    closing_amount = Column(
+        Numeric(10,2),
+        nullable=True
+    )
+
     expected_cash = Column(
         Numeric(10,2),
         nullable=True
@@ -5176,6 +5506,7 @@ class CashRegister(Base):
         back_populates="cash_register",
         cascade="all, delete-orphan"
     )
+
 ```
 
 ---
@@ -5402,7 +5733,6 @@ class OrderItem(Base):
 
     id = Column(Integer, primary_key=True)
 
-    # 🔥 MULTI-TENANT
     restaurant_id = Column(
         Integer,
         ForeignKey("restaurants.id"),
@@ -5910,13 +6240,14 @@ from .cash_movement import CashMovement
 
 **Clases (0):**
 
-**Imports (13):**
+**Imports (14):**
 - fastapi.APIRouter
 - fastapi.Depends
 - fastapi.HTTPException
 - fastapi.status
 - sqlalchemy.orm.Session
 - fastapi.security.OAuth2PasswordRequestForm
+- logging
 - app.db.session.get_db
 - app.models.user.User
 - app.schemas.auth.TokenResponse
@@ -5929,6 +6260,7 @@ from .cash_movement import CashMovement
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
+import logging
 
 from app.db.session import get_db
 from app.models.user import User
@@ -5937,6 +6269,7 @@ from app.schemas.user import UserOut
 from app.core.security import create_access_token, verify_password
 from app.dependencies.auth import get_current_user
 
+logger = logging.getLogger("app.routers.auth")
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -5951,11 +6284,18 @@ def login(
     ).first()
 
     if not user or not verify_password(form_data.password, user.password_hash):
+        logger.warning("Login fallido username=%s", form_data.username)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciales inválidas"
         )
 
+    if not user.active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuario desactivado"
+        )
+    logger.info("Login exitoso user=%s r=%s", user.id, user.restaurant_id)
     token = create_access_token({
         "sub": str(user.id),
         "role": user.role.value,
@@ -5989,15 +6329,13 @@ def get_me(
 
 **Clases (0):**
 
-**Imports (18):**
+**Imports (16):**
 - fastapi.APIRouter
 - fastapi.Depends
-- fastapi.HTTPException
-- sqlalchemy.orm.Session
-- app.db.session.get_db
 - app.models.user.User
+- app.models.user.UserRole
 - app.dependencies.auth.get_current_user
-- app.domain.errors.CashRegisterDomainError
+- app.dependencies.permissions.require_roles
 - app.schemas.cash_register.CashRegisterOpen
 - app.schemas.cash_register.CashRegisterSummary
 - app.schemas.cash_register.CashRegisterCloseOut
@@ -6010,13 +6348,12 @@ def get_me(
 - app.domain.cash_register.dependencies.get_cash_movement_service
 
 ```python
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends
 
-from app.db.session import get_db
-from app.models.user import User
+from app.models.user import User, UserRole
+
 from app.dependencies.auth import get_current_user
-from app.domain.errors import CashRegisterDomainError
+from app.dependencies.permissions import require_roles
 
 from app.schemas.cash_register import (
     CashRegisterOpen,
@@ -6034,6 +6371,7 @@ from app.domain.cash_register.dependencies import (
     get_cash_movement_service
 )
 
+
 router = APIRouter(
     prefix="/cash-register",
     tags=["cash-register"]
@@ -6043,96 +6381,72 @@ router = APIRouter(
 @router.post("/open")
 def open_cash_register(
     data: CashRegisterOpen,
-    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.CASHIER)),
     service: CashRegisterService = Depends(get_cash_register_service),
-    user: User = Depends(get_current_user)
 ):
-    try:
-        return service.open_cash_register(
-            db=db,
-            restaurant_id=user.restaurant_id,
-            user_id=user.id,
-            opening_amount=data.opening_amount
-        )
-    except CashRegisterDomainError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    return service.open_cash_register(
+        restaurant_id=user.restaurant_id,
+        user_id=user.id,
+        opening_amount=data.opening_amount
+    )
 
 
 @router.post("/close", response_model=CashRegisterCloseOut)
 def close_cash_register(
     payload: CashRegisterClose,
-    db: Session = Depends(get_db),
-    service: CashRegisterService = Depends(get_cash_register_service),
-    user: User = Depends(get_current_user)
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.CASHIER)),
+    service: CashRegisterService = Depends(get_cash_register_service)   
 ):
-    try:
-        return service.close_cash_register(
-            db=db,
-            restaurant_id=user.restaurant_id,
-            user_id=user.id,
-            counted_cash=payload.counted_cash
-        )
-    except CashRegisterDomainError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    return service.close_cash_register(
+        restaurant_id=user.restaurant_id,
+        user_id=user.id,
+        counted_cash=payload.counted_cash
+    )
 
 
 @router.post("/movements")
 def create_cash_movement(
     payload: CashMovementCreate,
-    db: Session = Depends(get_db),
-    service: CashMovementService = Depends(get_cash_movement_service),
-    user: User = Depends(get_current_user)
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.CASHIER)),
+    service: CashMovementService = Depends(get_cash_movement_service)
 ):
-    try:
-        return service.create_cash_movement(
-            db=db,
-            restaurant_id=user.restaurant_id,
-            user_id=user.id,
-            movement_type=payload.type,
-            amount=payload.amount,
-            reason=payload.reason
-        )
-    except CashRegisterDomainError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    return service.create_cash_movement(
+        restaurant_id=user.restaurant_id,
+        user_id=user.id,
+        movement_type=payload.type,
+        amount=payload.amount,
+        reason=payload.reason
+    )
 
 
 @router.delete("/movements/{movement_id}")
 def delete_cash_movement(
     movement_id: int,
-    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.CASHIER)),
     service: CashMovementService = Depends(get_cash_movement_service),
-    user: User = Depends(get_current_user)
 ):
-    try:
-        return service.delete_cash_movement(
-            db=db,
-            restaurant_id=user.restaurant_id,
-            movement_id=movement_id
-        )
-    except CashRegisterDomainError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    return service.delete_cash_movement(
+        restaurant_id=user.restaurant_id,
+        movement_id=movement_id
+    )
 
 
 @router.get("/current", response_model=CashRegisterSummary | None)
 def current_cash_register(
-    db: Session = Depends(get_db),
     service: CashRegisterService = Depends(get_cash_register_service),
-    user: User = Depends(get_current_user)
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.CASHIER))
 ):
     return service.get_current_cash_register(
-        db=db,
         restaurant_id=user.restaurant_id
     )
 
 
 @router.get("/dashboard", response_model=CashRegisterDashboard | None)
 def get_cash_register_dashboard(
-    db: Session = Depends(get_db),
     service: CashRegisterService = Depends(get_cash_register_service),
-    user: User = Depends(get_current_user)
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.CASHIER))
 ):
     return service.get_dashboard(
-        db=db,
         restaurant_id=user.restaurant_id
     )
 ```
@@ -6150,26 +6464,29 @@ def get_cash_register_dashboard(
 
 **Clases (0):**
 
-**Imports (9):**
+**Imports (11):**
 - fastapi.APIRouter
 - fastapi.Depends
 - app.dependencies.auth.get_current_user
 - app.models.user.User
+- app.models.user.UserRole
 - app.schemas.category.CategoryResponse
 - app.schemas.category.CategoryCreate
 - app.schemas.category.CategoryWithProducts
 - app.domain.category.category_service.CategoryService
 - app.domain.category.dependencies.get_category_service
+- app.dependencies.permissions.require_roles
 
 ```python
 from fastapi import APIRouter, Depends
 
 from app.dependencies.auth import get_current_user
-from app.models.user import User
+from app.models.user import User, UserRole
 
 from app.schemas.category import CategoryResponse, CategoryCreate, CategoryWithProducts
 from app.domain.category.category_service import CategoryService
 from app.domain.category.dependencies import get_category_service
+from app.dependencies.permissions import require_roles
 
 
 router = APIRouter(prefix="/categories", tags=["categories"])
@@ -6178,7 +6495,7 @@ router = APIRouter(prefix="/categories", tags=["categories"])
 @router.post("/", response_model=CategoryResponse)
 def create_category(
     data: CategoryCreate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN)),
     service: CategoryService = Depends(get_category_service)
 ):
     return service.create_category(user.restaurant_id, data.name)
@@ -6186,7 +6503,7 @@ def create_category(
 
 @router.get("/", response_model=list[CategoryResponse])
 def list_categories(
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.WAITER)),
     service: CategoryService = Depends(get_category_service)
 ):
     return service.list_categories(user.restaurant_id)
@@ -6194,7 +6511,7 @@ def list_categories(
 
 @router.get("/with-products", response_model=list[CategoryWithProducts])
 def list_categories_with_products(
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.WAITER)),
     service: CategoryService = Depends(get_category_service)
 ):
     return service.list_categories_with_products(user.restaurant_id)
@@ -6204,7 +6521,7 @@ def list_categories_with_products(
 def update_category(
     category_id: int,
     data: CategoryCreate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN)),
     service: CategoryService = Depends(get_category_service)
 ):
     return service.update_category(user.restaurant_id, category_id, data.name)
@@ -6213,7 +6530,7 @@ def update_category(
 @router.delete("/{category_id}")
 def delete_category(
     category_id: int,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN)),
     service: CategoryService = Depends(get_category_service)
 ):
     service.delete_category(user.restaurant_id, category_id)
@@ -6233,11 +6550,13 @@ def delete_category(
 
 **Clases (0):**
 
-**Imports (9):**
+**Imports (11):**
 - fastapi.APIRouter
 - fastapi.Depends
 - app.models.user.User
+- app.models.user.UserRole
 - app.dependencies.auth.get_current_user
+- app.dependencies.permissions.require_roles
 - app.schemas.order.order_item.OrderItemStatusUpdate
 - app.schemas.order.order_item.OrderItemOut
 - app.schemas.order.kitchen.KitchenItemOut
@@ -6247,14 +6566,15 @@ def delete_category(
 ```python
 from fastapi import APIRouter, Depends
 
-from app.models.user import User
+from app.models.user import User, UserRole
+
 from app.dependencies.auth import get_current_user
+from app.dependencies.permissions import require_roles
 
 from app.schemas.order.order_item import (
     OrderItemStatusUpdate,
     OrderItemOut
 )
-
 from app.schemas.order.kitchen import KitchenItemOut
 
 from app.domain.kitchen.dependencies import get_kitchen_service
@@ -6274,7 +6594,7 @@ router = APIRouter(
 )
 def get_station_items(
     station_id: int,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.KITCHEN)),
     service: KitchenService = Depends(get_kitchen_service)
 ):
     return service.get_station_items(
@@ -6291,7 +6611,7 @@ def get_station_items(
 def update_item_status(
     item_id: int,
     data: OrderItemStatusUpdate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.KITCHEN)),
     service: KitchenService = Depends(get_kitchen_service)
 ):
     item = service.update_item_status(
@@ -6319,31 +6639,38 @@ def update_item_status(
 
 **Clases (0):**
 
-**Imports (8):**
+**Imports (10):**
 - fastapi.APIRouter
 - fastapi.Depends
 - app.schemas.layout.LayoutOut
 - app.schemas.layout.LayoutUpdate
 - app.dependencies.auth.get_current_user
+- app.dependencies.permissions.require_roles
 - app.domain.layout.dependencies.get_layout_service
 - app.domain.layout.layout_service.LayoutService
 - app.models.user.User
+- app.models.user.UserRole
 
 ```python
 from fastapi import APIRouter, Depends
 
 from app.schemas.layout import LayoutOut, LayoutUpdate
+
 from app.dependencies.auth import get_current_user
+from app.dependencies.permissions import require_roles
+
 from app.domain.layout.dependencies import get_layout_service
 from app.domain.layout.layout_service import LayoutService
-from app.models.user import User
+
+from app.models.user import User, UserRole
+
 
 router = APIRouter(prefix="/layout", tags=["layout"])
 
 
 @router.get("/", response_model=LayoutOut)
 def get_layout(
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.WAITER)),
     service: LayoutService = Depends(get_layout_service)
 ):
     return service.get_layout(user.restaurant_id)
@@ -6352,7 +6679,7 @@ def get_layout(
 @router.patch("/", response_model=LayoutUpdate)
 def update_layout(
     data: LayoutUpdate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN)),
     service: LayoutService = Depends(get_layout_service)
 ):
     return service.update_layout(
@@ -6365,52 +6692,53 @@ def update_layout(
 
 ### .\backend\app\routers\orders.py
 
-**Funciones (10):**
-- get_order_service
+**Funciones (11):**
 - add_item_to_order
 - send_to_kitchen
 - add_payment
+- apply_discount
 - close_order
 - get_active_orders
 - get_order
 - update_order_status
+- update_order_item_quantity
 - delete_order_item
 - cancel_payment
 
 **Clases (0):**
 
 **Imports (12):**
+- decimal.Decimal
 - fastapi.APIRouter
 - fastapi.Depends
-- sqlalchemy.orm.Session
-- app.db.session.get_db
+- fastapi.Query
 - app.models.user.User
-- app.models.payment.Payment
-- app.dependencies.auth.get_current_user
+- app.models.user.UserRole
+- app.dependencies.permissions.require_roles
 - app.schemas.order.order_item.OrderItemCreate
 - app.schemas.order.payment.PaymentCreate
 - app.schemas.order.order.OrderStatusUpdate
 - app.domain.order.order_service.OrderService
-- app.domain.order.order_service.OrderDomainError
+- app.domain.order.dependencies.get_order_service
 
 ```python
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from decimal import Decimal
+from fastapi import APIRouter, Depends, Query
 
-from app.db.session import get_db
-from app.models.user import User
-from app.models.payment import Payment
-from app.dependencies.auth import get_current_user
+from app.models.user import User, UserRole
+
+from app.dependencies.permissions import require_roles
+
 from app.schemas.order.order_item import OrderItemCreate
 from app.schemas.order.payment import PaymentCreate
 from app.schemas.order.order import OrderStatusUpdate
 
-from app.domain.order.order_service import OrderService, OrderDomainError
+from app.domain.order.order_service import OrderService
+from app.domain.order.dependencies import get_order_service
+
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
-def get_order_service(db: Session = Depends(get_db)):
-    return OrderService(db)
 
 # -------------------------
 # Agregar item
@@ -6419,7 +6747,7 @@ def get_order_service(db: Session = Depends(get_db)):
 def add_item_to_order(
     order_id: int,
     item: OrderItemCreate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.WAITER)),
     service: OrderService = Depends(get_order_service)
 ):
     order = service.get_order(order_id, user.restaurant_id)
@@ -6431,7 +6759,7 @@ def add_item_to_order(
 @router.post("/{order_id}/send-to-kitchen")
 def send_to_kitchen(
     order_id: int,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.WAITER)),
     service: OrderService = Depends(get_order_service)
 ):
     order = service.get_order(order_id, user.restaurant_id)
@@ -6444,11 +6772,24 @@ def send_to_kitchen(
 def add_payment(
     order_id: int,
     payment: PaymentCreate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER)),
     service: OrderService = Depends(get_order_service)
 ):
     order = service.get_order(order_id, user.restaurant_id)
     return service.add_payment(order, payment.amount, payment.method)
+
+# -------------------------
+# Aplicar descuento
+# -------------------------
+@router.put("/{order_id}/discount")
+def apply_discount(
+    order_id: int,
+    discount: Decimal = Query(..., ge=0),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER)),
+    service: OrderService = Depends(get_order_service)
+):
+    order = service.get_order(order_id, user.restaurant_id)
+    return service.apply_discount(order, discount)
 
 # -------------------------
 # Cerrar orden
@@ -6456,7 +6797,7 @@ def add_payment(
 @router.post("/{order_id}/close")
 def close_order(
     order_id: int,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER)),
     service: OrderService = Depends(get_order_service)
 ):
     order = service.get_order(order_id, user.restaurant_id)
@@ -6467,7 +6808,13 @@ def close_order(
 # -------------------------
 @router.get("/active")
 def get_active_orders(
-    user: User = Depends(get_current_user),
+    user: User = Depends(
+    require_roles(
+        UserRole.ADMIN,
+        UserRole.WAITER,
+        UserRole.KITCHEN,
+        UserRole.CASHIER
+    )),
     service: OrderService = Depends(get_order_service)
 ):
     return service.serialize_orders(user.restaurant_id)
@@ -6478,7 +6825,13 @@ def get_active_orders(
 @router.get("/{order_id}")
 def get_order(
     order_id: int,
-    user: User = Depends(get_current_user),
+    user: User = Depends(
+    require_roles(
+        UserRole.ADMIN,
+        UserRole.WAITER,
+        UserRole.KITCHEN,
+        UserRole.CASHIER
+    )),
     service: OrderService = Depends(get_order_service)
 ):
     order = service.get_order(order_id, user.restaurant_id)
@@ -6491,11 +6844,33 @@ def get_order(
 def update_order_status(
     order_id: int,
     data: OrderStatusUpdate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(
+    require_roles(
+        UserRole.ADMIN,
+        UserRole.WAITER,
+        UserRole.KITCHEN,
+        UserRole.CASHIER
+    )),
     service: OrderService = Depends(get_order_service)
 ):
     order = service.get_order(order_id, user.restaurant_id)
     return service.update_status(order, data.status)
+
+# -------------------------
+# Actualizar cantidad de item
+# -------------------------
+@router.patch("/order-items/{item_id}")
+def update_order_item_quantity(
+    item_id: int,
+    quantity: int,
+    service: OrderService = Depends(get_order_service),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.WAITER))
+):
+    return service.update_item_quantity(
+        restaurant_id=user.restaurant_id,
+        item_id=item_id,
+        quantity=quantity
+    )
 
 # -------------------------
 # Borrar item de orden
@@ -6504,7 +6879,7 @@ def update_order_status(
 def delete_order_item(
     order_id: int,
     item_id: int,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.WAITER)),
     service: OrderService = Depends(get_order_service)
 ):
     service.delete_order_item(user.restaurant_id, order_id, item_id)
@@ -6516,11 +6891,12 @@ def delete_order_item(
 @router.delete("/payments/{payment_id}")
 def cancel_payment(
     payment_id: int,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER)),
     service: OrderService = Depends(get_order_service)
 ):
     service.cancel_payment(user.restaurant_id, payment_id)
     return {"ok": True}
+
 ```
 
 ---
@@ -6534,25 +6910,27 @@ def cancel_payment(
 **Imports (9):**
 - fastapi.APIRouter
 - fastapi.Depends
-- sqlalchemy.orm.Session
-- app.db.session.get_db
 - app.models.user.User
 - app.models.user.UserRole
 - app.dependencies.auth.get_current_user
+- app.dependencies.permissions.require_roles
 - app.schemas.order.order_item.OrderItemStatusUpdate
 - app.domain.order_item.order_item_service.OrderItemService
+- app.domain.order_item.dependencies.get_order_item_service
 
 ```python
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
 
-from app.db.session import get_db
 from app.models.user import User, UserRole
+
 from app.dependencies.auth import get_current_user
+from app.dependencies.permissions import require_roles
 
 from app.schemas.order.order_item import OrderItemStatusUpdate
 
 from app.domain.order_item.order_item_service import OrderItemService
+
+from app.domain.order_item.dependencies import get_order_item_service
 
 router = APIRouter(
     prefix="/order-items",
@@ -6563,22 +6941,14 @@ router = APIRouter(
 async def update_item_status(
     item_id: int,
     data: OrderItemStatusUpdate,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.WAITER, UserRole.KITCHEN)),
+    service: OrderItemService = Depends(get_order_item_service)
 ):
-
-    service = OrderItemService(db)
-
-    item = service.update_status(
+    return service.update_status(
         item_id=item_id,
         new_status=data.status,
         user=user
     )
-
-    return {
-        "item_id": item.id,
-        "new_status": item.status
-    }
 ```
 
 ---
@@ -6593,26 +6963,31 @@ async def update_item_status(
 
 **Clases (0):**
 
-**Imports (8):**
+**Imports (10):**
 - fastapi.APIRouter
 - fastapi.Depends
 - app.models.user.User
+- app.models.user.UserRole
 - app.schemas.product.ProductCreate
 - app.schemas.product.ProductUpdate
 - app.dependencies.auth.get_current_user
+- app.dependencies.permissions.require_roles
 - app.domain.product.product_service.ProductService
 - app.domain.product.dependencies.get_product_service
 
 ```python
 from fastapi import APIRouter, Depends
 
-from app.models.user import User
+from app.models.user import User, UserRole
+
 from app.schemas.product import ProductCreate, ProductUpdate
 
 from app.dependencies.auth import get_current_user
+from app.dependencies.permissions import require_roles
 
 from app.domain.product.product_service import ProductService
 from app.domain.product.dependencies import get_product_service
+
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -6620,7 +6995,7 @@ router = APIRouter(prefix="/products", tags=["products"])
 @router.post("/")
 def create_product(
     product: ProductCreate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN)),
     service: ProductService = Depends(get_product_service)
 ):
     return service.create_product(
@@ -6631,7 +7006,7 @@ def create_product(
 
 @router.get("/")
 def list_products(
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.WAITER)),
     service: ProductService = Depends(get_product_service)
 ):
 
@@ -6642,10 +7017,9 @@ def list_products(
 def update_product(
     product_id: int,
     product: ProductUpdate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN)),
     service: ProductService = Depends(get_product_service)
 ):
-
     return service.update_product(
         product_id,
         user.restaurant_id,
@@ -6656,10 +7030,9 @@ def update_product(
 @router.patch("/{product_id}/toggle")
 def toggle_product(
     product_id: int,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN)),
     service: ProductService = Depends(get_product_service)
 ):
-
     return service.toggle_product(
         product_id,
         user.restaurant_id
@@ -6681,18 +7054,11 @@ def toggle_product(
 
 **Clases (0):**
 
-**Imports (18):**
+**Imports (12):**
 - fastapi.APIRouter
 - fastapi.Depends
-- fastapi.HTTPException
-- sqlalchemy.orm.Session
-- app.db.session.get_db
-- app.models.order_item.OrderItem
-- app.models.order_item.OrderItemStatus
-- app.models.product.Product
-- app.models.production_station.ProductionStation
 - app.models.user.User
-- app.models.order.Order
+- app.models.user.UserRole
 - app.domain.stations.dependencies.get_station_service
 - app.domain.stations.station_service.StationService
 - app.schemas.station.StationCreate
@@ -6700,17 +7066,12 @@ def toggle_product(
 - app.schemas.station.StationUpdate
 - app.schemas.order.kitchen.KitchenItemOut
 - app.dependencies.auth.get_current_user
+- app.dependencies.permissions.require_roles
 
 ```python
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends
 
-from app.db.session import get_db
-from app.models.order_item import OrderItem, OrderItemStatus
-from app.models.product import Product
-from app.models.production_station import ProductionStation
-from app.models.user import User
-from app.models.order import Order
+from app.models.user import User, UserRole
 
 from app.domain.stations.dependencies import get_station_service
 from app.domain.stations.station_service import StationService
@@ -6719,6 +7080,7 @@ from app.schemas.station import StationCreate, StationOut, StationUpdate
 from app.schemas.order.kitchen import KitchenItemOut
 
 from app.dependencies.auth import get_current_user
+from app.dependencies.permissions import require_roles
 
 router = APIRouter(prefix="/stations", tags=["stations"])
 
@@ -6726,7 +7088,7 @@ router = APIRouter(prefix="/stations", tags=["stations"])
 @router.post("/", response_model=StationOut)
 def create_station(
     data: StationCreate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN)),
     service: StationService = Depends(get_station_service)
 ):
     return service.create_station(
@@ -6764,7 +7126,7 @@ def get_station(
 def update_station(
     station_id: int,
     data: StationUpdate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN)),
     service: StationService = Depends(get_station_service)
 ):
     return service.update_station(
@@ -6777,7 +7139,7 @@ def update_station(
 @router.patch("/{station_id}/toggle")
 def toggle_station(
     station_id: int,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN)),
     service: StationService = Depends(get_station_service)
 ):
     return service.toggle_station(
@@ -6790,40 +7152,12 @@ def toggle_station(
 def get_station_items(
     station_id: int,
     user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    service: StationService = Depends(get_station_service)
 ):
-    items = (
-        db.query(OrderItem)
-        .join(OrderItem.product)
-        .join(Product.station)
-        .join(OrderItem.order)
-        .join(Order.table)
-        .filter(
-            Product.station_id == station_id,
-            OrderItem.restaurant_id == user.restaurant_id,
-            OrderItem.status.in_([
-                OrderItemStatus.SENT,
-                OrderItemStatus.IN_PROGRESS
-            ])
-        )
-        .all()
+    return service.get_station_items(
+        user.restaurant_id,
+        station_id
     )
-
-    result = []
-
-    for item in items:
-        result.append({
-            "item_id": item.id,
-            "product_name": item.product.name,
-            "quantity": item.quantity,
-            "status": item.status,
-            "table_number": item.order.table.number,
-            "order_id": item.order.id
-        })
-
-    return result
-
-
 ```
 
 ---
@@ -6843,7 +7177,7 @@ def get_station_items(
 
 **Clases (0):**
 
-**Imports (15):**
+**Imports (18):**
 - fastapi.APIRouter
 - fastapi.Depends
 - fastapi.Query
@@ -6852,13 +7186,16 @@ def get_station_items(
 - app.schemas.table.TableList
 - app.schemas.table.TableOut
 - app.schemas.table.TablePositionUpdate
+- app.schemas.table.TablePositionOut
 - app.schemas.order.order_item.AddItemRequest
 - app.domain.table.table_service.TableService
 - app.domain.table.dependencies.get_table_service
 - app.domain.order.order_service.OrderService
 - app.domain.order.dependencies.get_order_service
 - app.models.user.User
+- app.models.user.UserRole
 - app.dependencies.auth.get_current_user
+- app.dependencies.permissions.require_roles
 
 ```python
 from fastapi import APIRouter, Depends, Query
@@ -6868,19 +7205,21 @@ from app.schemas.table import (
     TableUpdate,
     TableList,
     TableOut,
-    TablePositionUpdate
+    TablePositionUpdate,
+    TablePositionOut
 )
 
 from app.schemas.order.order_item import AddItemRequest
 
 from app.domain.table.table_service import TableService
 from app.domain.table.dependencies import get_table_service
-
 from app.domain.order.order_service import OrderService
 from app.domain.order.dependencies import get_order_service
 
-from app.models.user import User
+from app.models.user import User, UserRole
+
 from app.dependencies.auth import get_current_user
+from app.dependencies.permissions import require_roles
 
 
 router = APIRouter(prefix="/tables", tags=["tables"])
@@ -6889,7 +7228,7 @@ router = APIRouter(prefix="/tables", tags=["tables"])
 @router.post("/")
 def create_table(
     table_in: TableCreate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN)),
     service: TableService = Depends(get_table_service)
 ):
     return service.create_table(user.restaurant_id, table_in)
@@ -6936,20 +7275,20 @@ def list_tables_status(
     return service.list_tables_status(user.restaurant_id)
 
 
-@router.patch("/{table_id}/position", status_code=204)
+@router.patch("/{table_id}/position", response_model=TablePositionOut)
 def update_position(
     table_id: int,
     data: TablePositionUpdate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN)),
     service: TableService = Depends(get_table_service)
 ):
-    service.update_position(user.restaurant_id, table_id, data)
+    return service.update_position(user.restaurant_id, table_id, data)
 
 
 @router.patch("/{table_id}/activate")
 def activate_table(
     table_id: int,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN)),
     service: TableService = Depends(get_table_service)
 ):
     return service.activate_table(user.restaurant_id, table_id)
@@ -6959,7 +7298,7 @@ def activate_table(
 def update_table(
     table_id: int,
     table_in: TableUpdate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN)),
     service: TableService = Depends(get_table_service)
 ):
     return service.update_table(user.restaurant_id, table_id, table_in)
@@ -6968,10 +7307,11 @@ def update_table(
 @router.delete("/{table_id}")
 def deactivate_table(
     table_id: int,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN)),
     service: TableService = Depends(get_table_service)
 ):
     return service.deactivate_table(user.restaurant_id, table_id)
+
 ```
 
 ---
@@ -6979,8 +7319,8 @@ def deactivate_table(
 ### .\backend\app\routers\users.py
 
 **Funciones (4):**
-- list_users
 - create_user
+- list_users
 - update_user
 - toggle_user
 
@@ -6989,10 +7329,10 @@ def deactivate_table(
 **Imports (11):**
 - fastapi.APIRouter
 - fastapi.Depends
-- sqlalchemy.orm.Session
-- app.db.session.get_db
 - app.dependencies.auth.get_current_user
+- app.dependencies.permissions.require_roles
 - app.models.user.User
+- app.models.user.UserRole
 - app.schemas.user.UserCreate
 - app.schemas.user.UserUpdate
 - app.schemas.user.UserOut
@@ -7001,12 +7341,11 @@ def deactivate_table(
 
 ```python
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
 
-from app.db.session import get_db
 from app.dependencies.auth import get_current_user
+from app.dependencies.permissions import require_roles
 
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.user import UserCreate, UserUpdate, UserOut
 
 from app.domain.user.user_service import UserService
@@ -7015,43 +7354,39 @@ from app.domain.user.dependencies import get_user_service
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-@router.get("/", response_model=list[UserOut])
-def list_users(
-    user: User = Depends(get_current_user),
-    service: UserService = Depends(get_user_service)
-):
-
-    return service.list_users(user.restaurant_id)
-
-
 @router.post("/", response_model=UserOut)
 def create_user(
     data: UserCreate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN)),
     service: UserService = Depends(get_user_service)
 ):
-
     return service.create_user(user.restaurant_id, data)
+
+
+@router.get("/", response_model=list[UserOut])
+def list_users(
+    user: User = Depends(require_roles(UserRole.ADMIN)),
+    service: UserService = Depends(get_user_service)
+):
+    return service.list_users(user.restaurant_id)
 
 
 @router.patch("/{user_id}", response_model=UserOut)
 def update_user(
     user_id: int,
     data: UserUpdate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN)),
     service: UserService = Depends(get_user_service)
 ):
-
     return service.update_user(user_id, user.restaurant_id, data)
 
 
 @router.patch("/{user_id}/toggle", response_model=UserOut)
 def toggle_user(
     user_id: int,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_roles(UserRole.ADMIN)),
     service: UserService = Depends(get_user_service)
 ):
-
     return service.toggle_user(user_id, user.restaurant_id)
 ```
 
@@ -7118,7 +7453,7 @@ class TimestampSchema(BaseSchema):
 
 **Funciones (0):**
 
-**Clases (8):**
+**Clases (9):**
 - CashRegisterOpen
 - CashRegisterOut
 - CashRegisterSummary
@@ -7126,21 +7461,24 @@ class TimestampSchema(BaseSchema):
 - CashRegisterCloseOut
 - CashRegisterClose
 - CashMovementCreate
+- CashMovementOut
 - CashRegisterDashboard
 
-**Imports (3):**
+**Imports (4):**
 - datetime.datetime
 - decimal.Decimal
+- pydantic.Field
 - base.BaseSchema
 
 ```python
 from datetime import datetime
 from decimal import Decimal
+from pydantic import Field
 from .base import BaseSchema
 
 
 class CashRegisterOpen(BaseSchema):
-    opening_amount: Decimal
+    opening_amount: Decimal = Field(ge=Decimal("0"))
 
 
 class CashRegisterOut(BaseSchema):
@@ -7171,39 +7509,48 @@ class CashRegisterCloseOut(BaseSchema):
     message: str
     total_sales: Decimal
     transactions_count: int
-    by_method: list[PaymentBreakdown]
+    by_method: dict[str, Decimal]
     opening_amount: Decimal
+    closing_amount: Decimal
+    cash_in: Decimal
+    cash_out: Decimal
     expected_cash: Decimal
     counted_cash: Decimal
     difference: Decimal
 
 
 class CashRegisterClose(BaseSchema):
-    counted_cash: Decimal
+    counted_cash: Decimal = Field(ge=Decimal("0"))
 
 
 class CashMovementCreate(BaseSchema):
     type: str
-    amount: Decimal
+    amount: Decimal = Field(gt=Decimal("0"))
     reason: str
 
 
-class CashRegisterDashboard(BaseSchema):
+class CashMovementOut(BaseSchema):
+    id: int
+    type: str
+    amount: Decimal
+    reason: str | None
+    created_at: datetime
 
+
+class CashRegisterDashboard(BaseSchema):
     cash_register_id: int
     opened_at: datetime
-
     opening_amount: Decimal
-
     total_sales: Decimal
     orders_count: int
+    transactions_count: int
     average_ticket: Decimal
-
     by_method: dict[str, Decimal]
-
-    cash_movements: list[dict]
-
+    cash_movements: list[CashMovementOut]
     expected_cash: Decimal
+
+
+
 ```
 
 ---
@@ -7372,13 +7719,14 @@ class StationOut(BaseSchema):
 
 **Funciones (0):**
 
-**Clases (6):**
+**Clases (7):**
 - TableStatus
 - TableOut
 - TableCreate
 - TableUpdate
 - TableList
 - TablePositionUpdate
+- TablePositionOut
 
 **Imports (4):**
 - app.models.order.OrderStatus
@@ -7409,6 +7757,7 @@ class TableOut(BaseSchema):
     order_status: OrderStatus | None
 
 class TableCreate(BaseSchema):
+    number: Optional[int] = None
     x: int = 0
     y: int = 0
     capacity: int = 4
@@ -7431,6 +7780,12 @@ class TableList(BaseSchema):
 class TablePositionUpdate(BaseSchema):
     x: int
     y: int
+
+class TablePositionOut(BaseSchema):
+    id: int
+    x: int
+    y: int
+
 ```
 
 ---
@@ -7660,9 +8015,8 @@ class PaymentOut(BaseSchema):
 
 ### .\backend\app\services\event_service.py
 
-**Funciones (8):**
+**Funciones (7):**
 - _log_task_error
-- __init__
 - emit_to_role
 - emit_to_station
 - broadcast
@@ -7700,7 +8054,7 @@ from app.models.domain_event import DomainEvent
 from app.db.session import SessionLocal
 from app.core.redis import redis_client
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("app.services.event_service")
 INSTANCE_ID = str(uuid.uuid4())
 
 class EventService:
@@ -7709,12 +8063,15 @@ class EventService:
     # API PÚBLICA
     # =========================
 
-    def __init__(self):
-        self.loop = None
+    #def __init__(self):
+    #    self.loop = None
 
 
     def emit_to_role(self, restaurant_id: int, role: UserRole, message: dict):
-        print("EVENT emit_to_role", message)
+        logger.debug(
+            "emit_to_role r=%s role=%s type=%s",
+            restaurant_id, role, message.get("type")
+        )
         event = {
             "restaurant_id": restaurant_id,
             "target": "role",
@@ -7727,7 +8084,10 @@ class EventService:
         self._dispatch(manager.send_to_role, restaurant_id, role, message)
 
     def emit_to_station(self, restaurant_id: int, station_id: int, message: dict):
-        print("EVENT emit_to_station", message)
+        logger.debug(
+            "emit_to_station r=%s station_id=%s type=%s",
+            restaurant_id, station_id, message.get("type")
+        )
         event = {
             "restaurant_id": restaurant_id,
             "target": "station",
@@ -7740,7 +8100,10 @@ class EventService:
         self._dispatch(manager.send_to_station, restaurant_id, station_id, message)
 
     def broadcast(self, restaurant_id: int, message: dict):
-        print("EVENT broadcast", message)
+        logger.debug(
+            "broadcast r=%s type=%s",
+            restaurant_id, message.get("type")
+        )
         event = {
             "restaurant_id": restaurant_id,
             "target": "broadcast",
@@ -7776,35 +8139,19 @@ class EventService:
     # =========================
 
     def _dispatch(self, func, *args):
-        """
-        Agenda las coroutines en el loop de FastAPI.
-        Guarda referencia a cada tarea para evitar garbage collection
-        y registra errores en el callback.
-        """
         logger.info("emit event type=%s", args[-1].get("type"))
         try:
-            loop = self.loop
-            if not loop:
-                logger.error("Event loop not initialized")
-                return
+            asyncio.get_running_loop()
         except RuntimeError:
-            # Nunca debería ocurrir en FastAPI, pero por seguridad:
             logger.error("_dispatch llamado fuera de un loop async. Evento descartado.")
             return
-
         event = args[-1]
+        self._create_task(func(*args))
+        self._create_task(self._publish_redis(event))
 
-        self._create_task(loop, func(*args))
-        self._create_task(loop, self._publish_redis(event))
 
-
-    def _create_task(self, loop: asyncio.AbstractEventLoop, coro):
-        """
-        Crea la tarea guardando referencia y registrando errores.
-        """
-        task = loop.create_task(coro)
-
-        # Guardar referencia evita que el GC la elimine antes de completar
+    def _create_task(self, coro):
+        task = asyncio.create_task(coro)
         _background_tasks.add(task)
         task.add_done_callback(_background_tasks.discard)
         task.add_done_callback(_log_task_error)
@@ -7856,16 +8203,20 @@ event_service = EventService()
 **Clases (1):**
 - ConnectionManager
 
-**Imports (3):**
+**Imports (5):**
 - fastapi.WebSocket
+- fastapi.logger
 - collections.defaultdict
 - app.models.user.UserRole
+- logging
 
 ```python
-from fastapi import WebSocket
+from fastapi import WebSocket, logger
 from collections import defaultdict
 from app.models.user import UserRole
+import logging
 
+logger = logging.getLogger("app.websocket.manager")
 
 class ConnectionManager:
 
@@ -7879,7 +8230,10 @@ class ConnectionManager:
         conn = {"ws": websocket, "user": user, "station_id": station_id}
         self.connections[user.restaurant_id].append(conn)
         self._ws_index[id(websocket)] = user.restaurant_id
-        print(f"WS connected r={user.restaurant_id} role={user.role}")
+        logger.info(
+            "WS connected r=%s role=%s station=%s",
+            user.restaurant_id, user.role, station_id
+        )
 
 
     def disconnect(self, websocket):
@@ -7889,7 +8243,7 @@ class ConnectionManager:
                 c for c in self.connections[restaurant_id]
                 if c["ws"] != websocket
             ]
-        print("WS disconnected")
+        logger.info("WS disconnected r=%s", restaurant_id)
 
     # =========================
     # ENVÍOS
@@ -7916,7 +8270,8 @@ class ConnectionManager:
         try:
             await ws.send_json(message)
         except Exception as e:
-            print("WS send failed", e)
+            logger.warning("WS send failed, desconectando: %s", e)
+            self.disconnect(ws)
 
 
 manager = ConnectionManager()
@@ -7930,21 +8285,37 @@ manager = ConnectionManager()
 - __init__
 
 **Clases (1):**
-- WSUser
+- AuthUser
 
-**Imports (5):**
+**Imports (6):**
 - fastapi.APIRouter
 - fastapi.WebSocket
 - fastapi.WebSocketDisconnect
 - app.websocket.manager.manager
 - app.core.security.decode_access_token
+- app.models.user.UserRole
 
 ```python
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.websocket.manager import manager
 from app.core.security import decode_access_token
+from app.models.user import UserRole
 
 router = APIRouter()
+
+
+class AuthUser:
+    def __init__(self, payload):
+        self.id = payload.get("sub")
+
+        role = payload.get("role")
+        try:
+            self.role = UserRole(role)
+        except ValueError:
+            self.role = None
+
+        self.restaurant_id = payload.get("restaurant_id")
+
 
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -7957,30 +8328,33 @@ async def websocket_endpoint(websocket: WebSocket):
 
     payload = decode_access_token(token)
 
-    if not payload:
+    if not payload or not payload.get("sub") or not payload.get("restaurant_id"):
         await websocket.close(code=1008)
         return
 
-    # 🔥 ARMAR USER FAKE (simple y suficiente)
-    class WSUser:
-        def __init__(self, payload):
-            self.id = payload.get("sub")
-            self.role = payload.get("role")
-            self.restaurant_id = payload.get("restaurant_id")
+    user = AuthUser(payload)
 
-    user = WSUser(payload)
+    if not user.role:
+        await websocket.close(code=1008)
+        return
 
-    station_id = websocket.query_params.get("station_id")
+    station_id_param = websocket.query_params.get("station_id")
+
+    try:
+        station_id = int(station_id_param) if station_id_param else None
+    except ValueError:
+        station_id = None
 
     await manager.connect(
         websocket,
         user,
-        int(station_id) if station_id else None
+        station_id
     )
 
     try:
         while True:
             await websocket.receive_text()
+
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 ```

@@ -25,6 +25,7 @@ class ErrorCode(str, Enum):
 
     # TABLES
     TABLE_NOT_FOUND = "table_not_found"
+    TABLE_NUMBER_ALREADY_EXISTS = "table_number_already_exists"
 
     # PAYMENTS
     PAYMENT_NOT_FOUND = "payment_not_found"
@@ -53,3 +54,6 @@ class ErrorCode(str, Enum):
     # STATIONS
     STATION_NOT_FOUND = "station_not_found"
     STATION_NAME_ALREADY_EXISTS = "station_name_already_exists"
+
+    # PERMISSIONS
+    PERMISSION_DENIED = "Permission_denied"

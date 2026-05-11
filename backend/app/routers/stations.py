@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+
 from app.models.user import User
 
 from app.domain.stations.dependencies import get_station_service
@@ -8,6 +9,7 @@ from app.schemas.station import StationCreate, StationOut, StationUpdate
 from app.schemas.order.kitchen import KitchenItemOut
 
 from app.dependencies.auth import get_current_user
+from app.dependencies.roles import admin_only
 
 router = APIRouter(prefix="/stations", tags=["stations"])
 
@@ -15,7 +17,7 @@ router = APIRouter(prefix="/stations", tags=["stations"])
 @router.post("/", response_model=StationOut)
 def create_station(
     data: StationCreate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(admin_only),
     service: StationService = Depends(get_station_service)
 ):
     return service.create_station(
@@ -53,7 +55,7 @@ def get_station(
 def update_station(
     station_id: int,
     data: StationUpdate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(admin_only),
     service: StationService = Depends(get_station_service)
 ):
     return service.update_station(
@@ -66,7 +68,7 @@ def update_station(
 @router.patch("/{station_id}/toggle")
 def toggle_station(
     station_id: int,
-    user: User = Depends(get_current_user),
+    user: User = Depends(admin_only),
     service: StationService = Depends(get_station_service)
 ):
     return service.toggle_station(

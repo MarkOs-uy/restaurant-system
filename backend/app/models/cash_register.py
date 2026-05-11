@@ -50,6 +50,11 @@ class CashRegister(Base):
         nullable=False
     )
 
+    closing_amount = Column(
+        Numeric(10,2),
+        nullable=True
+    )
+
     expected_cash = Column(
         Numeric(10,2),
         nullable=True

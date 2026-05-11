@@ -1,6 +1,9 @@
 from sqlalchemy.orm import Session
 from app.models.restaurant_layout import RestaurantLayout
 from app.schemas.layout import LayoutUpdate
+import logging
+
+logger = logging.getLogger("app.domain.layout")
 
 
 class LayoutService:
@@ -35,7 +38,7 @@ class LayoutService:
 
 
     def update_layout(self, restaurant_id: int, data: LayoutUpdate):
-
+        logger.info("Layout actualizado r=%s", restaurant_id)
         layout = self.get_layout(restaurant_id)
 
         layout.width = data.width

@@ -42,5 +42,10 @@ class Restaurant(Base):
     order_items = relationship("OrderItem", back_populates="restaurant", cascade="all, delete")
     users = relationship("User", back_populates="restaurant")
     domain_events = relationship("DomainEvent", back_populates="restaurant")
+    event_outbox = relationship(
+        "EventOutbox",
+        back_populates="restaurant",
+        cascade="all, delete-orphan"
+    )
 
 
