@@ -1,13 +1,14 @@
 #!/bin/bash
+set -e
 
 echo "Esperando a Postgres..."
 
-until pg_isready -h db -U admin
+until pg_isready -h db -U "${POSTGRES_USER:-pos_user}" -d "${POSTGRES_DB:-restaurant}"
 do
   sleep 2
 done
 
-echo "Postgres listo ✅"
+echo "Postgres listo"
 
 echo "Corriendo migrations..."
 alembic upgrade head

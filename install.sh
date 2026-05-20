@@ -2,64 +2,141 @@
 set -euo pipefail
 
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="${APP_DIR}/backend/.env"
 HOSTNAME_LOCAL="pos"
 FRONTEND_PORT="80"
 BACKEND_PORT="8000"
+COMPOSE_FILE="docker-compose.prod.yml"
 
-echo "=== Instalando POS Restaurant ==="
+if [ -t 1 ]; then
+  RED=$'\033[31m'
+  GREEN=$'\033[32m'
+  YELLOW=$'\033[33m'
+  BLUE=$'\033[34m'
+  BOLD=$'\033[1m'
+  RESET=$'\033[0m'
+else
+  RED=""
+  GREEN=""
+  YELLOW=""
+  BLUE=""
+  BOLD=""
+  RESET=""
+fi
+
+section() {
+  printf "\n%s==> %s%s\n" "$BLUE" "$1" "$RESET"
+}
+
+success() {
+  printf "%s[OK]%s %s\n" "$GREEN" "$RESET" "$1"
+}
+
+warn() {
+  printf "%s[AVISO]%s %s\n" "$YELLOW" "$RESET" "$1"
+}
+
+fail() {
+  printf "%s[ERROR]%s %s\n" "$RED" "$RESET" "$1" >&2
+  exit 1
+}
+
+get_local_ip() {
+  ip route get 1.1.1.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="src") {print $(i+1); exit}}'
+}
+
+env_value() {
+  awk -F= -v key="$1" '$1 == key {sub(/\r$/, ""); print substr($0, index($0, "=") + 1); exit}' "$ENV_FILE"
+}
+
+compose() {
+  docker compose -f "$COMPOSE_FILE" "$@"
+}
+
+wait_for_postgres() {
+  local ready=0
+
+  for _ in {1..30}; do
+    if compose exec -T db pg_isready -U "${POSTGRES_USER_VALUE:-pos_user}" -d "${POSTGRES_DB_VALUE:-restaurant}" >/dev/null 2>&1; then
+      ready=1
+      break
+    fi
+    sleep 2
+  done
+
+  [ "$ready" -eq 1 ] || fail "Postgres no respondio despues de 60 segundos. Revisa: docker compose -f ${COMPOSE_FILE} logs db"
+}
+
+wait_for_backend() {
+  local ready=0
+
+  for _ in {1..45}; do
+    if compose exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)" >/dev/null 2>&1; then
+      ready=1
+      break
+    fi
+    sleep 2
+  done
+
+  [ "$ready" -eq 1 ] || fail "El backend no quedo listo despues de 90 segundos. Revisa: docker compose -f ${COMPOSE_FILE} logs backend"
+}
+
+printf "%sPOS Restaurant - instalador de produccion%s\n" "$BOLD" "$RESET"
 
 if ! command -v apt-get >/dev/null 2>&1; then
-  echo "Este instalador está pensado para Linux Debian/Ubuntu."
-  exit 1
+  fail "Este instalador esta pensado para Linux Debian/Ubuntu."
 fi
 
 if [ "$EUID" -ne 0 ]; then
-  echo "Ejecutar como root: sudo bash install.sh"
-  exit 1
+  fail "Ejecuta el instalador como root: sudo bash install.sh"
 fi
 
 cd "$APP_DIR"
 
-# =============================================================
-echo "=== Instalando dependencias del sistema ==="
-# =============================================================
-
+section "Instalando dependencias del sistema"
 apt-get update -qq
 apt-get install -y \
   avahi-daemon \
   docker.io \
   docker-compose-plugin \
+  iproute2 \
   libnss-mdns \
   python3 \
   python3-zeroconf
+success "Dependencias instaladas"
 
-# =============================================================
-echo "=== Configurando mDNS: ${HOSTNAME_LOCAL}.local ==="
-# =============================================================
+section "Configurando mDNS: ${HOSTNAME_LOCAL}.local"
+AVAHI_CONF="/etc/avahi/avahi-daemon.conf"
+AVAHI_BACKUP="/etc/avahi/avahi-daemon.conf.pos-backup.$(date +%Y%m%d%H%M%S)"
+cp "$AVAHI_CONF" "$AVAHI_BACKUP"
 
-cp /etc/avahi/avahi-daemon.conf /etc/avahi/avahi-daemon.conf.pos-backup
-
-if grep -q "^#\?host-name=" /etc/avahi/avahi-daemon.conf; then
-  sed -i "s/^#\?host-name=.*/host-name=${HOSTNAME_LOCAL}/" /etc/avahi/avahi-daemon.conf
+if grep -q "^#\?host-name=" "$AVAHI_CONF"; then
+  sed -i "s/^#\?host-name=.*/host-name=${HOSTNAME_LOCAL}/" "$AVAHI_CONF"
 else
-  sed -i "/^\[server\]/a host-name=${HOSTNAME_LOCAL}" /etc/avahi/avahi-daemon.conf
+  sed -i "/^\[server\]/a host-name=${HOSTNAME_LOCAL}" "$AVAHI_CONF"
 fi
 
-systemctl enable avahi-daemon
+systemctl enable avahi-daemon >/dev/null
 systemctl restart avahi-daemon
+success "mDNS activo como ${HOSTNAME_LOCAL}.local"
 
-# =============================================================
-echo "=== Generando configuración ==="
-# =============================================================
+section "Generando configuracion"
+ENV_CREATED=0
+ADMIN_PASSWORD=""
+LOCAL_IP="$(get_local_ip)"
 
-if [ ! -f "./backend/.env" ]; then
+if [ -z "$LOCAL_IP" ]; then
+  LOCAL_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+fi
 
-  LOCAL_IP=$(ip route get 1 | awk '{print $7;exit}')
-  POSTGRES_PASSWORD=$(python3 -c "import secrets; print(secrets.token_hex(16))")
-  SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
-  ADMIN_PASSWORD=$(python3 -c "import secrets; print(secrets.token_urlsafe(12))")
+[ -n "$LOCAL_IP" ] || fail "No pude detectar la IP local del servidor."
 
-  cat > ./backend/.env << EOF
+if [ ! -f "$ENV_FILE" ]; then
+  POSTGRES_PASSWORD="$(python3 -c "import secrets; print(secrets.token_hex(16))")"
+  SECRET_KEY="$(python3 -c "import secrets; print(secrets.token_hex(32))")"
+  ADMIN_PASSWORD="$(python3 -c "import secrets; print(secrets.token_urlsafe(12))")"
+
+  cat > "$ENV_FILE" << EOF
 POSTGRES_USER=pos_user
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 POSTGRES_DB=restaurant
@@ -80,67 +157,39 @@ ENVIRONMENT=production
 LOG_LEVEL=INFO
 EOF
 
-  # Guardar para mostrar al final
-  echo "$ADMIN_PASSWORD" > /tmp/pos_admin_pass
-
-  echo "Configuración generada"
-
+  chmod 600 "$ENV_FILE"
+  ENV_CREATED=1
+  success "Configuracion creada en backend/.env"
 else
-  echo "backend/.env ya existe — no se sobreescribe"
+  warn "backend/.env ya existe; no se sobreescribe."
 fi
 
-# =============================================================
-echo "=== Iniciando Docker ==="
-# =============================================================
+POSTGRES_USER_VALUE="$(env_value POSTGRES_USER)"
+POSTGRES_DB_VALUE="$(env_value POSTGRES_DB)"
 
-systemctl enable docker
+section "Iniciando Docker"
+systemctl enable docker >/dev/null
 systemctl start docker
 
 until docker info >/dev/null 2>&1; do
   sleep 1
 done
+success "Docker esta listo"
 
-# =============================================================
-echo "=== Construyendo e iniciando contenedores ==="
-# =============================================================
+section "Construyendo e iniciando contenedores"
+compose up -d --build
+success "Contenedores iniciados"
 
-docker compose -f docker-compose.prod.yml up -d --build
+section "Verificando servicios"
+printf "Esperando base de datos...\n"
+wait_for_postgres
+success "Postgres responde"
 
-# Esperar postgres
-echo "Esperando base de datos..."
-for i in {1..30}; do
-  if docker compose -f docker-compose.prod.yml exec -T db \
-      pg_isready -U pos_user -d restaurant &>/dev/null; then
-    break
-  fi
-  sleep 2
-done
+printf "Esperando backend...\n"
+wait_for_backend
+success "Backend responde en /health"
 
-# =============================================================
-echo "=== Inicializando base de datos ==="
-# =============================================================
-
-echo "Esperando backend..."
-
-for i in {1..30}; do
-  if docker compose -f docker-compose.prod.yml exec -T backend \
-     python -c "print('ready')" &>/dev/null; then
-    break
-  fi
-  sleep 2
-done
-
-docker compose -f docker-compose.prod.yml exec -T backend \
-  alembic upgrade head
-
-docker compose -f docker-compose.prod.yml exec -T backend \
-  python -m app.seed
-
-# =============================================================
-echo "=== Registrando servicios del sistema ==="
-# =============================================================
-
-# Zeroconf
+section "Registrando servicios del sistema"
 tee /etc/systemd/system/pos-zeroconf.service >/dev/null << EOF
 [Unit]
 Description=POS Zeroconf Announcer
@@ -162,7 +211,6 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
-# Arranque automático del POS
 tee /etc/systemd/system/pos-restaurant.service >/dev/null << EOF
 [Unit]
 Description=POS Restaurant
@@ -173,8 +221,8 @@ Requires=docker.service
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=${APP_DIR}
-ExecStart=/usr/bin/docker compose -f docker-compose.prod.yml up -d
-ExecStop=/usr/bin/docker compose -f docker-compose.prod.yml down
+ExecStart=/usr/bin/docker compose -f ${COMPOSE_FILE} up -d
+ExecStop=/usr/bin/docker compose -f ${COMPOSE_FILE} down
 TimeoutStartSec=120
 
 [Install]
@@ -182,31 +230,35 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable pos-zeroconf
+systemctl enable pos-zeroconf >/dev/null
 systemctl restart pos-zeroconf
-systemctl enable pos-restaurant
+systemctl enable pos-restaurant >/dev/null
+success "Servicios systemd registrados"
 
-# =============================================================
-LOCAL_IP=$(ip route get 1 | awk '{print $7;exit}')
-ADMIN_PASSWORD=$(cat /tmp/pos_admin_pass 2>/dev/null || echo "(ver backend/.env)")
-rm -f /tmp/pos_admin_pass
+LOCAL_IP="$(get_local_ip)"
+if [ -z "$LOCAL_IP" ]; then
+  LOCAL_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+fi
 
-echo ""
-echo "╔══════════════════════════════════════════╗"
-echo "║   POS Restaurant instalado con éxito     ║"
-echo "╚══════════════════════════════════════════╝"
-echo ""
-echo "  Acceso desde cualquier dispositivo en la red:"
-echo "  → http://${HOSTNAME_LOCAL}.local"
-echo "  → http://${LOCAL_IP}"
-echo ""
-echo "  Usuario: admin"
-echo "  Contraseña: ${ADMIN_PASSWORD}"
-echo ""
-echo "  Guardá esta contraseña — no se vuelve a mostrar"
-echo ""
-echo "  Comandos útiles:"
-echo "  → Logs:       cd ${APP_DIR} && docker compose -f docker-compose.prod.yml logs -f"
-echo "  → Reiniciar:  systemctl restart pos-restaurant"
-echo "  → Estado:     systemctl status pos-restaurant"
-echo ""
+printf "\n%s+--------------------------------------------------+%s\n" "$GREEN" "$RESET"
+printf "%s|       POS Restaurant instalado con exito         |%s\n" "$GREEN" "$RESET"
+printf "%s+--------------------------------------------------+%s\n" "$GREEN" "$RESET"
+printf "\n%sAcceso en la red local:%s\n" "$BOLD" "$RESET"
+printf "  %shttp://%s.local%s\n" "$BLUE" "$HOSTNAME_LOCAL" "$RESET"
+printf "  %shttp://%s%s\n" "$BLUE" "$LOCAL_IP" "$RESET"
+
+printf "\n%sCredenciales iniciales:%s\n" "$BOLD" "$RESET"
+printf "  Usuario:    admin\n"
+if [ "$ENV_CREATED" -eq 1 ]; then
+  printf "  Contrasena: %s\n" "$ADMIN_PASSWORD"
+  printf "\n%sGuarda esta contrasena ahora; no se volvera a mostrar en pantalla.%s\n" "$YELLOW" "$RESET"
+else
+  printf "  Contrasena: ya configurada anteriormente en backend/.env\n"
+fi
+
+printf "\n%sComandos utiles:%s\n" "$BOLD" "$RESET"
+printf "  Logs:       cd %s && docker compose -f %s logs -f\n" "$APP_DIR" "$COMPOSE_FILE"
+printf "  Reiniciar:  systemctl restart pos-restaurant\n"
+printf "  Estado:     systemctl status pos-restaurant\n"
+printf "  Backup:     ls -lh %s/backups\n" "$APP_DIR"
+printf "\n"
