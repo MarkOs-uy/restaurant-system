@@ -97,13 +97,54 @@ section "Instalando dependencias del sistema"
 apt-get update -qq
 apt-get install -y \
   avahi-daemon \
-  docker.io \
-  docker-compose-plugin \
+  ca-certificates \
+  curl \
+  gnupg \
   iproute2 \
   libnss-mdns \
   python3 \
   python3-zeroconf
-success "Dependencias instaladas"
+success "Dependencias base instaladas"
+
+section "Instalando Docker"
+if command -v docker &>/dev/null && docker compose version &>/dev/null; then
+  warn "Docker ya instalado — omitiendo"
+else
+  # Detectar Ubuntu o Debian automaticamente
+  . /etc/os-release
+  if [[ "$ID" != "ubuntu" && "$ID" != "debian" ]]; then
+    fail "Sistema no soportado: $ID. Se requiere Ubuntu o Debian."
+  fi
+
+  printf "Sistema detectado: %s %s\n" "$ID" "$VERSION_CODENAME"
+
+  # Remover versiones viejas si existen
+  apt-get remove -y docker docker-engine docker.io containerd runc 2>/dev/null || true
+
+  # Clave GPG oficial de Docker
+  install -m 0755 -d /etc/apt/keyrings
+  curl -fsSL "https://download.docker.com/linux/${ID}/gpg" \
+    -o /etc/apt/keyrings/docker.asc
+  chmod a+r /etc/apt/keyrings/docker.asc
+
+  # Repositorio oficial — mismo mecanismo para Ubuntu y Debian
+  echo \
+    "deb [arch=$(dpkg --print-architecture) \
+    signed-by=/etc/apt/keyrings/docker.asc] \
+    https://download.docker.com/linux/${ID} \
+    ${VERSION_CODENAME} stable" \
+    | tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+  apt-get update -qq
+  apt-get install -y \
+    docker-ce \
+    docker-ce-cli \
+    containerd.io \
+    docker-buildx-plugin \
+    docker-compose-plugin
+
+  success "Docker instalado"
+fi
 
 section "Configurando mDNS: ${HOSTNAME_LOCAL}.local"
 AVAHI_CONF="/etc/avahi/avahi-daemon.conf"
