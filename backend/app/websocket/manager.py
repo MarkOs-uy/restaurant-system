@@ -39,7 +39,7 @@ class ConnectionManager:
                 user.id
             )
             await websocket.close(code=1008)
-            return
+            return False
 
         await websocket.accept()
 
@@ -52,9 +52,7 @@ class ConnectionManager:
         ws_id = id(websocket)
 
         self._ws_index[ws_id] = conn
-
         self._by_restaurant[user.restaurant_id].add(ws_id)
-
         self._by_role[user.restaurant_id][user.role].add(ws_id)
 
         if station_id:
@@ -69,6 +67,8 @@ class ConnectionManager:
             user.role,
             station_id
         )
+
+        return True
 
     # =========================
     # DISCONNECT
@@ -127,15 +127,10 @@ class ConnectionManager:
             )
             return
 
-        logger.info(
-            "WS role send: restaurant=%s role=%s connections=%s",
-            restaurant_id,
-            role,
-            len(targets)
-        )
-
-        for ws_id in list(self._by_role[restaurant_id].get(role, [])):
+        logger.debug("WS role send: r=%s role=%s connections=%s", restaurant_id, role, len(targets))
+        for ws_id in targets:
             await self._safe_send(ws_id, message)
+
 
     async def send_to_station(
         self,
@@ -144,7 +139,9 @@ class ConnectionManager:
         message: dict
     ):
 
-        for ws_id in list(self._by_station[restaurant_id].get(station_id, [])):
+        targets = list(self._by_station[restaurant_id].get(station_id, []))
+        logger.debug("WS station send: r=%s station=%s connections=%s", restaurant_id, station_id, len(targets))
+        for ws_id in targets:
             await self._safe_send(ws_id, message)
 
     async def broadcast(
@@ -153,7 +150,9 @@ class ConnectionManager:
         message: dict
     ):
 
-        for ws_id in list(self._by_restaurant.get(restaurant_id, [])):
+        targets = list(self._by_restaurant.get(restaurant_id, []))
+        logger.debug("WS broadcast: r=%s connections=%s", restaurant_id, len(targets))
+        for ws_id in targets:
             await self._safe_send(ws_id, message)
 
     # =========================
@@ -168,12 +167,6 @@ class ConnectionManager:
             return
 
         ws = conn["ws"]
-
-        logger.info(
-            "WS send: ws_id=%s message=%s",
-            ws_id,
-            message
-        )
 
         try:
             logger.info(

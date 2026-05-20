@@ -62,15 +62,11 @@ class OrderItemService:
             order_service
         )
 
-        self.db.commit()
-        self.db.refresh(item)
-
         # =========================
         # EVENTOS
         # =========================
 
         payload = {
-            "type": "ITEM_STATUS_CHANGED",
             "order_id": order.id,
             "item_id": item.id,
             "status": new_status.value,
@@ -85,7 +81,7 @@ class OrderItemService:
             event_type="ITEM_STATUS_CHANGED",
             payload=payload,
             target="station",
-            target_id=item.product.station_id
+            target_id=str(item.product.station_id)
         )
 
         # mozos
@@ -103,7 +99,6 @@ class OrderItemService:
                 restaurant_id=order.restaurant_id,
                 event_type="ITEM_READY",
                 payload={
-                    "type": "ITEM_READY",
                     "order_id": order.id,
                     "table": order.table.number,
                     "product": item.product.name,
@@ -119,14 +114,14 @@ class OrderItemService:
                 restaurant_id=order.restaurant_id,
                 event_type="ORDER_STATUS_CHANGED",
                 payload={
-                    "type": "ORDER_STATUS_CHANGED",
                     "order_id": order.id,
                     "status": order.status.value
                 },
                 target="role",
                 target_id=UserRole.WAITER.value
             )
-
+        self.db.commit()
+        self.db.refresh(item)
         return item
     
     # -------------------------

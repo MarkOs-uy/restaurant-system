@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { apiFetch } from "../api"
+import { wsService } from "../services/wsService"
 
 interface Station {
   id: number
@@ -10,7 +11,6 @@ interface Station {
 export default function KitchenStations() {
 
   const navigate = useNavigate()
-
   const [stations, setStations] = useState<Station[]>([])
 
   useEffect(() => {
@@ -18,9 +18,7 @@ export default function KitchenStations() {
   }, [])
 
   const fetchStations = async () => {
-    const data = await apiFetch(
-      `/stations/active`
-    )
+    const data = await apiFetch(`/stations/active`)
     setStations(data)
   }
 
@@ -33,6 +31,7 @@ export default function KitchenStations() {
           key={station.id}
           onClick={() => {
             localStorage.setItem("kitchen_station_id", station.id.toString())
+            wsService.connect(station.id)
             navigate(`/kitchen/${station.id}`)
           }}
           style={{

@@ -1,5 +1,7 @@
 import { useEffect, useReducer } from "react"
-import { apiFetch, WS_URL } from "../api"
+import { apiFetch } from "../api"
+import { wsService } from "../services/wsService"
+import type { WSEventParsed } from "../ws"
 
 interface Item {
   id: number
@@ -100,8 +102,13 @@ function ordersReducer(state: Order[], event: Event): Order[] {
 
     case "ORDER_CLOSED":
       return state.filter(order => order.id !== event.order_id)
+
+    case "ORDER_UPDATED":
+      return state
+
     default:
       return state
+
   }
 }
 
@@ -130,55 +137,21 @@ export default function Waiter() {
   ========================= */
 
   useEffect(() => {
-
-    let ws: WebSocket | null = null
-    let reconnectTimer: any = null
-
     fetchOrders()
-
-    const connect = () => {
-
-      ws = new WebSocket(
-        `${WS_URL}/ws?token=${localStorage.getItem("token")}`
-      )
-
-      ws.onopen = () => {
-        console.log("Waiter WS connected")
+    const handler = ({ type, data }: WSEventParsed) => {
+      console.log("WS EVENT:", type, data)
+      if (type === "ITEM_READY") {
+        playSound()
       }
-
-      ws.onmessage = (event) => {
-
-        let data
-
-        try {
-          data = JSON.parse(event.data)
-        } catch {
-          return
-        }
-
-        if (data.type === "ITEM_READY") {
-          playSound()
-        }
-
-        dispatch(data)
-      }
-
-      ws.onclose = () => {
-        reconnectTimer = setTimeout(connect, 2000)
-      }
-
-      ws.onerror = () => {
-        ws?.close()
-      }
+      dispatch({
+        type,
+        ...data
+      })
     }
-
-    connect()
-
+    wsService.subscribe(handler)
     return () => {
-      ws?.close()
-      if (reconnectTimer) clearTimeout(reconnectTimer)
+      wsService.unsubscribe(handler)
     }
-
   }, [])
 
   /* =========================

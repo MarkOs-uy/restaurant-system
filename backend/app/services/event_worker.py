@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -44,7 +44,6 @@ class EventWorker:
 
             try:
                 await self._process_batch()
-                await self._cleanup_old_events()
 
             except Exception as e:
                 logger.exception("EventWorker loop error: %s", e)
@@ -80,7 +79,7 @@ class EventWorker:
                     await self._deliver_event(event)
 
                     event.status = "processed"
-                    event.processed_at = datetime.utcnow()
+                    event.processed_at = datetime.now(timezone.utc)
 
                 except Exception as e:
 
@@ -160,35 +159,3 @@ class EventWorker:
                 "target_id": event.target_id
             })
         )
-    # =========================
-    # CLEANUP
-    # =========================
-
-    async def _cleanup_old_events(self):
-
-        db: Session = SessionLocal()
-
-        try:
-
-            cutoff = datetime.utcnow() - timedelta(hours=EVENT_TTL_HOURS)
-
-            stmt = (
-                select(EventOutbox)
-                .where(
-                    EventOutbox.status == "processed",
-                    EventOutbox.processed_at < cutoff
-                )
-                .limit(200)
-            )
-
-            old_events = db.execute(stmt).scalars().all()
-
-            for event in old_events:
-                db.delete(event)
-
-            if old_events:
-                db.commit()
-                logger.info("Cleaned %s old events", len(old_events))
-
-        finally:
-            db.close()

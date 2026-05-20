@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { apiFetch, WS_URL } from "../api"
+import { apiFetch } from "../api"
+import { wsService } from "../services/wsService"
 
 interface KitchenItem {
   item_id: number
@@ -30,6 +31,8 @@ export default function Kitchen() {
 
   useEffect(() => {
     if (!station) return
+    localStorage.setItem("kitchen_station_id", String(station))
+    wsService.connect(station)
     fetchItems()
     fetchStation()
   }, [station])
@@ -100,28 +103,21 @@ export default function Kitchen() {
     return acc
   }, {} as Record<number, { table: number, created_at: string, items: KitchenItem[] }>)
 
-//-----------------------------------------------------------
+  //-----------------------------------------------------------
 
   useEffect(() => {
-    let ws: WebSocket | null = null
-    let reconnectTimer: any = null
-    let shouldReconnect = true
 
-    // 🔥 CONTROL DE FETCH
     let fetching = false
     let pending = false
 
     const safeFetchItems = async () => {
-
       if (fetching) {
         pending = true
         return
       }
 
       fetching = true
-
       await fetchItems()
-
       fetching = false
 
       if (pending) {
@@ -130,62 +126,35 @@ export default function Kitchen() {
       }
     }
 
-    // 👉 carga inicial
     safeFetchItems()
 
-    const connect = () => {
+    const listener = (event: any) => {
 
-      const token = localStorage.getItem("token")
+      console.log("Kitchen WS EVENT:", event)
 
-      ws = new WebSocket(
-        `${WS_URL}/ws?token=${token}&station_id=${stationId}`
-      )
+      const { type, target, target_id } = event
 
-      ws.onopen = () => {
-        console.log("Kitchen WS connected")
+      if (target === "station" && Number(target_id) !== station) {
+        return
       }
 
-      ws.onmessage = (event) => {
-
-        const data = JSON.parse(event.data)
-
-        switch (data.type) {
-
-          case "ORDER_UPDATED":
-          case "ORDER_STATUS_CHANGED":
-            safeFetchItems()
-            break
-
-        }
-
+      switch (type) {
+        case "NEW_ITEM":
+        case "ORDER_UPDATED":
+        case "ORDER_STATUS_CHANGED":
+        case "ITEM_STATUS_CHANGED":
+          safeFetchItems()
+          break
       }
-
-      ws.onclose = () => {
-        console.log("Kitchen WS disconnected")
-
-        if (!shouldReconnect) return
-
-        reconnectTimer = setTimeout(() => {
-          console.log("Reconnecting kitchen WS...")
-          connect()
-        }, 2000)
-      }
-
-      ws.onerror = () => {
-        ws?.close()
-      }
-
     }
 
-    connect()
+    wsService.subscribe(listener)
 
     return () => {
-      shouldReconnect = false
-      ws?.close()
-      if (reconnectTimer) clearTimeout(reconnectTimer)
+      wsService.unsubscribe(listener)
     }
 
-  }, [stationId])
+  }, [station])
 
 //-----------------------------------------------------------
 

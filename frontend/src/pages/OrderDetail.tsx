@@ -1,6 +1,9 @@
 import { useParams, useNavigate } from "react-router-dom"
 import { useEffect, useState, useRef } from "react"
-import { apiFetch, WS_URL } from "../api"
+import { apiFetch } from "../api"
+import { wsService } from "../services/wsService"
+import type { WSEventParsed } from "../ws"
+import { moneyToNumber } from "../utils/money"
 
 interface Item {
   id: number
@@ -42,6 +45,25 @@ interface Product {
   price: number
 }
 
+function normalizeOrder(data: any): Order {
+  return {
+    ...data,
+    items: (data.items ?? []).map((item: any) => ({
+      ...item,
+      unit_price: moneyToNumber(item.unit_price)
+    })),
+    payments: (data.payments ?? []).map((payment: any) => ({
+      ...payment,
+      amount: moneyToNumber(payment.amount)
+    })),
+    subtotal: moneyToNumber(data.subtotal),
+    total: moneyToNumber(data.total),
+    total_paid: moneyToNumber(data.total_paid),
+    remaining: moneyToNumber(data.remaining),
+    discount: moneyToNumber(data.discount)
+  }
+}
+
 export default function OrderDetail() {
 
   const { orderId, tableId } = useParams()
@@ -74,47 +96,25 @@ export default function OrderDetail() {
 
   useEffect(() => {
     if (!id) return
-    const token = localStorage.getItem("token")
-    if (!token) return
-    const ws = new WebSocket(`${WS_URL}/ws?token=${token}`)
-    ws.onopen = () => {
-      console.log("OrderDetail WS conectado")
-    }
-    ws.onmessage = (event) => {
-      try {
-
-        const evt = JSON.parse(event.data)
-        const data = evt.payload ?? evt
-
-        if (!evt?.type) return
-
-        const relevantEvents = [
-          "ORDER_UPDATED",
-          "ORDER_STATUS_CHANGED",
-          "ITEM_STATUS_CHANGED",
-          "PAYMENT_ADDED"
-        ]
-
-        if (
-          relevantEvents.includes(evt.type) &&
-          data.order_id === id
-        ) {
-          fetchOrder()
-        }
-
-      } catch (err) {
-        console.error("WS parse error", err)
+    const handler = ({ type, data }: WSEventParsed) => {
+      const relevantEvents = [
+        "ORDER_UPDATED",
+        "ORDER_STATUS_CHANGED",
+        "ITEM_STATUS_CHANGED",
+        "PAYMENT_ADDED"
+      ]
+      if (
+        relevantEvents.includes(type) &&
+        data.order_id === id
+      ) {
+        fetchOrder()
       }
     }
-    ws.onclose = () => {
-      console.log("OrderDetail WS cerrado")
+    wsService.subscribe(handler)
+    return () => {
+      wsService.unsubscribe(handler)
     }
-    ws.onerror = () => {
-      ws.close()
-    }
-    return () => ws.close()
   }, [id])
-
   
   useEffect(() => {
     if (!order) return
@@ -126,7 +126,7 @@ export default function OrderDetail() {
     setLoading(true)
     try {
       const data = await apiFetch(`/orders/${id}`)
-      setOrder(data)
+      setOrder(normalizeOrder(data))
     } finally {
       setLoading(false)
     }

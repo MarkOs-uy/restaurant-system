@@ -1,3 +1,4 @@
+import { logout } from "./services/auth"
 export const API_URL = import.meta.env.VITE_API_URL || "/api"
 
 const defaultWsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:"
@@ -7,12 +8,6 @@ export const WS_URL =
 export const getAuthHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem("token")}`
 })
-
-export const logout = () => {
-  localStorage.removeItem("token")
-  localStorage.removeItem("role")
-  window.location.href = "/login"
-}
 
 type ApiFetchOptions = Omit<RequestInit, "body"> & {
   body?: any

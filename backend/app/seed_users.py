@@ -16,10 +16,10 @@ def seed_users(db: Session):
 
     print("Creando usuario admin...")
 
+    admin_password = os.getenv("ADMIN_SEED_PASSWORD")
+
     if not admin_password:
-        admin_password = os.getenv("ADMIN_SEED_PASSWORD")
-        if not admin_password:
-            raise ValueError("ADMIN_SEED_PASSWORD debe estar configurado")
+        raise ValueError("ADMIN_SEED_PASSWORD debe estar configurado")
     
     pass_hash = get_password_hash(admin_password)
 

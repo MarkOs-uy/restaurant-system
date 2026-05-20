@@ -6,6 +6,8 @@ import { CashMovementType,
   WSEvent,  
    } from "../types"
 import type { CashRegisterDashboard, CashMovement, CashRegisterCloseSummary } from "../types"
+import { parseWSEvent } from "../ws"
+import { moneyToNumber } from "../utils/money"
 
 interface Order {
   id: number
@@ -125,19 +127,57 @@ function normalizeDashboard(data: any): CashRegisterDashboard {
 
   return {
     ...data,
-    opening_amount: Number(data.opening_amount),
-    total_sales: Number(data.total_sales),
-    average_ticket: Number(data.average_ticket),
-    expected_cash: Number(data.expected_cash),
+    opening_amount: moneyToNumber(data.opening_amount),
+    total_sales: moneyToNumber(data.total_sales),
+    average_ticket: moneyToNumber(data.average_ticket),
+    expected_cash: moneyToNumber(data.expected_cash),
     by_method: Object.fromEntries(
-      Object.entries(data.by_method).map(
-        ([method, amount]) => [method, Number(amount)]
+      Object.entries(data.by_method ?? {}).map(
+        ([method, amount]) => [method, moneyToNumber(amount)]
       )
     ),
-    cash_movements: data.cash_movements.map((m: any) => ({
+    cash_movements: (data.cash_movements ?? []).map((m: any) => ({
       ...m,
-      amount: Number(m.amount)
+      amount: moneyToNumber(m.amount)
     }))
+  }
+}
+
+function normalizePayment(data: any): Payment {
+  return {
+    ...data,
+    amount: moneyToNumber(data.amount)
+  }
+}
+
+function normalizeOrder(data: any): Order {
+  return {
+    ...data,
+    subtotal: moneyToNumber(data.subtotal),
+    total: moneyToNumber(data.total),
+    total_paid: moneyToNumber(data.total_paid),
+    remaining: moneyToNumber(data.remaining),
+    discount: moneyToNumber(data.discount),
+    payments: (data.payments ?? []).map(normalizePayment)
+  }
+}
+
+function normalizeCloseSummary(data: any): CashRegisterCloseSummary {
+  return {
+    ...data,
+    total_sales: moneyToNumber(data.total_sales),
+    opening_amount: moneyToNumber(data.opening_amount),
+    closing_amount: moneyToNumber(data.closing_amount),
+    cash_in: moneyToNumber(data.cash_in),
+    cash_out: moneyToNumber(data.cash_out),
+    expected_cash: moneyToNumber(data.expected_cash),
+    counted_cash: moneyToNumber(data.counted_cash),
+    difference: moneyToNumber(data.difference),
+    by_method: Object.fromEntries(
+      Object.entries(data.by_method ?? {}).map(
+        ([method, amount]) => [method, moneyToNumber(amount)]
+      )
+    ) as Record<PaymentMethod, number>
   }
 }
 
@@ -228,7 +268,7 @@ export default function CashierPage() {
   const fetchActiveOrders = async () => {
     try {
       const data = await apiFetch("/orders/active")
-      dispatch({ type: "SET_ORDERS", payload: data })
+      dispatch({ type: "SET_ORDERS", payload: data.map(normalizeOrder) })
     } catch {
       dispatch({ type: "SET_ORDERS", payload: [] })
     }
@@ -261,9 +301,9 @@ export default function CashierPage() {
       const data = await apiFetch(`/orders/${orderId}`)
       dispatch({
         type:"SELECT_ORDER",
-        payload:data
+        payload: normalizeOrder(data)
       })
-      setPaymentAmount(data.remaining.toString())
+      setPaymentAmount(moneyToNumber(data.remaining).toString())
       setDiscount("")
       setTimeout(()=>{
         paymentInputRef.current?.focus()
@@ -386,7 +426,7 @@ export default function CashierPage() {
         }
       })
       setCloseModalOpen(false)
-      setCloseSummary(summary)
+      setCloseSummary(normalizeCloseSummary(summary))
       setShowCloseSummary(true)
       dispatch({
         type: "SET_DASHBOARD",
@@ -448,19 +488,17 @@ export default function CashierPage() {
 
       ws.onmessage = async (event) => {
 
-        console.log("WS MESSAGE", event.data)
-
-        const evt = JSON.parse(event.data)
-
-        const type = evt.type
-        const data = evt.payload ?? {}
+        const { type, data } = parseWSEvent(event)
 
         switch (type) {
 
           case WSEvent.CASH_MOVEMENT_ADDED:
             dispatch({
               type: "ADD_MOVEMENT",
-              payload: data.movement
+              payload: {
+                ...data.movement,
+                amount: moneyToNumber(data.movement.amount)
+              }
             })
           break
 
@@ -469,7 +507,7 @@ export default function CashierPage() {
               type: "DELETE_MOVEMENT",
               payload:{
                 movement_id: data.movement_id,
-                amount: data.amount,
+                amount: moneyToNumber(data.amount),
                 movement_type: data.movement_type
               }
             })

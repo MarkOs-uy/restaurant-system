@@ -1,29 +1,39 @@
 #!/usr/bin/env python3
 """
-POS Zeroconf announcer
-Anuncia los servicios del POS en la red local.
+POS Zeroconf announcer.
 
-Servicios publicados:
-- _pos._tcp.local  → descubrimiento del POS
-- _http._tcp.local → acceso web
-- _ws._tcp.local   → websocket
+Publishes the POS services on the local network so phones/tablets can discover
+the server. The hostname itself (pos.local by default) is provided by Avahi on
+the Linux host; this script publishes service metadata and ports.
 """
 
-import socket
-import time
+import os
 import signal
+import socket
 import sys
-from zeroconf import Zeroconf, ServiceInfo
+import time
+
+from zeroconf import ServiceInfo, Zeroconf
 
 
-def get_local_ip():
-    """Obtiene la IP local de la máquina"""
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-        s.connect(("8.8.8.8", 80))
-        return s.getsockname()[0]
+HOSTNAME = os.getenv("POS_HOSTNAME", "pos.local").rstrip(".")
+FRONTEND_PORT = int(os.getenv("POS_FRONTEND_PORT", "5173"))
+BACKEND_PORT = int(os.getenv("POS_BACKEND_PORT", "8000"))
+SERVICE_NAME = os.getenv("POS_SERVICE_NAME", "restaurant-pos")
 
 
-def create_service(service_type, name, port, ip):
+def get_local_ip() -> str:
+    """Return the LAN IP without requiring the destination to be reachable."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect(("8.8.8.8", 80))
+            return sock.getsockname()[0]
+    except OSError:
+        hostname = socket.gethostname()
+        return socket.gethostbyname(hostname)
+
+
+def create_service(service_type: str, name: str, port: int, ip: str) -> ServiceInfo:
     return ServiceInfo(
         service_type,
         f"{name}.{service_type}",
@@ -31,57 +41,52 @@ def create_service(service_type, name, port, ip):
         port=port,
         properties={
             "version": "1.0",
-            "service": name
+            "hostname": HOSTNAME,
+            "service": name,
         },
-        server="pos.local."
+        server=f"{HOSTNAME}.",
     )
 
 
-def main():
-
+def main() -> None:
     ip = get_local_ip()
 
     print("POS Zeroconf announcer")
     print("IP detectada:", ip)
+    print("Hostname:", f"{HOSTNAME}.")
 
     zeroconf = Zeroconf()
 
     services = [
-
         create_service(
             "_pos._tcp.local.",
-            "restaurant-pos",
-            80,
-            ip
+            SERVICE_NAME,
+            FRONTEND_PORT,
+            ip,
         ),
-
         create_service(
             "_http._tcp.local.",
-            "restaurant-pos-web",
-            80,
-            ip
+            f"{SERVICE_NAME}-web",
+            FRONTEND_PORT,
+            ip,
         ),
-
         create_service(
             "_ws._tcp.local.",
-            "restaurant-pos-ws",
-            8000,
-            ip
-        )
-
+            f"{SERVICE_NAME}-ws",
+            BACKEND_PORT,
+            ip,
+        ),
     ]
 
     for service in services:
         zeroconf.register_service(service)
-        print("Servicio publicado:", service.name)
+        print("Servicio publicado:", service.name, "puerto:", service.port)
 
     print("\nPOS disponible en:")
-    print(f"http://pos.local")
-    print(f"http://{ip}")
+    print(f"http://{HOSTNAME}:{FRONTEND_PORT}")
+    print(f"http://{ip}:{FRONTEND_PORT}")
 
-    print("\nCtrl+C para detener")
-
-    def shutdown(sig, frame):
+    def shutdown(_sig, _frame) -> None:
         print("\nCerrando Zeroconf...")
         for service in services:
             zeroconf.unregister_service(service)

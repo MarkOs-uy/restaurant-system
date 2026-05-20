@@ -15,6 +15,7 @@ from app.domain.order.order_transitions import is_valid_order_transition
 from app.domain.order.constants import ACTIVE_ORDER_STATUSES
 from app.domain.errors.base import DomainError
 from app.domain.errors.error_codes import ErrorCode
+from app.utils.money import money
 
 logger = logging.getLogger("app.domain.order")
 
@@ -96,8 +97,8 @@ class OrderService:
                     "id": item.id,
                     "product_name": item.product.name,
                     "quantity": item.quantity,
-                    "unit_price": float(item.unit_price),
-                    "subtotal": float(item.quantity * item.unit_price),
+                    "unit_price": money(item.unit_price),
+                    "subtotal": money(item.quantity * item.unit_price),
                     "status": item.status.value
                 }
                 for item in order.items
@@ -105,16 +106,16 @@ class OrderService:
             "payments": [
                 {
                     "id": p.id,
-                    "amount": float(p.amount),
+                    "amount": money(p.amount),
                     "method": p.method
                 }
                 for p in order.payments
             ],
-            "total": float(total),
-            "subtotal": float(subtotal),
-            "discount": float(order.discount or 0),
-            "total_paid": float(total_paid),
-            "remaining": float(remaining)
+            "total": money(total),
+            "subtotal": money(subtotal),
+            "discount": money(order.discount or 0),
+            "total_paid": money(total_paid),
+            "remaining": money(remaining)
         }
 
     # -------------------------
@@ -147,7 +148,7 @@ class OrderService:
                 ],
                 "total": total,
                 "subtotal": subtotal,
-                "discount": float(order.discount or 0),
+                "discount": money(order.discount or 0),
                 "total_paid": total_paid,
                 "remaining": remaining
             })
@@ -191,8 +192,8 @@ class OrderService:
                 "Discount cannot exceed order subtotal",
                 ErrorCode.INVALID_OPERATION,
                 context={
-                    "discount": float(discount),
-                    "subtotal": float(subtotal)
+                    "discount": money(discount),
+                    "subtotal": money(subtotal)
                 }
             )
         new_total = subtotal - discount
@@ -201,9 +202,9 @@ class OrderService:
                 "Discount would make paid amount exceed order total",
                 ErrorCode.INVALID_OPERATION,
                 context={
-                    "discount": float(discount),
-                    "new_total": float(new_total),
-                    "total_paid": float(total_paid)
+                    "discount": money(discount),
+                    "new_total": money(new_total),
+                    "total_paid": money(total_paid)
                 }
             )
         logger.info("Descuento aplicado order_id=%s discount=%s", order.id, discount)
@@ -462,9 +463,9 @@ class OrderService:
                 "product_id": item.product_id,
                 "product_name": item.product.name,
                 "quantity": item.quantity,
-                "unit_price": float(item.unit_price),
+                "unit_price": money(item.unit_price),
                 "status": item.status.value,
-                "subtotal": float(item.quantity * item.unit_price)
+                "subtotal": money(item.quantity * item.unit_price)
             }
             for item in pending_items
         ]
@@ -492,8 +493,8 @@ class OrderService:
                 "Payment exceeds remaining balance",
                 ErrorCode.PAYMENT_EXCEEDS_REMAINING,
                 context={
-                    "amount": float(amount),
-                    "remaining": float(remaining)
+                    "amount": money(amount),
+                    "remaining": money(remaining)
                 }
             )
         logger.info("Pago agregado order_id=%s amount=%s method=%s", order.id, amount, method)
@@ -511,7 +512,7 @@ class OrderService:
             self.events.emit(
                 restaurant_id=order.restaurant_id,
                 event_type="PAYMENT_ADDED",
-                payload={"order_id": order.id, "amount": float(amount), "method": method},
+                payload={"order_id": order.id, "amount": money(amount), "method": method},
                 target="role",
                 target_id=role.value
             )
@@ -564,7 +565,7 @@ class OrderService:
                 event_type="PAYMENT_DELETED",
                 payload={
                     "order_id": order_id,
-                    "amount": float(amount),
+                    "amount": money(amount),
                     "method": method
                 },
                 target="role",
@@ -598,7 +599,7 @@ class OrderService:
             raise DomainError(
                 f"La orden no está paga. Saldo: {remaining:.2f}",
                 ErrorCode.ORDER_HAS_REMAINING_BALANCE,
-                context={"remaining": float(remaining)}
+                context={"remaining": money(remaining)}
             )
 
         if not order.items:

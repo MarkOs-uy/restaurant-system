@@ -16,6 +16,8 @@ import ManageTables from "./pages/ManageTables"
 import { startHealthMonitor } from "./services/healthMonitor.ts"
 import { useState, useEffect } from "react"
 import { Toaster } from "react-hot-toast"
+import { wsService } from "./services/wsService.ts"
+import { logout } from "./services/auth"
 
 function App() {
   const [role, setRole] = useState<string | null>(null)
@@ -23,12 +25,19 @@ function App() {
   const isKitchen = role === "ADMIN" || role === "KITCHEN"
   const isCashier = role === "ADMIN" || role === "CASHIER"
   const isAdmin = role === "ADMIN"
-  const logout = () => {
-    localStorage.removeItem("token")
-    localStorage.removeItem("role")
-    window.dispatchEvent(new Event("authChanged"))
-    window.location.href = "/login"
-  }
+
+
+  useEffect(() => {
+
+    const token = localStorage.getItem("token")
+
+    if (token) {
+      wsService.connect()
+    } else {
+      wsService.disconnect()
+    }
+
+  }, [role])
 
   useEffect(() => {
     startHealthMonitor()

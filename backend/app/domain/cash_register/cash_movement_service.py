@@ -5,6 +5,7 @@ from app.domain.errors.base import DomainError
 from app.domain.errors.error_codes import ErrorCode
 from app.models.user import UserRole
 from app.services.event_service import EventService
+from app.utils.money import money
 
 
 class CashMovementService:
@@ -56,7 +57,7 @@ class CashMovementService:
                 "movement": {
                     "id": movement.id,
                     "type": movement.type,
-                    "amount": float(movement.amount),
+                    "amount": money(movement.amount),
                     "reason": movement.reason,
                     "created_at": movement.created_at.isoformat()
                 }
@@ -101,7 +102,7 @@ class CashMovementService:
             event_type="CASH_MOVEMENT_DELETED",
             payload={
                 "movement_id": movement_id,
-                "amount": float(amount),
+                "amount": money(amount),
                 "movement_type": movement_type
             },
             target="role",

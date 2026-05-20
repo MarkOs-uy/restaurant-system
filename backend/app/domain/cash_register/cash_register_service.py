@@ -13,6 +13,7 @@ from app.models.cash_movement import CashMovementType
 from app.domain.errors.base import DomainError
 from app.domain.errors.error_codes import ErrorCode
 from app.core.serialization import decimal_dict_to_float
+from app.utils.money import money
 
 logger = logging.getLogger("app.domain.cash_register")
 
@@ -113,7 +114,7 @@ class CashRegisterService:
             raise DomainError(
                 "opening amount must be greater than or equal to zero",
                 ErrorCode.INVALID_OPERATION,
-                context={"opening_amount": float(opening_amount)}
+                context={"opening_amount": money(opening_amount)}
             )
 
         existing = self.db.query(CashRegister).filter(
@@ -148,7 +149,7 @@ class CashRegisterService:
             raise DomainError(
                 "counted cash must be greater than or equal to zero",
                 ErrorCode.CASH_REGISTER_INVALID_COUNT,
-                context={"counted_cash": float(counted_cash)}
+                context={"counted_cash": money(counted_cash)}
             )
 
         cash_register = self._get_open_cash_register(

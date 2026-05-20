@@ -1,5 +1,5 @@
 # 📊 Project Summary
-Generated: 2026-05-04 10:47:09.622171
+Generated: 2026-05-18 15:56:02.938826
 
 ## 📁 Estructura del proyecto
 
@@ -15,6 +15,7 @@ Generated: 2026-05-04 10:47:09.622171
         - 530c9b9f2a9f_initial_schema.py
         - 5aa86605f254_add_discount_to_orders.py
         - 6ba12f28852f_cambios_en_cashregister.py
+        - 6e40084bfae8_create_event_outbox.py
         - 7b0b567ffe9e_add_discount_to_orders.py
         - 7fd07db91f0d_refactor_restaurant_layout_structure.py
         - 900c4d6546a2_creando_tabla_de_eventos.py
@@ -42,6 +43,7 @@ Generated: 2026-05-04 10:47:09.622171
       - dependencies/
         - auth.py
         - permissions.py
+        - roles.py
       - domain/
         - cash_register/
           - cash_movement_service.py
@@ -87,6 +89,7 @@ Generated: 2026-05-04 10:47:09.622171
         - cash_register.py
         - category.py
         - domain_event.py
+        - event_outbox.py
         - order.py
         - order_item.py
         - payment.py
@@ -126,7 +129,9 @@ Generated: 2026-05-04 10:47:09.622171
           - order_item.py
           - payment.py
       - services/
+        - event_cleanup.py
         - event_service.py
+        - event_worker.py
       - websocket/
         - manager.py
         - ws.py
@@ -865,6 +870,227 @@ def downgrade() -> None:
 
 ---
 
+### .\backend\alembic\versions\6e40084bfae8_create_event_outbox.py
+
+**Funciones (2):**
+- upgrade
+- downgrade
+
+**Clases (0):**
+
+**Imports (4):**
+- typing.Sequence
+- typing.Union
+- alembic.op
+- sqlalchemy
+
+```python
+"""create event_outbox
+
+Revision ID: 6e40084bfae8
+Revises: 6ba12f28852f
+Create Date: 2026-05-05 18:52:54.136588
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+
+
+# revision identifiers, used by Alembic.
+revision: str = '6e40084bfae8'
+down_revision: Union[str, Sequence[str], None] = '6ba12f28852f'
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade():
+
+    # =============================
+    # CREAR TABLA EVENT_OUTBOX
+    # =============================
+
+    op.create_table(
+        "event_outbox",
+
+        sa.Column("id", sa.Integer(), primary_key=True),
+
+        sa.Column(
+            "restaurant_id",
+            sa.Integer(),
+            sa.ForeignKey("restaurants.id"),
+            nullable=False
+        ),
+
+        sa.Column(
+            "event_type",
+            sa.String(),
+            nullable=False
+        ),
+
+        sa.Column(
+            "payload",
+            sa.JSON(),
+            nullable=False
+        ),
+
+        sa.Column(
+            "target",
+            sa.String(),
+            nullable=False
+        ),
+
+        sa.Column(
+            "target_id",
+            sa.String(),
+            nullable=True
+        ),
+
+        sa.Column(
+            "status",
+            sa.String(),
+            nullable=False,
+            server_default="pending"
+        ),
+
+        sa.Column(
+            "retries",
+            sa.Integer(),
+            nullable=False,
+            server_default="0"
+        ),
+
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False
+        ),
+
+        sa.Column(
+            "processed_at",
+            sa.DateTime(timezone=True),
+            nullable=True
+        ),
+
+        sa.Column(
+            "last_error",
+            sa.String(),
+            nullable=True
+        ),
+    )
+
+
+    # =============================
+    # INDEXES
+    # =============================
+
+    op.create_index(
+        "ix_event_outbox_restaurant",
+        "event_outbox",
+        ["restaurant_id"]
+    )
+
+    op.create_index(
+        "ix_event_outbox_status",
+        "event_outbox",
+        ["status"]
+    )
+
+    op.create_index(
+        "ix_event_outbox_created",
+        "event_outbox",
+        ["created_at"]
+    )
+
+    op.create_index(
+        "ix_event_outbox_event_type",
+        "event_outbox",
+        ["event_type"]
+    )
+
+    # --------------------------------------
+    # Índice para cleanup de eventos enviados
+    # --------------------------------------
+
+    op.create_index(
+        "idx_event_outbox_cleanup",
+        "event_outbox",
+        ["status", "processed_at"]
+    )
+
+    # --------------------------------------
+    # Índice para cleanup de eventos fallidos
+    # --------------------------------------
+
+    op.create_index(
+        "idx_event_outbox_failed_cleanup",
+        "event_outbox",
+        ["status", "retries", "created_at"]
+    )
+
+
+    # =============================
+    # ELIMINAR DOMAIN_EVENTS
+    # =============================
+
+    op.drop_table("domain_events")
+
+
+def downgrade():
+
+    # =============================
+    # RECREAR DOMAIN_EVENTS
+    # =============================
+
+    op.create_table(
+        "domain_events",
+
+        sa.Column("id", sa.Integer(), primary_key=True),
+
+        sa.Column(
+            "restaurant_id",
+            sa.Integer(),
+            sa.ForeignKey("restaurants.id"),
+            nullable=False
+        ),
+
+        sa.Column(
+            "event_type",
+            sa.String(),
+            nullable=True
+        ),
+
+        sa.Column(
+            "payload",
+            sa.JSON(),
+            nullable=False
+        ),
+
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False
+        ),
+    )
+
+
+    # =============================
+    # ELIMINAR EVENT_OUTBOX
+    # =============================
+
+    op.drop_index("ix_event_outbox_event_type", table_name="event_outbox")
+    op.drop_index("ix_event_outbox_created", table_name="event_outbox")
+    op.drop_index("ix_event_outbox_status", table_name="event_outbox")
+    op.drop_index("ix_event_outbox_restaurant", table_name="event_outbox")
+
+    op.drop_table("event_outbox")
+```
+
+---
+
 ### .\backend\alembic\versions\7b0b567ffe9e_add_discount_to_orders.py
 
 **Funciones (2):**
@@ -1413,7 +1639,7 @@ def downgrade() -> None:
 
 **Clases (0):**
 
-**Imports (23):**
+**Imports (25):**
 - fastapi.FastAPI
 - fastapi.Request
 - fastapi.responses.JSONResponse
@@ -1422,6 +1648,8 @@ def downgrade() -> None:
 - asyncio
 - logging
 - app.models
+- app.services.event_worker.EventWorker
+- app.services.event_cleanup.EventCleanup
 - app.events.redis_listener.redis_event_listener
 - app.routers.tables
 - app.routers.orders
@@ -1448,6 +1676,8 @@ import asyncio
 import logging
 
 from app import models
+from app.services.event_worker import EventWorker
+from app.services.event_cleanup import EventCleanup
 from app.events.redis_listener import redis_event_listener
 
 # routers
@@ -1471,24 +1701,44 @@ async def lifespan(app: FastAPI):
 
     logger.info("Backend arrancando...")
 
-    # 🔥 REGISTRAR EVENT LOOP PARA EVENT SERVICE
-    #event_service.loop = asyncio.get_running_loop()
-
-    #print("EventService loop registrado")
+    # Event worker
+    worker = EventWorker()
+    worker_task = asyncio.create_task(worker.run())
+    logger.info("Event worker iniciado")
 
     # Redis listener
     redis_task = asyncio.create_task(redis_event_listener())
     logger.info("Redis listener iniciado")
 
+    # Event cleanup
+    cleanup = EventCleanup(interval_seconds=3600)
+    cleanup_task = asyncio.create_task(cleanup.run())
+    logger.info("Event cleanup iniciado")
+
     yield
 
     logger.info("Backend apagándose...")
 
+    # Cancelar redis
     redis_task.cancel()
     try:
         await redis_task
     except asyncio.CancelledError:
-        pass
+        logger.info("Redis listener detenido")
+
+    # Cancelar worker
+    worker_task.cancel()
+    try:
+        await worker_task
+    except asyncio.CancelledError:
+        logger.info("Event worker detenido")
+
+    # Cancelar cleanup
+    cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        logger.info("Event cleanup detenido")
 
 
 app = FastAPI(lifespan=lifespan, redirect_slashes=False)
@@ -1810,17 +2060,19 @@ def seed_stations(db: Session):
 
 **Clases (0):**
 
-**Imports (4):**
+**Imports (5):**
 - sqlalchemy.orm.Session
 - app.models.user.User
 - app.seed_restaurant.seed_restaurant
 - app.core.security.get_password_hash
+- os
 
 ```python
 from sqlalchemy.orm import Session
 from app.models.user import User
 from app.seed_restaurant import seed_restaurant
 from app.core.security import get_password_hash
+import os
 
 def seed_users(db: Session):
 
@@ -1834,7 +2086,12 @@ def seed_users(db: Session):
 
     print("Creando usuario admin...")
 
-    pass_hash = get_password_hash("1234")
+    admin_password = os.getenv("ADMIN_SEED_PASSWORD")
+
+    if not admin_password:
+        raise ValueError("ADMIN_SEED_PASSWORD debe estar configurado")
+    
+    pass_hash = get_password_hash(admin_password)
 
     users = [
         User(username="admin", role="ADMIN", password_hash = pass_hash, restaurant_id=restaurant.id)
@@ -1883,10 +2140,9 @@ if not SECRET_KEY:
 ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
-CORS_ORIGINS = _get_csv_env(
-    "CORS_ORIGINS",
-    "http://localhost:5173,http://127.0.0.1:5173",
-)
+CORS_ORIGINS = _get_csv_env("CORS_ORIGINS", "")
+if not CORS_ORIGINS:
+    raise RuntimeError("CORS_ORIGINS debe configurarse explícitamente")
 
 ```
 
@@ -1926,10 +2182,11 @@ redis_client = redis.Redis(
 
 **Clases (0):**
 
-**Imports (9):**
+**Imports (10):**
 - datetime.datetime
 - datetime.timedelta
 - datetime.timezone
+- uuid.uuid4
 - jose.JWTError
 - jose.jwt
 - passlib.context.CryptContext
@@ -1939,9 +2196,13 @@ redis_client = redis.Redis(
 
 ```python
 from datetime import datetime, timedelta, timezone
+from uuid import uuid4
+
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+
 from app.core.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+
 
 pwd_context = CryptContext(
     schemes=["bcrypt"],
@@ -1964,11 +2225,17 @@ def create_access_token(data: dict):
 
     to_encode = data.copy()
 
-    expire = datetime.now(timezone.utc) + timedelta(
+    now = datetime.now(timezone.utc)
+
+    expire = now + timedelta(
         minutes=ACCESS_TOKEN_EXPIRE_MINUTES
     )
 
-    to_encode.update({"exp": expire})
+    to_encode.update({
+        "exp": expire,
+        "iat": now,
+        "jti": str(uuid4())
+    })
 
     return jwt.encode(
         to_encode,
@@ -1988,11 +2255,16 @@ def decode_access_token(token: str):
             algorithms=[ALGORITHM]
         )
 
+        exp = payload.get("exp")
+
+        if exp:
+            if datetime.fromtimestamp(exp, tz=timezone.utc) < datetime.now(timezone.utc):
+                return None
+
         return payload
 
     except JWTError:
         return None
-
 ```
 
 ---
@@ -2219,6 +2491,31 @@ def require_roles(*roles: UserRole):
 
 ---
 
+### .\backend\app\dependencies\roles.py
+
+**Funciones (0):**
+
+**Clases (0):**
+
+**Imports (2):**
+- app.models.user.UserRole
+- app.dependencies.permissions.require_roles
+
+```python
+from app.models.user import UserRole
+from app.dependencies.permissions import require_roles
+
+admin_only = require_roles(UserRole.ADMIN)
+waiter_or_admin = require_roles(UserRole.ADMIN, UserRole.WAITER)
+cashier_or_admin = require_roles(UserRole.ADMIN, UserRole.CASHIER)
+kitchen_or_admin = require_roles(UserRole.ADMIN, UserRole.KITCHEN)
+waiter_kitchen_or_admin = require_roles(UserRole.ADMIN, UserRole.WAITER, UserRole.KITCHEN)
+waiter_cashier_or_admin = require_roles(UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER)
+all_staff = require_roles(UserRole.ADMIN, UserRole.WAITER, UserRole.KITCHEN, UserRole.CASHIER)
+```
+
+---
+
 ### .\backend\app\domain\cash_register\cash_movement_service.py
 
 **Funciones (3):**
@@ -2236,7 +2533,7 @@ def require_roles(*roles: UserRole):
 - app.domain.errors.base.DomainError
 - app.domain.errors.error_codes.ErrorCode
 - app.models.user.UserRole
-- app.services.event_service.event_service
+- app.services.event_service.EventService
 
 ```python
 from sqlalchemy.orm import Session
@@ -2245,13 +2542,14 @@ from app.models.cash_register import CashRegister
 from app.domain.errors.base import DomainError
 from app.domain.errors.error_codes import ErrorCode
 from app.models.user import UserRole
-from app.services.event_service import event_service
+from app.services.event_service import EventService
 
 
 class CashMovementService:
 
     def __init__(self, db: Session):
         self.db = db
+        self.events = EventService(db)
 
 
     # -------------------------
@@ -2288,13 +2586,11 @@ class CashMovementService:
             reason=reason
         )
         self.db.add(movement)
-        self.db.commit()
-        self.db.refresh(movement)
-        event_service.emit_to_role(
-            restaurant_id,
-            UserRole.CASHIER,
-            {
-                "type": "CASH_MOVEMENT_ADDED",
+        self.db.flush()
+        self.events.emit(
+            restaurant_id=restaurant_id,
+            event_type="CASH_MOVEMENT_ADDED",
+            payload={
                 "movement": {
                     "id": movement.id,
                     "type": movement.type,
@@ -2302,8 +2598,13 @@ class CashMovementService:
                     "reason": movement.reason,
                     "created_at": movement.created_at.isoformat()
                 }
-            }
+            },
+            target="role",
+            target_id=UserRole.CASHIER.value
         )
+        self.db.commit()
+        self.db.refresh(movement)
+
         return movement
 
     # -------------------------
@@ -2333,18 +2634,18 @@ class CashMovementService:
         movement_type = movement.type
 
         self.db.delete(movement)
-        self.db.commit()
-
-        event_service.emit_to_role(
-            restaurant_id,
-            UserRole.CASHIER,
-            {
-                "type": "CASH_MOVEMENT_DELETED",
+        self.events.emit(
+            restaurant_id=restaurant_id,
+            event_type="CASH_MOVEMENT_DELETED",
+            payload={
                 "movement_id": movement_id,
                 "amount": float(amount),
                 "movement_type": movement_type
-            }
+            },
+            target="role",
+            target_id=UserRole.CASHIER.value
         )
+        self.db.commit()
         return {"ok": True}
 ```
 
@@ -2367,10 +2668,9 @@ class CashMovementService:
 **Clases (1):**
 - CashRegisterService
 
-**Imports (15):**
+**Imports (14):**
 - decimal.Decimal
 - sqlalchemy.orm.Session
-- sqlalchemy.orm.query
 - sqlalchemy.func
 - logging
 - app.models.cash_register.CashRegister
@@ -2386,7 +2686,7 @@ class CashMovementService:
 
 ```python
 from decimal import Decimal
-from sqlalchemy.orm import Session, query
+from sqlalchemy.orm import Session
 from sqlalchemy import func
 import logging
 
@@ -2414,23 +2714,18 @@ class CashRegisterService:
         restaurant_id: int,
         for_update: bool = False
     ):
-
         query = self.db.query(CashRegister).filter(
             CashRegister.restaurant_id == restaurant_id,
             CashRegister.is_open == True
         )
-
         if for_update:
             query = query.with_for_update()
-
         cash_register = query.first()
-
         if not cash_register:
             raise DomainError(
                 "cash register not open",
                 ErrorCode.CASH_REGISTER_NOT_OPEN
             )
-
         return cash_register
 
 
@@ -3329,7 +3624,7 @@ def get_order_service(
 - app.models.user.UserRole
 - app.models.payment.Payment
 - app.models.table.Table
-- app.services.event_service.event_service
+- app.services.event_service.EventService
 - app.domain.order.order_transitions.is_valid_order_transition
 - app.domain.order.constants.ACTIVE_ORDER_STATUSES
 - app.domain.errors.base.DomainError
@@ -3349,7 +3644,7 @@ from app.models.user import UserRole
 from app.models.payment import Payment
 from app.models.table import Table
 
-from app.services.event_service import event_service
+from app.services.event_service import EventService
 from app.domain.order.order_transitions import is_valid_order_transition
 from app.domain.order.constants import ACTIVE_ORDER_STATUSES
 from app.domain.errors.base import DomainError
@@ -3361,11 +3656,15 @@ class OrderService:
 
     def __init__(self, db: Session):
         self.db = db
+        self.events = EventService(db)
 
     # -------------------------
     # Getters
     # -------------------------
 
+    # -------------------------
+    # Obtener orden por id
+    # -------------------------
     def get_order(self, order_id: int, restaurant_id: int):
         order = (
             self.db.query(Order)
@@ -3382,12 +3681,12 @@ class OrderService:
                 "Orden no encontrada",
                 ErrorCode.ORDER_NOT_FOUND
             )
-
         subtotal, total, total_paid, remaining = self.calculate_totals(order)
-
         return order
 
-
+    # -------------------------
+    # Obtener ordenes activas
+    # -------------------------
     def get_active_orders(self, restaurant_id: int):
         return (
             self.db.query(Order)
@@ -3401,7 +3700,9 @@ class OrderService:
             .all()
         )
 
-
+    # -------------------------
+    # Obtener orden activa por mesa
+    # -------------------------
     def get_active_order(self, restaurant_id: int, table_id: int):
         return (
             self.db.query(Order)
@@ -3413,7 +3714,9 @@ class OrderService:
             .first()
         )
 
-
+    # -------------------------
+    # Serialización
+    # -------------------------
     def serialize_order(self, order: Order):
         subtotal, total, total_paid, remaining = self.calculate_totals(order)
         return {
@@ -3448,7 +3751,9 @@ class OrderService:
             "remaining": float(remaining)
         }
 
-
+    # -------------------------
+    # Serializar ordenes activas
+    # -------------------------
     def serialize_orders(self, restaurant_id: int):
         orders = self.get_active_orders(restaurant_id)
 
@@ -3480,15 +3785,14 @@ class OrderService:
                 "total_paid": total_paid,
                 "remaining": remaining
             })
-
         return result
-
-
 
     # -------------------------
     # Totales
     # -------------------------
-
+    # -------------------------
+    # Calcular totales de la orden
+    # -------------------------
     def calculate_totals(self, order: Order):
         subtotal = sum((item.quantity * item.unit_price for item in order.items), Decimal("0"))
         discount = order.discount or Decimal("0")
@@ -3500,7 +3804,9 @@ class OrderService:
     # -------------------------
     # Descuentos
     # -------------------------
-
+    # -------------------------
+    # Aplicar descuento a la orden
+    # -------------------------
     def apply_discount(self, order: Order, discount: Decimal):
         if order.status == OrderStatus.CLOSED:
             raise DomainError(
@@ -3523,7 +3829,6 @@ class OrderService:
                     "subtotal": float(subtotal)
                 }
             )
-
         new_total = subtotal - discount
         if new_total < total_paid:
             raise DomainError(
@@ -3537,22 +3842,21 @@ class OrderService:
             )
         logger.info("Descuento aplicado order_id=%s discount=%s", order.id, discount)
         order.discount = discount
+        for role in [UserRole.WAITER, UserRole.CASHIER]:
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type="ORDER_UPDATED",
+                payload={"order_id": order.id},
+                target="role",
+                target_id=role.value
+            )
         self.db.commit()
         self.db.refresh(order)
-
-        for role in [UserRole.WAITER, UserRole.CASHIER]:
-            event_service.emit_to_role(
-                order.restaurant_id,
-                role,
-                {"type": "ORDER_UPDATED", "order_id": order.id}
-            )
-
         return self.serialize_order(order)
 
     # -------------------------
     # Crear / agregar items
     # -------------------------
-
     def add_item(self, order: Order, product_id: int, quantity: int) -> OrderItem:
         if order.status == OrderStatus.CLOSED:
             raise DomainError(
@@ -3564,7 +3868,6 @@ class OrderService:
                 "Quantity must be greater than zero",
                 ErrorCode.INVALID_OPERATION
             )
-
         # Buscar producto en la base
         product = (
             self.db.query(Product)
@@ -3581,6 +3884,8 @@ class OrderService:
                 ErrorCode.ITEM_NOT_FOUND,
                 context={"product_id": product_id}
             )
+        
+        previous_status = order.status
 
         existing_item = (
             self.db.query(OrderItem)
@@ -3591,7 +3896,6 @@ class OrderService:
             )
             .first()
         )
-
         if existing_item:
             existing_item.quantity += quantity
             item = existing_item
@@ -3606,41 +3910,48 @@ class OrderService:
             )
             self.db.add(item)
         
-        self.db.commit()
-        self.db.refresh(item)
-
-        previous_status = order.status
-        self.db.refresh(order)
-        self.recalculate_order_status(order)
-
+        self.db.flush()  # Asegura que item.id esté disponible  
+        self.recalculate_order_status(order)      
+        
         # =========================
         # 🔔 EVENTOS
         # =========================
-        event_service.emit_to_station(
-            order.restaurant_id,
-            product.station_id,
-            {"type": "NEW_ITEM", "order_id": order.id}
+        self.events.emit(
+            restaurant_id=order.restaurant_id,
+            event_type="NEW_ITEM",
+            payload={"order_id": order.id},
+            target="station",
+            target_id=str(product.station_id)
         )
 
         if order.status != previous_status:
             for role in [UserRole.WAITER, UserRole.CASHIER]:
-                event_service.emit_to_role(
-                    order.restaurant_id,
-                    role,
-                    {"type": "ORDER_STATUS_CHANGED", "order_id": order.id, "status": order.status.value}
+                self.events.emit(
+                    restaurant_id=order.restaurant_id,
+                    event_type="ORDER_STATUS_CHANGED",
+                    payload={"order_id": order.id, "status": order.status.value},
+                    target="role",
+                    target_id=role.value
                 )
 
         for role in [UserRole.WAITER, UserRole.CASHIER]:
             logger.debug("ORDER_UPDATED emit order_id=%s", order.id)
-            event_service.emit_to_role(
-                order.restaurant_id,
-                role,
-                {"type": "ORDER_UPDATED", "order_id": order.id}
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type="ORDER_UPDATED",
+                payload={"order_id": order.id},
+                target="role",
+                target_id=role.value
             )
 
+        self.db.commit()
+        self.db.refresh(item)
+        self.db.refresh(order)
         return item
 
-
+    # -------------------------
+    # Agregar producto a la mesa (crear orden si no existe)
+    # -------------------------
     def add_product_to_table(self, restaurant_id: int, table_id: int, product_id: int, quantity: int):
         table = self.db.query(Table).filter(Table.id == table_id, Table.restaurant_id == restaurant_id).first()
         if not table:
@@ -3670,7 +3981,9 @@ class OrderService:
     # -------------------------
     # Estados
     # -------------------------
-
+    # -------------------------
+    # Actualizar estado de la orden
+    # -------------------------
     def update_status(self, order: Order, new_status: OrderStatus):
         if order.status == new_status:
             return order
@@ -3684,29 +3997,33 @@ class OrderService:
                     "order_id": order.id
                 }
             )
-
         previous_status = order.status
         order.status = new_status
-
-        self.db.commit()
-        self.db.refresh(order)
-
+        logger.info("Estado de orden actualizado order_id=%s from=%s to=%s", order.id, previous_status.value, new_status.value)
         # Emit events solo si cambio
         if previous_status != new_status:
-            event_service.emit_to_role(
-                order.restaurant_id,
-                UserRole.WAITER,
-                {"type": "ORDER_STATUS_CHANGED", "order_id": order.id, "status": new_status.value}
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type="ORDER_STATUS_CHANGED",
+                payload={"order_id": order.id, "status": new_status.value},
+                target="role",
+                target_id=UserRole.WAITER.value
             )
 
-        event_service.emit_to_role(
-            order.restaurant_id,
-            UserRole.WAITER,
-            {"type": "ORDER_UPDATED", "order_id": order.id}
+        self.events.emit(
+            restaurant_id=order.restaurant_id,
+            event_type="ORDER_UPDATED",
+            payload={"order_id": order.id},
+            target="role",
+            target_id=UserRole.WAITER.value
         )
+        self.db.commit()
+        self.db.refresh(order)
         return order
 
-
+    # -------------------------
+    # Recalcular estado de la orden basado en estados de los items
+    # -------------------------
     def recalculate_order_status(self, order: Order):
         active_items = [
             i for i in order.items
@@ -3736,44 +4053,42 @@ class OrderService:
     # -------------------------
     # Enviar a cocina
     # -------------------------
-
     def send_to_kitchen(self, order: Order):
         if order.status == OrderStatus.CLOSED:
             raise DomainError(
                 "Order is closed",
                 ErrorCode.ORDER_ALREADY_CLOSED
             )
-
         pending_items = [i for i in order.items if i.status == OrderItemStatus.PENDING]
         if not pending_items:
             raise DomainError(
                 "No pending items to send",
                 ErrorCode.NO_PENDING_ITEMS_TO_SEND
             )
-
         previous_status = order.status
         for item in pending_items:
             item.status = OrderItemStatus.SENT
         logger.info("Orden enviada a cocina order_id=%s r=%s", order.id, order.restaurant_id)
         self.recalculate_order_status(order)
-        self.db.commit()
-
         # Agrupar por estación y emitir
         station_ids = {i.product.station_id for i in pending_items}
         for station_id in station_ids:
-            event_service.emit_to_station(
-                order.restaurant_id,
-                station_id,
-                {"type": "ORDER_UPDATED", "order_id": order.id}
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type="ORDER_UPDATED",
+                payload={"order_id": order.id},
+                target="station",
+                target_id=str(station_id)
             )
-
         if order.status != previous_status:
-            event_service.emit_to_role(
-                order.restaurant_id,
-                UserRole.WAITER,
-                {"type": "ORDER_STATUS_CHANGED", "order_id": order.id, "status": order.status.value}
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type="ORDER_STATUS_CHANGED",
+                payload={"order_id": order.id, "status": order.status.value},
+                target="role",
+                target_id=UserRole.WAITER.value
             )
-
+        self.db.commit()
         # 🔹 Convertir a JSON serializable
         result = [
             {
@@ -3787,7 +4102,6 @@ class OrderService:
             }
             for item in pending_items
         ]
-
         return result
 
     # -------------------------
@@ -3825,25 +4139,31 @@ class OrderService:
             cash_register_id=cash_register.id
         )
         self.db.add(payment)
-        self.db.commit()
-        self.db.refresh(payment)
 
         # Emitir eventos
         for role in [UserRole.WAITER, UserRole.CASHIER]:
-            event_service.emit_to_role(
-                order.restaurant_id,
-                role,
-                {"type": "PAYMENT_ADDED", "order_id": order.id, "amount": float(amount), "method": method}
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type="PAYMENT_ADDED",
+                payload={"order_id": order.id, "amount": float(amount), "method": method},
+                target="role",
+                target_id=role.value
             )
 
-        event_service.emit_to_role(
-            order.restaurant_id,
-            UserRole.CASHIER,
-            {"type": "CASH_REGISTER_UPDATED"}
+        self.events.emit(
+            restaurant_id=order.restaurant_id,
+            event_type="CASH_REGISTER_UPDATED",
+            payload={"order_id": order.id},
+            target="role",
+            target_id=UserRole.CASHIER.value
         )
+        self.db.commit()
+        self.db.refresh(payment)
         return payment
 
-
+    # -------------------------
+    # Cancelar pago
+    # -------------------------
     def cancel_payment(self, restaurant_id: int, payment_id: int):
         payment = (
             self.db.query(Payment)
@@ -3871,34 +4191,33 @@ class OrderService:
         method = payment.method
 
         self.db.delete(payment)
-        self.db.commit()
-
-        logger.debug("cancel_payment payment_id=%s", payment_id)
 
         for role in [UserRole.WAITER, UserRole.CASHIER]:
-            event_service.emit_to_role(
-                restaurant_id,
-                role,
-                {
-                    "type": "PAYMENT_DELETED",
+            self.events.emit(
+                restaurant_id=restaurant_id,
+                event_type="PAYMENT_DELETED",
+                payload={
                     "order_id": order_id,
                     "amount": float(amount),
-                    "method": method                   
-                }
+                    "method": method
+                },
+                target="role",
+                target_id=role.value
             )
 
-        event_service.emit_to_role(
-            restaurant_id,
-            UserRole.CASHIER,
-            {"type": "CASH_REGISTER_UPDATED"}
+        self.events.emit(
+            restaurant_id=restaurant_id,
+            event_type="CASH_REGISTER_UPDATED",
+            payload={"order_id": order_id},
+            target="role",
+            target_id=UserRole.CASHIER.value
         )
-
+        self.db.commit()
         return {"deleted": payment_id}
 
     # -------------------------
     # Cerrar orden
     # -------------------------
-
     def close_order(self, order: Order):
 
         if order.status == OrderStatus.CLOSED:
@@ -3933,28 +4252,30 @@ class OrderService:
         logger.info("Orden cerrada order_id=%s r=%s total=%s", order.id, order.restaurant_id, total)
         self.update_status(order, OrderStatus.CLOSED)
         order.closed_at = func.now()
-        self.db.commit()
 
         # Emitir evento
         for role in [UserRole.WAITER, UserRole.CASHIER]:
-            event_service.emit_to_role(
-                order.restaurant_id,
-                role,
-                {"type": "ORDER_CLOSED", "order_id": order.id}
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type="ORDER_CLOSED",
+                payload={"order_id": order.id},
+                target="role",
+                target_id=role.value
             )
 
-        event_service.emit_to_role(
-            order.restaurant_id,
-            UserRole.CASHIER,
-            {"type": "CASH_REGISTER_UPDATED"}
+        self.events.emit(
+            restaurant_id=order.restaurant_id,
+            event_type="CASH_REGISTER_UPDATED",
+            payload={"order_id": order.id},
+            target="role",
+            target_id=UserRole.CASHIER.value
         )
-
+        self.db.commit()
         return order
 
     # -------------------------
     # Eliminar item de la orden
     # -------------------------
-
     def delete_order_item(
         self,
         restaurant_id: int,
@@ -4000,24 +4321,22 @@ class OrderService:
         )
 
         self.db.delete(item)
-        self.db.commit()
-
         self.recalculate_order_status(order)
-
         # 🔔 EVENTO
         for role in [UserRole.WAITER, UserRole.CASHIER]:
-            event_service.emit_to_role(
-                restaurant_id,
-                role,
-                {"type": "ORDER_UPDATED", "order_id": order_id}
+            self.events.emit(
+                restaurant_id=restaurant_id,
+                event_type="ORDER_UPDATED",
+                payload={"order_id": order_id},
+                target="role",
+                target_id=role.value
             )
-
+        self.db.commit()
         return {"message": "Item eliminado"}
 
     # -------------------------
     # Actualizar cantidad por item de la orden
     # -------------------------
-
     def update_item_quantity(
         self,
         restaurant_id: int,
@@ -4168,7 +4487,7 @@ def get_order_item_service(
 - app.domain.order_item.order_item_transitions.can_transition
 - app.domain.errors.base.DomainError
 - app.domain.errors.error_codes.ErrorCode
-- app.services.event_service.event_service
+- app.services.event_service.EventService
 
 ```python
 from fastapi import HTTPException
@@ -4183,7 +4502,7 @@ from app.domain.order_item.order_item_transitions import can_transition
 from app.domain.errors.base import DomainError
 from app.domain.errors.error_codes import ErrorCode
 
-from app.services.event_service import event_service
+from app.services.event_service import EventService
 
 
 
@@ -4191,6 +4510,7 @@ class OrderItemService:
 
     def __init__(self, db: Session):
         self.db = db
+        self.events = EventService(db)
 
     # -------------------------
     # Obtener item
@@ -4234,15 +4554,11 @@ class OrderItemService:
             order_service
         )
 
-        self.db.commit()
-        self.db.refresh(item)
-
         # =========================
         # EVENTOS
         # =========================
 
         payload = {
-            "type": "ITEM_STATUS_CHANGED",
             "order_id": order.id,
             "item_id": item.id,
             "status": new_status.value,
@@ -4252,45 +4568,52 @@ class OrderItemService:
         }
 
         # cocina
-        event_service.emit_to_station(
-            order.restaurant_id,
-            item.product.station_id,
-            payload
+        self.events.emit(
+            restaurant_id=order.restaurant_id,
+            event_type="ITEM_STATUS_CHANGED",
+            payload=payload,
+            target="station",
+            target_id=str(item.product.station_id)
         )
 
         # mozos
-        event_service.emit_to_role(
-            order.restaurant_id,
-            UserRole.WAITER,
-            payload
+        self.events.emit(
+            restaurant_id=order.restaurant_id,
+            event_type="ITEM_STATUS_CHANGED",
+            payload=payload,
+            target="role",
+            target_id=UserRole.WAITER.value
         )
 
         # evento READY
         if new_status == OrderItemStatus.READY:
-            event_service.emit_to_role(
-                order.restaurant_id,
-                UserRole.WAITER,
-                {
-                    "type": "ITEM_READY",
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type="ITEM_READY",
+                payload={
                     "order_id": order.id,
                     "table": order.table.number,
                     "product": item.product.name,
                     "quantity": item.quantity
-                }
+                },
+                target="role",
+                target_id=UserRole.WAITER.value
             )
 
         # cambio estado orden
         if order.status != previous_status:
-            event_service.emit_to_role(
-                order.restaurant_id,
-                UserRole.WAITER,
-                {
-                    "type": "ORDER_STATUS_CHANGED",
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type="ORDER_STATUS_CHANGED",
+                payload={
                     "order_id": order.id,
                     "status": order.status.value
-                }
+                },
+                target="role",
+                target_id=UserRole.WAITER.value
             )
-
+        self.db.commit()
+        self.db.refresh(item)
         return item
     
     # -------------------------
@@ -5258,61 +5581,171 @@ class UserService:
 
 **Clases (0):**
 
-**Imports (5):**
+**Imports (7):**
 - asyncio
 - json
+- logging
 - app.core.redis.redis_client
 - app.websocket.manager.manager
-- app.services.event_service.INSTANCE_ID
+- app.services.event_worker.INSTANCE_ID
+- app.models.user.UserRole
 
 ```python
 import asyncio
 import json
+import logging
 
 from app.core.redis import redis_client
 from app.websocket.manager import manager
-from app.services.event_service import INSTANCE_ID
+from app.services.event_worker import INSTANCE_ID
+from app.models.user import UserRole
+
+logger = logging.getLogger("app.redis_listener")
+
+CHANNEL = "restaurant_events"
+
+
+async def _process_event(data: dict):
+    try:
+
+        # ignorar eventos propios
+        if data.get("origin") == INSTANCE_ID:
+            return
+
+        restaurant_id = data.get("restaurant_id")
+        target = data.get("target")
+        target_id = data.get("target_id")
+        event_type = data.get("event_type")
+        payload = data.get("payload") or {}
+
+        if isinstance(payload, str):
+            try:
+                payload = json.loads(payload)
+            except Exception:
+                logger.warning("Invalid JSON payload: %s", payload)
+                return
+
+        if not restaurant_id or not event_type:
+            logger.warning("Invalid event received: %s", data)
+            return
+
+        if not isinstance(payload, dict):
+            logger.warning("Invalid payload type: %s", type(payload))
+            return
+
+        message = {
+            "type": event_type,
+            "data": payload
+        }
+
+        logger.debug(
+            "Dispatch WS event: r=%s target=%s type=%s payload=%s",
+            restaurant_id,
+            target,
+            event_type,
+            payload
+        )
+
+        if target == "broadcast":
+
+            await manager.broadcast(
+                restaurant_id,
+                message
+            )
+
+        elif target == "role":
+
+            await manager.send_to_role(
+                restaurant_id,
+                UserRole(target_id),
+                message
+            )
+
+        elif target == "station":
+
+            await manager.send_to_station(
+                restaurant_id,
+                int(target_id),
+                message
+            )
+
+        else:
+
+            logger.warning(
+                "Unknown event target: %s",
+                target
+            )
+
+    except Exception:
+        logger.exception("Error processing redis event")
 
 
 async def redis_event_listener():
 
-    pubsub = redis_client.pubsub()
+    while True:
 
-    await pubsub.subscribe("restaurant_events")
+        pubsub = None
 
-    print("Redis listener started")
+        try:
 
-    try:
-        async for message in pubsub.listen():
+            logger.info("Starting Redis listener")
 
-            if message["type"] != "message":
-                continue
+            pubsub = redis_client.pubsub()
 
-            data = json.loads(message["data"])
+            await pubsub.subscribe(CHANNEL)
 
-            # ignorar eventos de esta misma instancia
-            if data.get("origin") == INSTANCE_ID:
-                continue
+            logger.info("Subscribed to %s", CHANNEL)
 
-            restaurant_id = data.get("restaurant_id")
-            target = data.get("target")
-            target_id = data.get("target_id")
+            async for message in pubsub.listen():
 
-            if target == "broadcast":
-                await manager.broadcast(restaurant_id, data["payload"])
+                try:
 
-            elif target == "role":
-                await manager.send_to_role(restaurant_id, target_id, data["payload"])
+                    if message["type"] != "message":
+                        continue
 
-            elif target == "station":
-                await manager.send_to_station(restaurant_id, target_id, data["payload"])
+                    raw = message["data"]
 
-    except asyncio.CancelledError:
-        print("Redis listener stopped")
+                    if not raw:
+                        continue
 
-    finally:
-        await pubsub.unsubscribe("restaurant_events")
-        await pubsub.close()
+                    # Redis puede enviar bytes
+                    if isinstance(raw, bytes):
+                        raw = raw.decode()
+
+                    data = json.loads(raw)
+
+                    # procesar evento sin bloquear listener
+                    asyncio.create_task(
+                        _process_event(data)
+                    )
+
+                except Exception:
+                    logger.exception("Error reading redis message")
+
+        except asyncio.CancelledError:
+
+            logger.info("Redis listener cancelled")
+            break
+
+        except Exception:
+
+            logger.exception(
+                "Redis listener crashed. Reconnecting in 3 seconds..."
+            )
+
+            await asyncio.sleep(3)
+
+        finally:
+
+            if pubsub:
+
+                try:
+                    await pubsub.unsubscribe(CHANNEL)
+                    await pubsub.close()
+                except Exception:
+                    pass
+
+            logger.info("Redis listener stopped")
 ```
 
 ---
@@ -5608,6 +6041,110 @@ class DomainEvent(Base):
     restaurant = relationship(
         "Restaurant",
         back_populates="domain_events"
+    )
+```
+
+---
+
+### .\backend\app\models\event_outbox.py
+
+**Funciones (0):**
+
+**Clases (1):**
+- EventOutbox
+
+**Imports (9):**
+- sqlalchemy.Column
+- sqlalchemy.Integer
+- sqlalchemy.String
+- sqlalchemy.DateTime
+- sqlalchemy.JSON
+- sqlalchemy.ForeignKey
+- sqlalchemy.func
+- sqlalchemy.orm.relationship
+- app.db.base_class.Base
+
+```python
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    DateTime,
+    JSON,
+    ForeignKey,
+    func
+)
+
+from sqlalchemy.orm import relationship
+from app.db.base_class import Base
+
+class EventOutbox(Base):
+
+    __tablename__ = "event_outbox"
+
+    id = Column(Integer, primary_key=True)
+
+    restaurant_id = Column(
+        Integer,
+        ForeignKey("restaurants.id"),
+        nullable=False,
+        index=True
+    )
+
+    event_type = Column(
+        String,
+        nullable=False,
+        index=True
+    )
+
+    payload = Column(
+        JSON,
+        nullable=False
+    )
+
+    target = Column(
+        String,
+        nullable=False
+    )
+
+    target_id = Column(
+        String,
+        nullable=True
+    )
+
+    status = Column(
+        String,
+        nullable=False,
+        default="pending",
+        index=True
+    )
+
+    retries = Column(
+        Integer,
+        nullable=False,
+        default=0
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        index=True
+    )
+
+    processed_at = Column(
+        DateTime(timezone=True),
+        nullable=True
+    )
+
+    last_error = Column(
+        String,
+        nullable=True
+    )
+
+    restaurant = relationship(
+        "Restaurant",
+        back_populates="event_outbox"
     )
 ```
 
@@ -5989,6 +6526,11 @@ class Restaurant(Base):
     order_items = relationship("OrderItem", back_populates="restaurant", cascade="all, delete")
     users = relationship("User", back_populates="restaurant")
     domain_events = relationship("DomainEvent", back_populates="restaurant")
+    event_outbox = relationship(
+        "EventOutbox",
+        back_populates="restaurant",
+        cascade="all, delete-orphan"
+    )
 
 
 
@@ -6198,7 +6740,7 @@ class User(Base):
 
 **Clases (0):**
 
-**Imports (13):**
+**Imports (14):**
 - table.Table
 - order.Order
 - product.Product
@@ -6212,6 +6754,7 @@ class User(Base):
 - domain_event.DomainEvent
 - restaurant_layout.RestaurantLayout
 - cash_movement.CashMovement
+- event_outbox.EventOutbox
 
 ```python
 from .table import Table
@@ -6227,6 +6770,7 @@ from .user import User
 from .domain_event import DomainEvent
 from .restaurant_layout import RestaurantLayout
 from .cash_movement import CashMovement
+from .event_outbox import EventOutbox
 
 ```
 
@@ -6329,13 +6873,11 @@ def get_me(
 
 **Clases (0):**
 
-**Imports (16):**
+**Imports (14):**
 - fastapi.APIRouter
 - fastapi.Depends
 - app.models.user.User
-- app.models.user.UserRole
-- app.dependencies.auth.get_current_user
-- app.dependencies.permissions.require_roles
+- app.dependencies.roles.cashier_or_admin
 - app.schemas.cash_register.CashRegisterOpen
 - app.schemas.cash_register.CashRegisterSummary
 - app.schemas.cash_register.CashRegisterCloseOut
@@ -6350,10 +6892,9 @@ def get_me(
 ```python
 from fastapi import APIRouter, Depends
 
-from app.models.user import User, UserRole
+from app.models.user import User
 
-from app.dependencies.auth import get_current_user
-from app.dependencies.permissions import require_roles
+from app.dependencies.roles import cashier_or_admin
 
 from app.schemas.cash_register import (
     CashRegisterOpen,
@@ -6381,7 +6922,7 @@ router = APIRouter(
 @router.post("/open")
 def open_cash_register(
     data: CashRegisterOpen,
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.CASHIER)),
+    user: User = Depends(cashier_or_admin),
     service: CashRegisterService = Depends(get_cash_register_service),
 ):
     return service.open_cash_register(
@@ -6394,7 +6935,7 @@ def open_cash_register(
 @router.post("/close", response_model=CashRegisterCloseOut)
 def close_cash_register(
     payload: CashRegisterClose,
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.CASHIER)),
+    user: User = Depends(cashier_or_admin),
     service: CashRegisterService = Depends(get_cash_register_service)   
 ):
     return service.close_cash_register(
@@ -6407,7 +6948,7 @@ def close_cash_register(
 @router.post("/movements")
 def create_cash_movement(
     payload: CashMovementCreate,
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.CASHIER)),
+    user: User = Depends(cashier_or_admin),
     service: CashMovementService = Depends(get_cash_movement_service)
 ):
     return service.create_cash_movement(
@@ -6422,7 +6963,7 @@ def create_cash_movement(
 @router.delete("/movements/{movement_id}")
 def delete_cash_movement(
     movement_id: int,
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.CASHIER)),
+    user: User = Depends(cashier_or_admin),
     service: CashMovementService = Depends(get_cash_movement_service),
 ):
     return service.delete_cash_movement(
@@ -6434,7 +6975,7 @@ def delete_cash_movement(
 @router.get("/current", response_model=CashRegisterSummary | None)
 def current_cash_register(
     service: CashRegisterService = Depends(get_cash_register_service),
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.CASHIER))
+    user: User = Depends(cashier_or_admin)
 ):
     return service.get_current_cash_register(
         restaurant_id=user.restaurant_id
@@ -6444,7 +6985,7 @@ def current_cash_register(
 @router.get("/dashboard", response_model=CashRegisterDashboard | None)
 def get_cash_register_dashboard(
     service: CashRegisterService = Depends(get_cash_register_service),
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.CASHIER))
+    user: User = Depends(cashier_or_admin)
 ):
     return service.get_dashboard(
         restaurant_id=user.restaurant_id
@@ -6464,29 +7005,27 @@ def get_cash_register_dashboard(
 
 **Clases (0):**
 
-**Imports (11):**
+**Imports (10):**
 - fastapi.APIRouter
 - fastapi.Depends
-- app.dependencies.auth.get_current_user
+- app.dependencies.roles.waiter_or_admin
+- app.dependencies.roles.admin_only
 - app.models.user.User
-- app.models.user.UserRole
 - app.schemas.category.CategoryResponse
 - app.schemas.category.CategoryCreate
 - app.schemas.category.CategoryWithProducts
 - app.domain.category.category_service.CategoryService
 - app.domain.category.dependencies.get_category_service
-- app.dependencies.permissions.require_roles
 
 ```python
 from fastapi import APIRouter, Depends
 
-from app.dependencies.auth import get_current_user
-from app.models.user import User, UserRole
+from app.dependencies.roles import waiter_or_admin, admin_only
+from app.models.user import User
 
 from app.schemas.category import CategoryResponse, CategoryCreate, CategoryWithProducts
 from app.domain.category.category_service import CategoryService
 from app.domain.category.dependencies import get_category_service
-from app.dependencies.permissions import require_roles
 
 
 router = APIRouter(prefix="/categories", tags=["categories"])
@@ -6495,7 +7034,7 @@ router = APIRouter(prefix="/categories", tags=["categories"])
 @router.post("/", response_model=CategoryResponse)
 def create_category(
     data: CategoryCreate,
-    user: User = Depends(require_roles(UserRole.ADMIN)),
+    user: User = Depends(admin_only),
     service: CategoryService = Depends(get_category_service)
 ):
     return service.create_category(user.restaurant_id, data.name)
@@ -6503,7 +7042,7 @@ def create_category(
 
 @router.get("/", response_model=list[CategoryResponse])
 def list_categories(
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.WAITER)),
+    user: User = Depends(waiter_or_admin),
     service: CategoryService = Depends(get_category_service)
 ):
     return service.list_categories(user.restaurant_id)
@@ -6511,7 +7050,7 @@ def list_categories(
 
 @router.get("/with-products", response_model=list[CategoryWithProducts])
 def list_categories_with_products(
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.WAITER)),
+    user: User = Depends(waiter_or_admin),
     service: CategoryService = Depends(get_category_service)
 ):
     return service.list_categories_with_products(user.restaurant_id)
@@ -6521,7 +7060,7 @@ def list_categories_with_products(
 def update_category(
     category_id: int,
     data: CategoryCreate,
-    user: User = Depends(require_roles(UserRole.ADMIN)),
+    user: User = Depends(admin_only),
     service: CategoryService = Depends(get_category_service)
 ):
     return service.update_category(user.restaurant_id, category_id, data.name)
@@ -6530,7 +7069,7 @@ def update_category(
 @router.delete("/{category_id}")
 def delete_category(
     category_id: int,
-    user: User = Depends(require_roles(UserRole.ADMIN)),
+    user: User = Depends(admin_only),
     service: CategoryService = Depends(get_category_service)
 ):
     service.delete_category(user.restaurant_id, category_id)
@@ -6550,13 +7089,11 @@ def delete_category(
 
 **Clases (0):**
 
-**Imports (11):**
+**Imports (9):**
 - fastapi.APIRouter
 - fastapi.Depends
 - app.models.user.User
-- app.models.user.UserRole
-- app.dependencies.auth.get_current_user
-- app.dependencies.permissions.require_roles
+- app.dependencies.roles.kitchen_or_admin
 - app.schemas.order.order_item.OrderItemStatusUpdate
 - app.schemas.order.order_item.OrderItemOut
 - app.schemas.order.kitchen.KitchenItemOut
@@ -6566,10 +7103,9 @@ def delete_category(
 ```python
 from fastapi import APIRouter, Depends
 
-from app.models.user import User, UserRole
+from app.models.user import User
 
-from app.dependencies.auth import get_current_user
-from app.dependencies.permissions import require_roles
+from app.dependencies.roles import kitchen_or_admin
 
 from app.schemas.order.order_item import (
     OrderItemStatusUpdate,
@@ -6594,7 +7130,7 @@ router = APIRouter(
 )
 def get_station_items(
     station_id: int,
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.KITCHEN)),
+    user: User = Depends(kitchen_or_admin),
     service: KitchenService = Depends(get_kitchen_service)
 ):
     return service.get_station_items(
@@ -6611,7 +7147,7 @@ def get_station_items(
 def update_item_status(
     item_id: int,
     data: OrderItemStatusUpdate,
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.KITCHEN)),
+    user: User = Depends(kitchen_or_admin),
     service: KitchenService = Depends(get_kitchen_service)
 ):
     item = service.update_item_status(
@@ -6639,30 +7175,28 @@ def update_item_status(
 
 **Clases (0):**
 
-**Imports (10):**
+**Imports (9):**
 - fastapi.APIRouter
 - fastapi.Depends
 - app.schemas.layout.LayoutOut
 - app.schemas.layout.LayoutUpdate
-- app.dependencies.auth.get_current_user
-- app.dependencies.permissions.require_roles
+- app.dependencies.roles.waiter_or_admin
+- app.dependencies.roles.admin_only
 - app.domain.layout.dependencies.get_layout_service
 - app.domain.layout.layout_service.LayoutService
 - app.models.user.User
-- app.models.user.UserRole
 
 ```python
 from fastapi import APIRouter, Depends
 
 from app.schemas.layout import LayoutOut, LayoutUpdate
 
-from app.dependencies.auth import get_current_user
-from app.dependencies.permissions import require_roles
+from app.dependencies.roles import waiter_or_admin, admin_only
 
 from app.domain.layout.dependencies import get_layout_service
 from app.domain.layout.layout_service import LayoutService
 
-from app.models.user import User, UserRole
+from app.models.user import User
 
 
 router = APIRouter(prefix="/layout", tags=["layout"])
@@ -6670,7 +7204,7 @@ router = APIRouter(prefix="/layout", tags=["layout"])
 
 @router.get("/", response_model=LayoutOut)
 def get_layout(
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.WAITER)),
+    user: User = Depends(waiter_or_admin),
     service: LayoutService = Depends(get_layout_service)
 ):
     return service.get_layout(user.restaurant_id)
@@ -6679,7 +7213,7 @@ def get_layout(
 @router.patch("/", response_model=LayoutUpdate)
 def update_layout(
     data: LayoutUpdate,
-    user: User = Depends(require_roles(UserRole.ADMIN)),
+    user: User = Depends(admin_only),
     service: LayoutService = Depends(get_layout_service)
 ):
     return service.update_layout(
@@ -6707,14 +7241,15 @@ def update_layout(
 
 **Clases (0):**
 
-**Imports (12):**
+**Imports (13):**
 - decimal.Decimal
 - fastapi.APIRouter
 - fastapi.Depends
 - fastapi.Query
 - app.models.user.User
-- app.models.user.UserRole
-- app.dependencies.permissions.require_roles
+- app.dependencies.roles.waiter_or_admin
+- app.dependencies.roles.waiter_cashier_or_admin
+- app.dependencies.roles.all_staff
 - app.schemas.order.order_item.OrderItemCreate
 - app.schemas.order.payment.PaymentCreate
 - app.schemas.order.order.OrderStatusUpdate
@@ -6725,9 +7260,9 @@ def update_layout(
 from decimal import Decimal
 from fastapi import APIRouter, Depends, Query
 
-from app.models.user import User, UserRole
+from app.models.user import User
 
-from app.dependencies.permissions import require_roles
+from app.dependencies.roles import waiter_or_admin, waiter_cashier_or_admin, all_staff
 
 from app.schemas.order.order_item import OrderItemCreate
 from app.schemas.order.payment import PaymentCreate
@@ -6747,7 +7282,7 @@ router = APIRouter(prefix="/orders", tags=["orders"])
 def add_item_to_order(
     order_id: int,
     item: OrderItemCreate,
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.WAITER)),
+    user: User = Depends(waiter_or_admin),
     service: OrderService = Depends(get_order_service)
 ):
     order = service.get_order(order_id, user.restaurant_id)
@@ -6759,7 +7294,7 @@ def add_item_to_order(
 @router.post("/{order_id}/send-to-kitchen")
 def send_to_kitchen(
     order_id: int,
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.WAITER)),
+    user: User = Depends(waiter_or_admin),
     service: OrderService = Depends(get_order_service)
 ):
     order = service.get_order(order_id, user.restaurant_id)
@@ -6772,7 +7307,7 @@ def send_to_kitchen(
 def add_payment(
     order_id: int,
     payment: PaymentCreate,
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER)),
+    user: User = Depends(waiter_cashier_or_admin),
     service: OrderService = Depends(get_order_service)
 ):
     order = service.get_order(order_id, user.restaurant_id)
@@ -6785,7 +7320,7 @@ def add_payment(
 def apply_discount(
     order_id: int,
     discount: Decimal = Query(..., ge=0),
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER)),
+    user: User = Depends(waiter_cashier_or_admin),
     service: OrderService = Depends(get_order_service)
 ):
     order = service.get_order(order_id, user.restaurant_id)
@@ -6797,7 +7332,7 @@ def apply_discount(
 @router.post("/{order_id}/close")
 def close_order(
     order_id: int,
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER)),
+    user: User = Depends(waiter_cashier_or_admin),
     service: OrderService = Depends(get_order_service)
 ):
     order = service.get_order(order_id, user.restaurant_id)
@@ -6808,13 +7343,7 @@ def close_order(
 # -------------------------
 @router.get("/active")
 def get_active_orders(
-    user: User = Depends(
-    require_roles(
-        UserRole.ADMIN,
-        UserRole.WAITER,
-        UserRole.KITCHEN,
-        UserRole.CASHIER
-    )),
+    user: User = Depends(all_staff),
     service: OrderService = Depends(get_order_service)
 ):
     return service.serialize_orders(user.restaurant_id)
@@ -6825,13 +7354,7 @@ def get_active_orders(
 @router.get("/{order_id}")
 def get_order(
     order_id: int,
-    user: User = Depends(
-    require_roles(
-        UserRole.ADMIN,
-        UserRole.WAITER,
-        UserRole.KITCHEN,
-        UserRole.CASHIER
-    )),
+    user: User = Depends(all_staff),
     service: OrderService = Depends(get_order_service)
 ):
     order = service.get_order(order_id, user.restaurant_id)
@@ -6844,13 +7367,7 @@ def get_order(
 def update_order_status(
     order_id: int,
     data: OrderStatusUpdate,
-    user: User = Depends(
-    require_roles(
-        UserRole.ADMIN,
-        UserRole.WAITER,
-        UserRole.KITCHEN,
-        UserRole.CASHIER
-    )),
+    user: User = Depends(all_staff),
     service: OrderService = Depends(get_order_service)
 ):
     order = service.get_order(order_id, user.restaurant_id)
@@ -6864,7 +7381,7 @@ def update_order_item_quantity(
     item_id: int,
     quantity: int,
     service: OrderService = Depends(get_order_service),
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.WAITER))
+    user: User = Depends(waiter_or_admin)
 ):
     return service.update_item_quantity(
         restaurant_id=user.restaurant_id,
@@ -6879,7 +7396,7 @@ def update_order_item_quantity(
 def delete_order_item(
     order_id: int,
     item_id: int,
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.WAITER)),
+    user: User = Depends(waiter_or_admin),
     service: OrderService = Depends(get_order_service)
 ):
     service.delete_order_item(user.restaurant_id, order_id, item_id)
@@ -6891,7 +7408,7 @@ def delete_order_item(
 @router.delete("/payments/{payment_id}")
 def cancel_payment(
     payment_id: int,
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER)),
+    user: User = Depends(waiter_cashier_or_admin),
     service: OrderService = Depends(get_order_service)
 ):
     service.cancel_payment(user.restaurant_id, payment_id)
@@ -6907,13 +7424,12 @@ def cancel_payment(
 
 **Clases (0):**
 
-**Imports (9):**
+**Imports (8):**
 - fastapi.APIRouter
 - fastapi.Depends
 - app.models.user.User
 - app.models.user.UserRole
-- app.dependencies.auth.get_current_user
-- app.dependencies.permissions.require_roles
+- app.dependencies.roles.waiter_kitchen_or_admin
 - app.schemas.order.order_item.OrderItemStatusUpdate
 - app.domain.order_item.order_item_service.OrderItemService
 - app.domain.order_item.dependencies.get_order_item_service
@@ -6923,13 +7439,11 @@ from fastapi import APIRouter, Depends
 
 from app.models.user import User, UserRole
 
-from app.dependencies.auth import get_current_user
-from app.dependencies.permissions import require_roles
+from app.dependencies.roles import waiter_kitchen_or_admin
 
 from app.schemas.order.order_item import OrderItemStatusUpdate
 
 from app.domain.order_item.order_item_service import OrderItemService
-
 from app.domain.order_item.dependencies import get_order_item_service
 
 router = APIRouter(
@@ -6941,7 +7455,7 @@ router = APIRouter(
 async def update_item_status(
     item_id: int,
     data: OrderItemStatusUpdate,
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.WAITER, UserRole.KITCHEN)),
+    user: User = Depends(waiter_kitchen_or_admin),
     service: OrderItemService = Depends(get_order_item_service)
 ):
     return service.update_status(
@@ -6963,27 +7477,25 @@ async def update_item_status(
 
 **Clases (0):**
 
-**Imports (10):**
+**Imports (9):**
 - fastapi.APIRouter
 - fastapi.Depends
 - app.models.user.User
-- app.models.user.UserRole
 - app.schemas.product.ProductCreate
 - app.schemas.product.ProductUpdate
-- app.dependencies.auth.get_current_user
-- app.dependencies.permissions.require_roles
+- app.dependencies.roles.waiter_or_admin
+- app.dependencies.roles.admin_only
 - app.domain.product.product_service.ProductService
 - app.domain.product.dependencies.get_product_service
 
 ```python
 from fastapi import APIRouter, Depends
 
-from app.models.user import User, UserRole
+from app.models.user import User
 
 from app.schemas.product import ProductCreate, ProductUpdate
 
-from app.dependencies.auth import get_current_user
-from app.dependencies.permissions import require_roles
+from app.dependencies.roles import waiter_or_admin,admin_only
 
 from app.domain.product.product_service import ProductService
 from app.domain.product.dependencies import get_product_service
@@ -6995,7 +7507,7 @@ router = APIRouter(prefix="/products", tags=["products"])
 @router.post("/")
 def create_product(
     product: ProductCreate,
-    user: User = Depends(require_roles(UserRole.ADMIN)),
+    user: User = Depends(admin_only),
     service: ProductService = Depends(get_product_service)
 ):
     return service.create_product(
@@ -7006,7 +7518,7 @@ def create_product(
 
 @router.get("/")
 def list_products(
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.WAITER)),
+    user: User = Depends(waiter_or_admin),
     service: ProductService = Depends(get_product_service)
 ):
 
@@ -7017,7 +7529,7 @@ def list_products(
 def update_product(
     product_id: int,
     product: ProductUpdate,
-    user: User = Depends(require_roles(UserRole.ADMIN)),
+    user: User = Depends(admin_only),
     service: ProductService = Depends(get_product_service)
 ):
     return service.update_product(
@@ -7030,7 +7542,7 @@ def update_product(
 @router.patch("/{product_id}/toggle")
 def toggle_product(
     product_id: int,
-    user: User = Depends(require_roles(UserRole.ADMIN)),
+    user: User = Depends(admin_only),
     service: ProductService = Depends(get_product_service)
 ):
     return service.toggle_product(
@@ -7054,11 +7566,10 @@ def toggle_product(
 
 **Clases (0):**
 
-**Imports (12):**
+**Imports (11):**
 - fastapi.APIRouter
 - fastapi.Depends
 - app.models.user.User
-- app.models.user.UserRole
 - app.domain.stations.dependencies.get_station_service
 - app.domain.stations.station_service.StationService
 - app.schemas.station.StationCreate
@@ -7066,12 +7577,12 @@ def toggle_product(
 - app.schemas.station.StationUpdate
 - app.schemas.order.kitchen.KitchenItemOut
 - app.dependencies.auth.get_current_user
-- app.dependencies.permissions.require_roles
+- app.dependencies.roles.admin_only
 
 ```python
 from fastapi import APIRouter, Depends
 
-from app.models.user import User, UserRole
+from app.models.user import User
 
 from app.domain.stations.dependencies import get_station_service
 from app.domain.stations.station_service import StationService
@@ -7080,7 +7591,7 @@ from app.schemas.station import StationCreate, StationOut, StationUpdate
 from app.schemas.order.kitchen import KitchenItemOut
 
 from app.dependencies.auth import get_current_user
-from app.dependencies.permissions import require_roles
+from app.dependencies.roles import admin_only
 
 router = APIRouter(prefix="/stations", tags=["stations"])
 
@@ -7088,7 +7599,7 @@ router = APIRouter(prefix="/stations", tags=["stations"])
 @router.post("/", response_model=StationOut)
 def create_station(
     data: StationCreate,
-    user: User = Depends(require_roles(UserRole.ADMIN)),
+    user: User = Depends(admin_only),
     service: StationService = Depends(get_station_service)
 ):
     return service.create_station(
@@ -7126,7 +7637,7 @@ def get_station(
 def update_station(
     station_id: int,
     data: StationUpdate,
-    user: User = Depends(require_roles(UserRole.ADMIN)),
+    user: User = Depends(admin_only),
     service: StationService = Depends(get_station_service)
 ):
     return service.update_station(
@@ -7139,7 +7650,7 @@ def update_station(
 @router.patch("/{station_id}/toggle")
 def toggle_station(
     station_id: int,
-    user: User = Depends(require_roles(UserRole.ADMIN)),
+    user: User = Depends(admin_only),
     service: StationService = Depends(get_station_service)
 ):
     return service.toggle_station(
@@ -7177,7 +7688,7 @@ def get_station_items(
 
 **Clases (0):**
 
-**Imports (18):**
+**Imports (17):**
 - fastapi.APIRouter
 - fastapi.Depends
 - fastapi.Query
@@ -7193,9 +7704,8 @@ def get_station_items(
 - app.domain.order.order_service.OrderService
 - app.domain.order.dependencies.get_order_service
 - app.models.user.User
-- app.models.user.UserRole
-- app.dependencies.auth.get_current_user
-- app.dependencies.permissions.require_roles
+- app.dependencies.roles.waiter_or_admin
+- app.dependencies.roles.admin_only
 
 ```python
 from fastapi import APIRouter, Depends, Query
@@ -7216,10 +7726,9 @@ from app.domain.table.dependencies import get_table_service
 from app.domain.order.order_service import OrderService
 from app.domain.order.dependencies import get_order_service
 
-from app.models.user import User, UserRole
+from app.models.user import User
 
-from app.dependencies.auth import get_current_user
-from app.dependencies.permissions import require_roles
+from app.dependencies.roles import waiter_or_admin, admin_only
 
 
 router = APIRouter(prefix="/tables", tags=["tables"])
@@ -7228,7 +7737,7 @@ router = APIRouter(prefix="/tables", tags=["tables"])
 @router.post("/")
 def create_table(
     table_in: TableCreate,
-    user: User = Depends(require_roles(UserRole.ADMIN)),
+    user: User = Depends(admin_only),
     service: TableService = Depends(get_table_service)
 ):
     return service.create_table(user.restaurant_id, table_in)
@@ -7237,7 +7746,7 @@ def create_table(
 @router.post("/{table_id}/touch")
 def touch_table(
     table_id: int,
-    user: User = Depends(get_current_user),
+    user: User = Depends(waiter_or_admin),
     service: TableService = Depends(get_table_service)
 ):
     return service.touch_table(user.restaurant_id, table_id)
@@ -7247,7 +7756,7 @@ def touch_table(
 def add_product_to_table(
     table_id: int,
     payload: AddItemRequest,
-    user: User = Depends(get_current_user),
+    user: User = Depends(waiter_or_admin),
     service: OrderService = Depends(get_order_service)
 ):
     return service.add_product_to_table(
@@ -7261,7 +7770,7 @@ def add_product_to_table(
 @router.get("/", response_model=list[TableList])
 def list_tables(
     active: bool | None = Query(default=True),
-    user: User = Depends(get_current_user),
+    user: User = Depends(waiter_or_admin),
     service: TableService = Depends(get_table_service)
 ):
     return service.list_tables(user.restaurant_id, active)
@@ -7269,7 +7778,7 @@ def list_tables(
 
 @router.get("/status", response_model=list[TableOut])
 def list_tables_status(
-    user: User = Depends(get_current_user),
+    user: User = Depends(waiter_or_admin),
     service: TableService = Depends(get_table_service)
 ):
     return service.list_tables_status(user.restaurant_id)
@@ -7279,7 +7788,7 @@ def list_tables_status(
 def update_position(
     table_id: int,
     data: TablePositionUpdate,
-    user: User = Depends(require_roles(UserRole.ADMIN)),
+    user: User = Depends(admin_only),
     service: TableService = Depends(get_table_service)
 ):
     return service.update_position(user.restaurant_id, table_id, data)
@@ -7288,7 +7797,7 @@ def update_position(
 @router.patch("/{table_id}/activate")
 def activate_table(
     table_id: int,
-    user: User = Depends(require_roles(UserRole.ADMIN)),
+    user: User = Depends(admin_only),
     service: TableService = Depends(get_table_service)
 ):
     return service.activate_table(user.restaurant_id, table_id)
@@ -7298,7 +7807,7 @@ def activate_table(
 def update_table(
     table_id: int,
     table_in: TableUpdate,
-    user: User = Depends(require_roles(UserRole.ADMIN)),
+    user: User = Depends(admin_only),
     service: TableService = Depends(get_table_service)
 ):
     return service.update_table(user.restaurant_id, table_id, table_in)
@@ -7307,7 +7816,7 @@ def update_table(
 @router.delete("/{table_id}")
 def deactivate_table(
     table_id: int,
-    user: User = Depends(require_roles(UserRole.ADMIN)),
+    user: User = Depends(admin_only),
     service: TableService = Depends(get_table_service)
 ):
     return service.deactivate_table(user.restaurant_id, table_id)
@@ -7326,11 +7835,10 @@ def deactivate_table(
 
 **Clases (0):**
 
-**Imports (11):**
+**Imports (10):**
 - fastapi.APIRouter
 - fastapi.Depends
-- app.dependencies.auth.get_current_user
-- app.dependencies.permissions.require_roles
+- app.dependencies.roles.admin_only
 - app.models.user.User
 - app.models.user.UserRole
 - app.schemas.user.UserCreate
@@ -7342,8 +7850,7 @@ def deactivate_table(
 ```python
 from fastapi import APIRouter, Depends
 
-from app.dependencies.auth import get_current_user
-from app.dependencies.permissions import require_roles
+from app.dependencies.roles import admin_only
 
 from app.models.user import User, UserRole
 from app.schemas.user import UserCreate, UserUpdate, UserOut
@@ -7357,7 +7864,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 @router.post("/", response_model=UserOut)
 def create_user(
     data: UserCreate,
-    user: User = Depends(require_roles(UserRole.ADMIN)),
+    user: User = Depends(admin_only),
     service: UserService = Depends(get_user_service)
 ):
     return service.create_user(user.restaurant_id, data)
@@ -7365,7 +7872,7 @@ def create_user(
 
 @router.get("/", response_model=list[UserOut])
 def list_users(
-    user: User = Depends(require_roles(UserRole.ADMIN)),
+    user: User = Depends(admin_only),
     service: UserService = Depends(get_user_service)
 ):
     return service.list_users(user.restaurant_id)
@@ -7375,7 +7882,7 @@ def list_users(
 def update_user(
     user_id: int,
     data: UserUpdate,
-    user: User = Depends(require_roles(UserRole.ADMIN)),
+    user: User = Depends(admin_only),
     service: UserService = Depends(get_user_service)
 ):
     return service.update_user(user_id, user.restaurant_id, data)
@@ -7384,7 +7891,7 @@ def update_user(
 @router.patch("/{user_id}/toggle", response_model=UserOut)
 def toggle_user(
     user_id: int,
-    user: User = Depends(require_roles(UserRole.ADMIN)),
+    user: User = Depends(admin_only),
     service: UserService = Depends(get_user_service)
 ):
     return service.toggle_user(user_id, user.restaurant_id)
@@ -7913,11 +8420,11 @@ class OrderOut(BaseSchema):
     created_at: str
     items: list[OrderItemOut]
     payments: list[PaymentOut]
-    subtotal: float
-    discount: float
-    total: float
-    total_paid: float
-    remaining: float
+    subtotal: Decimal
+    discount: Decimal
+    total: Decimal
+    total_paid: Decimal
+    remaining: Decimal
 
 
 class WaiterOrderOut(BaseSchema):
@@ -7927,11 +8434,11 @@ class WaiterOrderOut(BaseSchema):
     status: OrderStatus
     created_at: str
     items: list[OrderItemOut]
-    subtotal: float
-    discount: float
-    total: float
-    total_paid: float
-    remaining: float
+    subtotal: Decimal
+    discount: Decimal
+    total: Decimal
+    total_paid: Decimal
+    remaining: Decimal
 
 
 class OrderStatusUpdate(BaseSchema):
@@ -7950,11 +8457,13 @@ class OrderStatusUpdate(BaseSchema):
 - OrderItemOut
 - AddItemRequest
 
-**Imports (2):**
+**Imports (3):**
+- decimal.Decimal
 - app.models.order_item.OrderItemStatus
 - base.BaseSchema
 
 ```python
+from decimal import Decimal
 from app.models.order_item import OrderItemStatus
 from ..base import BaseSchema
 
@@ -7971,8 +8480,8 @@ class OrderItemOut(BaseSchema):
     id: int
     product_name: str
     quantity: int
-    unit_price: float
-    subtotal: float
+    unit_price: Decimal
+    subtotal: Decimal
     status: OrderItemStatus
 
 class AddItemRequest(BaseSchema):
@@ -8013,183 +8522,348 @@ class PaymentOut(BaseSchema):
 
 ---
 
+### .\backend\app\services\event_cleanup.py
+
+**Funciones (2):**
+- __init__
+- cleanup
+
+**Clases (1):**
+- EventCleanup
+
+**Imports (8):**
+- asyncio
+- logging
+- sqlalchemy.delete
+- sqlalchemy.and_
+- datetime.datetime
+- datetime.timedelta
+- app.db.session.SessionLocal
+- app.models.event_outbox.EventOutbox
+
+```python
+import asyncio
+import logging
+
+from sqlalchemy import delete, and_
+from datetime import datetime, timedelta
+
+from app.db.session import SessionLocal
+from app.models.event_outbox import EventOutbox
+
+logger = logging.getLogger("app.services.event_cleanup")
+
+
+class EventCleanup:
+
+    def __init__(self, interval_seconds=3600):
+        self.interval = interval_seconds
+
+    async def run(self):
+
+        logger.info("Event cleanup job started")
+
+        while True:
+
+            try:
+                await asyncio.sleep(self.interval)
+                self.cleanup()
+
+            except asyncio.CancelledError:
+                logger.info("Event cleanup stopped")
+                raise
+
+            except Exception:
+                logger.exception("Cleanup job failed")
+
+    def cleanup(self):
+
+        db = SessionLocal()
+
+        try:
+
+            now = datetime.utcnow()
+
+            processed_cutoff = now - timedelta(days=3)
+            failed_cutoff = now - timedelta(days=7)
+
+            # borrar processed viejos
+            processed_deleted = (
+                db.query(EventOutbox)
+                .filter(
+                    and_(
+                        EventOutbox.status == "processed",
+                        EventOutbox.processed_at < processed_cutoff
+                    )
+                )
+                .delete(synchronize_session=False)
+            )
+
+            # borrar failed irreparables
+            failed_deleted = (
+                db.query(EventOutbox)
+                .filter(
+                    and_(
+                        EventOutbox.status == "failed",
+                        EventOutbox.retries >= 10,
+                        EventOutbox.created_at < failed_cutoff
+                    )
+                )
+                .delete(synchronize_session=False)
+            )
+
+            db.commit()
+
+            total = processed_deleted + failed_deleted
+
+            if total > 0:
+                logger.info(
+                    "event_cleanup_completed processed=%s failed=%s total=%s",
+                    processed_deleted, failed_deleted, total
+                )
+
+        except Exception:
+
+            db.rollback()
+            logger.exception("event_cleanup_failed")
+
+        finally:
+
+            db.close()
+```
+
+---
+
 ### .\backend\app\services\event_service.py
 
-**Funciones (7):**
-- _log_task_error
-- emit_to_role
-- emit_to_station
-- broadcast
-- _persist_event
-- _dispatch
-- _create_task
+**Funciones (2):**
+- __init__
+- emit
 
 **Clases (1):**
 - EventService
 
-**Imports (10):**
-- asyncio
-- json
-- logging
-- uuid
+**Imports (2):**
 - sqlalchemy.orm.Session
-- app.websocket.manager.manager
-- app.models.user.UserRole
-- app.models.domain_event.DomainEvent
-- app.db.session.SessionLocal
-- app.core.redis.redis_client
+- app.models.event_outbox.EventOutbox
 
 ```python
-# backend/app/domain/event_service.py
-
-import asyncio
-import json
-import logging
-import uuid
 from sqlalchemy.orm import Session
+from app.models.event_outbox import EventOutbox
 
-from app.websocket.manager import manager
-from app.models.user import UserRole
-from app.models.domain_event import DomainEvent
-from app.db.session import SessionLocal
-from app.core.redis import redis_client
-
-logger = logging.getLogger("app.services.event_service")
-INSTANCE_ID = str(uuid.uuid4())
 
 class EventService:
 
-    # =========================
-    # API PÚBLICA
-    # =========================
+    def __init__(self, db: Session):
+        self.db = db
 
-    #def __init__(self):
-    #    self.loop = None
-
-
-    def emit_to_role(self, restaurant_id: int, role: UserRole, message: dict):
-        logger.debug(
-            "emit_to_role r=%s role=%s type=%s",
-            restaurant_id, role, message.get("type")
+    def emit(
+        self,
+        restaurant_id: int,
+        event_type: str,
+        payload: dict,
+        target: str = "broadcast",
+        target_id: str | None = None
+    ):
+        event = EventOutbox(
+            restaurant_id=restaurant_id,
+            event_type=event_type,
+            payload=payload,
+            target=target,
+            target_id=target_id,
+            status="pending",
+            retries=0
         )
-        event = {
-            "restaurant_id": restaurant_id,
-            "target": "role",
-            "target_id": role.value if hasattr(role, "value") else role,
-            "origin": INSTANCE_ID,
-            "payload": message,
-            "type": message.get("type")
-        }
-        self._persist_event(restaurant_id, event)
-        self._dispatch(manager.send_to_role, restaurant_id, role, message)
 
-    def emit_to_station(self, restaurant_id: int, station_id: int, message: dict):
-        logger.debug(
-            "emit_to_station r=%s station_id=%s type=%s",
-            restaurant_id, station_id, message.get("type")
-        )
-        event = {
-            "restaurant_id": restaurant_id,
-            "target": "station",
-            "target_id": station_id,
-            "origin": INSTANCE_ID,
-            "payload": message,
-            "type": message.get("type")
-        }
-        self._persist_event(restaurant_id, event)
-        self._dispatch(manager.send_to_station, restaurant_id, station_id, message)
+        self.db.add(event)
+```
 
-    def broadcast(self, restaurant_id: int, message: dict):
-        logger.debug(
-            "broadcast r=%s type=%s",
-            restaurant_id, message.get("type")
-        )
-        event = {
-            "restaurant_id": restaurant_id,
-            "target": "broadcast",
-            "origin": INSTANCE_ID,
-            "payload": message,
-            "type": message.get("type")
-        }
-        self._persist_event(restaurant_id, event)
-        self._dispatch(manager.broadcast, restaurant_id, message)
+---
+
+### .\backend\app\services\event_worker.py
+
+**Funciones (0):**
+
+**Clases (1):**
+- EventWorker
+
+**Imports (13):**
+- asyncio
+- json
+- logging
+- datetime.datetime
+- datetime.timedelta
+- sqlalchemy.select
+- sqlalchemy.orm.Session
+- app.db.session.SessionLocal
+- app.models.event_outbox.EventOutbox
+- app.websocket.manager.manager
+- app.core.redis.redis_client
+- app.models.user.UserRole
+- uuid
+
+```python
+import asyncio
+import json
+import logging
+from datetime import datetime, timedelta
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.db.session import SessionLocal
+from app.models.event_outbox import EventOutbox
+from app.websocket.manager import manager
+from app.core.redis import redis_client
+from app.models.user import UserRole
+
+import uuid
+
+INSTANCE_ID = str(uuid.uuid4())
+
+logger = logging.getLogger("app.event_worker")
+
+
+# =========================
+# CONFIGURACIÓN
+# =========================
+
+POLL_INTERVAL = 0.5
+MAX_RETRIES = 6
+BASE_RETRY_DELAY = 2
+BATCH_SIZE = 50
+EVENT_TTL_HOURS = 48
+
+
+# =========================
+# WORKER PRINCIPAL
+# =========================
+
+class EventWorker:
+
+    async def run(self):
+
+        logger.info("EventWorker started")
+
+        while True:
+
+            try:
+                await self._process_batch()
+
+            except Exception as e:
+                logger.exception("EventWorker loop error: %s", e)
+
+            await asyncio.sleep(POLL_INTERVAL)
 
     # =========================
-    # PERSISTENCIA
+    # PROCESAR EVENTOS
     # =========================
 
-    def _persist_event(self, restaurant_id: int, event: dict):
-        db = SessionLocal()
+    async def _process_batch(self):
+
+        db: Session = SessionLocal()
+
         try:
-            event = DomainEvent(
-                restaurant_id=restaurant_id,
-                event_type=event.get("type"),
-                payload=event
+
+            stmt = (
+                select(EventOutbox)
+                .where(EventOutbox.status == "pending")
+                .order_by(EventOutbox.id)
+                .limit(BATCH_SIZE)
+                .with_for_update(skip_locked=True)
             )
-            db.add(event)
-            db.commit()
-        except Exception as e:
-            db.rollback()
-            logger.error("Error persistiendo evento: %s", e)
+
+            events = db.execute(stmt).scalars().all()
+
+            if not events:
+                return
+
+            for event in events:
+
+                try:
+                    await self._deliver_event(event)
+
+                    event.status = "processed"
+                    event.processed_at = datetime.utcnow()
+
+                except Exception as e:
+
+                    event.retries += 1
+                    event.last_error = str(e)
+
+                    if event.retries >= MAX_RETRIES:
+                        event.status = "failed"
+                        logger.error(
+                            "Event failed permanently id=%s type=%s",
+                            event.id,
+                            event.event_type
+                        )
+                    else:
+                        delay = BASE_RETRY_DELAY ** event.retries
+                        logger.warning(
+                            "Event retry id=%s attempt=%s delay=%ss",
+                            event.id,
+                            event.retries,
+                            delay
+                        )
+                        await asyncio.sleep(delay)
+
+                db.commit()
+
         finally:
             db.close()
 
     # =========================
-    # DESPACHO
+    # ENTREGA DEL EVENTO
     # =========================
 
-    def _dispatch(self, func, *args):
-        logger.info("emit event type=%s", args[-1].get("type"))
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            logger.error("_dispatch llamado fuera de un loop async. Evento descartado.")
-            return
-        event = args[-1]
-        self._create_task(func(*args))
-        self._create_task(self._publish_redis(event))
+    async def _deliver_event(self, event: EventOutbox):
 
+        payload = event.payload or {}
 
-    def _create_task(self, coro):
-        task = asyncio.create_task(coro)
-        _background_tasks.add(task)
-        task.add_done_callback(_background_tasks.discard)
-        task.add_done_callback(_log_task_error)
+        message = {
+            "type": event.event_type,
+            "payload": event.payload
+        }
 
-    # =========================
-    # REDIS
-    # =========================
+        # ---- websocket delivery ----
 
-    async def _publish_redis(self, message: dict):
-        try:
-            await redis_client.publish(
-                "restaurant_events",
-                json.dumps(message)
+        if event.target == "broadcast":
+
+            await manager.broadcast(
+                event.restaurant_id,
+                message
             )
-        except Exception as e:
-            logger.error("Error publicando en Redis: %s", e)
 
+        elif event.target == "role":
 
-# Set global para mantener referencias a tareas en vuelo
-# Evita que el GC las elimine antes de que completen
-_background_tasks: set[asyncio.Task] = set()
+            await manager.send_to_role(
+                event.restaurant_id,
+                UserRole(event.target_id),
+                message
+            )
 
+        elif event.target == "station":
 
-def _log_task_error(task: asyncio.Task):
-    """Callback que registra excepciones de tareas background."""
-    if task.cancelled():
-        return
-    exc = task.exception()
-    if exc is not None:
-        logger.error(
-            "Error en tarea background [%s]: %s",
-            task.get_name(),
-            exc,
-            exc_info=exc
+            await manager.send_to_station(
+                event.restaurant_id,
+                int(event.target_id),
+                message
+            )
+
+        # ---- redis replication ----
+
+        await redis_client.publish(
+            "restaurant_events",
+            json.dumps({
+                "origin": INSTANCE_ID,
+                "restaurant_id": event.restaurant_id,
+                "event_type": event.event_type,
+                "payload": payload,
+                "target": event.target,
+                "target_id": event.target_id
+            })
         )
-
-
-event_service = EventService()
 ```
 
 ---
@@ -8203,74 +8877,196 @@ event_service = EventService()
 **Clases (1):**
 - ConnectionManager
 
-**Imports (5):**
+**Imports (4):**
 - fastapi.WebSocket
-- fastapi.logger
 - collections.defaultdict
 - app.models.user.UserRole
 - logging
 
 ```python
-from fastapi import WebSocket, logger
+from fastapi import WebSocket
 from collections import defaultdict
 from app.models.user import UserRole
 import logging
 
 logger = logging.getLogger("app.websocket.manager")
 
+MAX_CONNECTIONS_PER_USER = 3
+
+
 class ConnectionManager:
 
     def __init__(self):
-        # restaurant_id -> list of connections
-        self.connections = defaultdict(list)
+
+        # websocket_id -> connection
         self._ws_index = {}
 
-    async def connect(self, websocket, user, station_id=None):
+        # restaurant -> connections
+        self._by_restaurant = defaultdict(set)
+
+        # restaurant -> role -> connections
+        self._by_role = defaultdict(lambda: defaultdict(set))
+
+        # restaurant -> station -> connections
+        self._by_station = defaultdict(lambda: defaultdict(set))
+
+        # user -> connection_count
+        self._user_connections = defaultdict(int)
+
+    # =========================
+    # CONNECT
+    # =========================
+
+    async def connect(self, websocket: WebSocket, user, station_id=None):
+
+        if self._user_connections[user.id] >= MAX_CONNECTIONS_PER_USER:
+            logger.warning(
+                "WS rejected user=%s reason=max_connections",
+                user.id
+            )
+            await websocket.close(code=1008)
+            return False
+
         await websocket.accept()
-        conn = {"ws": websocket, "user": user, "station_id": station_id}
-        self.connections[user.restaurant_id].append(conn)
-        self._ws_index[id(websocket)] = user.restaurant_id
+
+        conn = {
+            "ws": websocket,
+            "user": user,
+            "station_id": station_id
+        }
+
+        ws_id = id(websocket)
+
+        self._ws_index[ws_id] = conn
+        self._by_restaurant[user.restaurant_id].add(ws_id)
+        self._by_role[user.restaurant_id][user.role].add(ws_id)
+
+        if station_id:
+            self._by_station[user.restaurant_id][station_id].add(ws_id)
+
+        self._user_connections[user.id] += 1
+
         logger.info(
-            "WS connected r=%s role=%s station=%s",
-            user.restaurant_id, user.role, station_id
+            "WS connected r=%s user=%s role=%s station=%s",
+            user.restaurant_id,
+            user.id,
+            user.role,
+            station_id
         )
 
-
-    def disconnect(self, websocket):
-        restaurant_id = self._ws_index.pop(id(websocket), None)
-        if restaurant_id:
-            self.connections[restaurant_id] = [
-                c for c in self.connections[restaurant_id]
-                if c["ws"] != websocket
-            ]
-        logger.info("WS disconnected r=%s", restaurant_id)
+        return True
 
     # =========================
-    # ENVÍOS
+    # DISCONNECT
     # =========================
 
-    async def send_to_role(self, restaurant_id: int, role: UserRole, message: dict):
+    def disconnect(self, websocket: WebSocket):
 
-        for c in self.connections[restaurant_id]:
-            if c["user"].role == role:
-                await self._safe_send(c["ws"], message)
+        ws_id = id(websocket)
 
-    async def send_to_station(self, restaurant_id: int, station_id: int, message: dict):
+        conn = self._ws_index.pop(ws_id, None)
 
-        for c in self.connections[restaurant_id]:
-            if c["station_id"] == station_id:
-                await self._safe_send(c["ws"], message)
+        if not conn:
+            return
 
-    async def broadcast(self, restaurant_id: int, message: dict):
+        user = conn["user"]
+        restaurant_id = user.restaurant_id
+        station_id = conn["station_id"]
 
-        for c in self.connections[restaurant_id]:
-            await self._safe_send(c["ws"], message)
+        self._by_restaurant[restaurant_id].discard(ws_id)
 
-    async def _safe_send(self, ws: WebSocket, message: dict):
+        self._by_role[restaurant_id][user.role].discard(ws_id)
+
+        if station_id:
+            self._by_station[restaurant_id][station_id].discard(ws_id)
+
+        self._user_connections[user.id] -= 1
+
+        if self._user_connections[user.id] <= 0:
+            del self._user_connections[user.id]
+
+        logger.info(
+            "WS disconnected r=%s user=%s",
+            restaurant_id,
+            user.id
+        )
+
+    # =========================
+    # SENDS
+    # =========================
+
+    async def send_to_role(
+        self,
+        restaurant_id: int,
+        role: UserRole,
+        message: dict
+    ):
+
+        targets = list(self._by_role[restaurant_id].get(role, []))
+
+        if not targets:
+            logger.warning(
+                "WS role send: no targets restaurant=%s role=%s message=%s",
+                restaurant_id,
+                role,
+                message["type"]
+            )
+            return
+
+        logger.debug("WS role send: r=%s role=%s connections=%s", restaurant_id, role, len(targets))
+        for ws_id in targets:
+            await self._safe_send(ws_id, message)
+
+
+    async def send_to_station(
+        self,
+        restaurant_id: int,
+        station_id: int,
+        message: dict
+    ):
+
+        targets = list(self._by_station[restaurant_id].get(station_id, []))
+        logger.debug("WS station send: r=%s station=%s connections=%s", restaurant_id, station_id, len(targets))
+        for ws_id in targets:
+            await self._safe_send(ws_id, message)
+
+    async def broadcast(
+        self,
+        restaurant_id: int,
+        message: dict
+    ):
+
+        targets = list(self._by_restaurant.get(restaurant_id, []))
+        logger.debug("WS broadcast: r=%s connections=%s", restaurant_id, len(targets))
+        for ws_id in targets:
+            await self._safe_send(ws_id, message)
+
+    # =========================
+    # SAFE SEND
+    # =========================
+
+    async def _safe_send(self, ws_id: int, message: dict):
+
+        conn = self._ws_index.get(ws_id)
+
+        if not conn:
+            return
+
+        ws = conn["ws"]
+
         try:
+            logger.info(
+                "WS send: ws_id=%s type=%s",
+                ws_id,
+                message["type"]
+            )
+
             await ws.send_json(message)
+
         except Exception as e:
-            logger.warning("WS send failed, desconectando: %s", e)
+
+            logger.warning("WS send failed: %s", e)
+
             self.disconnect(ws)
 
 
@@ -8287,34 +9083,37 @@ manager = ConnectionManager()
 **Clases (1):**
 - AuthUser
 
-**Imports (6):**
+**Imports (9):**
 - fastapi.APIRouter
 - fastapi.WebSocket
 - fastapi.WebSocketDisconnect
+- sqlalchemy.orm.Session
 - app.websocket.manager.manager
 - app.core.security.decode_access_token
+- app.db.session.SessionLocal
+- app.models.user.User
 - app.models.user.UserRole
 
 ```python
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from sqlalchemy.orm import Session
+
 from app.websocket.manager import manager
 from app.core.security import decode_access_token
-from app.models.user import UserRole
+from app.db.session import SessionLocal
+from app.models.user import User, UserRole
+
 
 router = APIRouter()
 
 
 class AuthUser:
-    def __init__(self, payload):
-        self.id = payload.get("sub")
 
-        role = payload.get("role")
-        try:
-            self.role = UserRole(role)
-        except ValueError:
-            self.role = None
+    def __init__(self, user: User):
 
-        self.restaurant_id = payload.get("restaurant_id")
+        self.id = user.id
+        self.role = user.role
+        self.restaurant_id = user.restaurant_id
 
 
 @router.websocket("/ws")
@@ -8328,35 +9127,76 @@ async def websocket_endpoint(websocket: WebSocket):
 
     payload = decode_access_token(token)
 
-    if not payload or not payload.get("sub") or not payload.get("restaurant_id"):
+    if not payload:
         await websocket.close(code=1008)
         return
 
-    user = AuthUser(payload)
+    user_id = payload.get("sub")
+    restaurant_id = payload.get("restaurant_id")
+    role = payload.get("role")
 
-    if not user.role:
+    if not user_id or not restaurant_id or not role:
         await websocket.close(code=1008)
         return
 
-    station_id_param = websocket.query_params.get("station_id")
+    db: Session = SessionLocal()
 
     try:
-        station_id = int(station_id_param) if station_id_param else None
-    except ValueError:
-        station_id = None
 
-    await manager.connect(
-        websocket,
-        user,
-        station_id
-    )
+        user = (
+            db.query(User)
+            .filter(
+                User.id == user_id,
+                User.restaurant_id == restaurant_id,
+                User.active == True
+            )
+            .first()
+        )
 
-    try:
-        while True:
-            await websocket.receive_text()
+        if not user:
+            await websocket.close(code=1008)
+            return
 
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        try:
+            user_role = UserRole(role)
+        except ValueError:
+            await websocket.close(code=1008)
+            return
+
+        if user.role != user_role:
+            await websocket.close(code=1008)
+            return
+
+        station_id_param = websocket.query_params.get("station_id")
+
+        try:
+            station_id = int(station_id_param) if station_id_param else None
+        except ValueError:
+            station_id = None
+
+        auth_user = AuthUser(user)
+
+        connected = await manager.connect(
+            websocket,
+            auth_user,
+            station_id
+        )
+
+        if not connected:
+            return
+
+        try:
+
+            while True:
+                await websocket.receive_text()
+
+        except WebSocketDisconnect:
+
+            manager.disconnect(websocket)
+
+    finally:
+
+        db.close()
 ```
 
 ---

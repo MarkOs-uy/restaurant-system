@@ -1,8 +1,8 @@
 import asyncio
 import logging
 
-from sqlalchemy import delete, and_
-from datetime import datetime, timedelta
+from sqlalchemy import and_
+from datetime import datetime, timedelta, timezone
 
 from app.db.session import SessionLocal
 from app.models.event_outbox import EventOutbox
@@ -20,6 +20,7 @@ class EventCleanup:
         logger.info("Event cleanup job started")
 
         while True:
+
             try:
                 await asyncio.sleep(self.interval)
                 self.cleanup()
@@ -31,68 +32,57 @@ class EventCleanup:
             except Exception:
                 logger.exception("Cleanup job failed")
 
-def cleanup(self):
+    def cleanup(self):
 
-    db = SessionLocal()
+        db = SessionLocal()
 
-    try:
+        try:
 
-        now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
 
-        sent_cutoff = now - timedelta(days=3)
-        failed_cutoff = now - timedelta(days=7)
+            processed_cutoff = now - timedelta(days=3)
+            failed_cutoff = now - timedelta(days=7)
 
-        # ---------------------------------
-        # borrar eventos ya enviados
-        # ---------------------------------
-
-        sent_deleted = (
-            db.query(EventOutbox)
-            .filter(
-                and_(
-                    EventOutbox.status == "sent",
-                    EventOutbox.processed_at < sent_cutoff
+            # borrar processed viejos
+            processed_deleted = (
+                db.query(EventOutbox)
+                .filter(
+                    and_(
+                        EventOutbox.status == "processed",
+                        EventOutbox.processed_at < processed_cutoff
+                    )
                 )
+                .delete(synchronize_session=False)
             )
-            .delete(synchronize_session=False)
-        )
 
-        # ---------------------------------
-        # borrar eventos fallidos irrecuperables
-        # ---------------------------------
-
-        failed_deleted = (
-            db.query(EventOutbox)
-            .filter(
-                and_(
-                    EventOutbox.status == "failed",
-                    EventOutbox.retries >= 10,
-                    EventOutbox.created_at < failed_cutoff
+            # borrar failed irreparables
+            failed_deleted = (
+                db.query(EventOutbox)
+                .filter(
+                    and_(
+                        EventOutbox.status == "failed",
+                        EventOutbox.retries >= 10,
+                        EventOutbox.created_at < failed_cutoff
+                    )
                 )
-            )
-            .delete(synchronize_session=False)
-        )
-
-        db.commit()
-
-        total = sent_deleted + failed_deleted
-
-        if total > 0:
-            logger.info(
-                "event_cleanup_completed",
-                extra={
-                    "sent_deleted": sent_deleted,
-                    "failed_deleted": failed_deleted,
-                    "total_deleted": total
-                }
+                .delete(synchronize_session=False)
             )
 
-    except Exception:
+            db.commit()
 
-        db.rollback()
+            total = processed_deleted + failed_deleted
 
-        logger.exception("event_cleanup_failed")
+            if total > 0:
+                logger.info(
+                    "event_cleanup_completed processed=%s failed=%s total=%s",
+                    processed_deleted, failed_deleted, total
+                )
 
-    finally:
+        except Exception:
 
-        db.close()
+            db.rollback()
+            logger.exception("event_cleanup_failed")
+
+        finally:
+
+            db.close()

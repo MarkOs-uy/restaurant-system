@@ -38,7 +38,7 @@ export default function LoginPage() {
 
       localStorage.setItem("role", role)
       localStorage.setItem("restaurant_id", String(restaurantId))
-
+      
       window.dispatchEvent(new Event("authChanged"))
 
       switch (role) {
@@ -52,7 +52,8 @@ export default function LoginPage() {
           break
 
         case "KITCHEN":
-          navigate("/kitchen/1")
+          localStorage.removeItem("kitchen_station_id")
+          navigate("/kitchen")
           break
 
         case "CASHIER":
