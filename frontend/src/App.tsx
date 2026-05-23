@@ -17,7 +17,7 @@ import { startHealthMonitor } from "./services/healthMonitor.ts"
 import { useState, useEffect } from "react"
 import { Toaster } from "react-hot-toast"
 import { wsService } from "./services/wsService.ts"
-import { logout } from "./services/auth"
+import { logout, readAuth } from "./services/auth"
 
 function App() {
   const [role, setRole] = useState<string | null>(null)
@@ -28,30 +28,24 @@ function App() {
 
 
   useEffect(() => {
-
-    const token = localStorage.getItem("token")
-
-    if (token) {
-      wsService.connect()
-    } else {
-      wsService.disconnect()
-    }
-
-  }, [role])
-
-  useEffect(() => {
     startHealthMonitor()
   }, [])
 
   useEffect(() => {
-    const loadRole = () => {
-      const r = localStorage.getItem("role")
-      setRole(r)
+    const loadAuth = () => {
+      const auth = readAuth()
+      setRole(auth.role)
+
+      if (auth.token) {
+        wsService.connect()
+      } else {
+        wsService.disconnect()
+      }
     }
-    loadRole()
-    window.addEventListener("authChanged", loadRole)
+    loadAuth()
+    window.addEventListener("authChanged", loadAuth)
     return () => {
-      window.removeEventListener("authChanged", loadRole)
+      window.removeEventListener("authChanged", loadAuth)
     }
   }, [])
     

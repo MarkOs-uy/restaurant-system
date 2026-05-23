@@ -1,6 +1,8 @@
 import { parseWSEvent, type WSEventParsed } from "../ws"
 
-const WS_URL = import.meta.env.VITE_WS_URL
+const defaultWsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:"
+const WS_URL =
+  import.meta.env.VITE_WS_URL || `${defaultWsProtocol}//${window.location.host}`
 
 type Listener = (event: WSEventParsed) => void
 
@@ -9,16 +11,9 @@ class WSService {
   private ws: WebSocket | null = null
   private listeners: Listener[] = []
   private reconnectTimer: any = null
-  private stationId?: number
   private manuallyDisconnected = false
 
-  connect(stationId?: number) {
-
-    const normalizedStationId = stationId || undefined
-    const stationChanged = this.stationId !== normalizedStationId
-
-    this.stationId = normalizedStationId
-    this.manuallyDisconnected = false
+  connect() {
 
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer)
@@ -27,35 +22,27 @@ class WSService {
 
     if (
       this.ws &&
-      this.ws.readyState === WebSocket.OPEN &&
-      !stationChanged
+      (
+        this.ws.readyState === WebSocket.OPEN ||
+        this.ws.readyState === WebSocket.CONNECTING
+      )
     ) {
       return
     }
 
-    if (this.ws) {
-      this.ws.onclose = null
-      this.ws.close()
-      this.ws = null
-    }
+    this.manuallyDisconnected = false
 
     const token = localStorage.getItem("token")
     if (!token) return
-    
-    console.log("WS connect attempt", token)
-    console.log("role:", localStorage.getItem("role"))
-    console.log("station_id:", stationId)
 
-    let url = `${WS_URL}/ws?token=${encodeURIComponent(token)}`
+    const url = `${WS_URL}/ws?token=${encodeURIComponent(token)}`
 
-    if (this.stationId) {
-      url += `&station_id=${this.stationId}`
-    }
+    console.log("WS connecting")
 
     this.ws = new WebSocket(url)
 
     this.ws.onopen = () => {
-      console.log("WS global connected")
+      console.log("WS connected")
     }
 
     this.ws.onmessage = (event) => {
@@ -77,7 +64,7 @@ class WSService {
       if (this.manuallyDisconnected) return
 
       this.reconnectTimer = setTimeout(() => {
-        this.connect(this.stationId)
+        this.connect()
       }, 2000)
 
     }
@@ -91,7 +78,6 @@ class WSService {
   disconnect() {
 
     this.manuallyDisconnected = true
-    this.stationId = undefined
 
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer)
@@ -103,8 +89,6 @@ class WSService {
       this.ws.close()
       this.ws = null
     }
-
-    this.listeners = []
 
   }
 

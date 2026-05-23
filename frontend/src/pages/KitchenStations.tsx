@@ -31,7 +31,7 @@ export default function KitchenStations() {
           key={station.id}
           onClick={() => {
             localStorage.setItem("kitchen_station_id", station.id.toString())
-            wsService.connect(station.id)
+            wsService.connect()
             navigate(`/kitchen/${station.id}`)
           }}
           style={{

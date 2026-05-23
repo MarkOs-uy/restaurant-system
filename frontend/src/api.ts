@@ -11,6 +11,7 @@ export const getAuthHeaders = () => ({
 
 type ApiFetchOptions = Omit<RequestInit, "body"> & {
   body?: any
+  suppressErrorToast?: boolean
 }
 
 import { handleApiError } from "./utils/handleApiError"
@@ -19,23 +20,27 @@ export async function apiFetch(
   url: string,
   options: ApiFetchOptions = {}
 ) {
+  const {
+    suppressErrorToast,
+    ...fetchOptions
+  } = options
 
   const isJsonBody =
-    options.body &&
-    typeof options.body === "object" &&
-    !(options.body instanceof FormData)
+    fetchOptions.body &&
+    typeof fetchOptions.body === "object" &&
+    !(fetchOptions.body instanceof FormData)
 
   const body = isJsonBody
-    ? JSON.stringify(options.body)
-    : options.body
+    ? JSON.stringify(fetchOptions.body)
+    : fetchOptions.body
 
   const res = await fetch(`${API_URL}${url}`, {
-    ...options,
+    ...fetchOptions,
     body,
     headers: {
       ...getAuthHeaders(),
       ...(isJsonBody ? { "Content-Type": "application/json" } : {}),
-      ...(options.headers || {})
+      ...(fetchOptions.headers || {})
     }
   })
 
@@ -45,7 +50,7 @@ export async function apiFetch(
     data = await res.json()
   } catch {}
 
-  if (res.status === 401) {
+  if (res.status === 401 && url !== "/auth/login") {
     logout()
   }
 
@@ -55,7 +60,9 @@ export async function apiFetch(
     error.context = data?.context
     error.status = res.status
 
-    handleApiError(error)
+    if (!suppressErrorToast) {
+      handleApiError(error)
+    }
 
     throw error
   }

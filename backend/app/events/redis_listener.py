@@ -42,7 +42,7 @@ async def _process_event(data: dict):
 
         message = {
             "type": event_type,
-            "data": payload
+            "payload": payload
         }
 
         logger.debug(
@@ -70,10 +70,18 @@ async def _process_event(data: dict):
 
         elif target == "station":
 
-            await manager.send_to_station(
+            station_payload = {
+                **payload,
+                "station_id": int(target_id)
+            }
+
+            await manager.send_to_role(
                 restaurant_id,
-                int(target_id),
-                message
+                UserRole.KITCHEN,
+                {
+                    "type": event_type,
+                    "payload": station_payload
+                }
             )
 
         else:

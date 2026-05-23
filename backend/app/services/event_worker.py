@@ -118,7 +118,7 @@ class EventWorker:
 
         message = {
             "type": event.event_type,
-            "payload": event.payload
+            "payload": payload
         }
 
         # ---- websocket delivery ----
@@ -140,10 +140,18 @@ class EventWorker:
 
         elif event.target == "station":
 
-            await manager.send_to_station(
+            station_payload = {
+                **payload,
+                "station_id": int(event.target_id)
+            }
+
+            await manager.send_to_role(
                 event.restaurant_id,
-                int(event.target_id),
-                message
+                UserRole.KITCHEN,
+                {
+                    "type": event.event_type,
+                    "payload": station_payload
+                }
             )
 
         # ---- redis replication ----

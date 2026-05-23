@@ -101,7 +101,8 @@ export default function OrderDetail() {
         "ORDER_UPDATED",
         "ORDER_STATUS_CHANGED",
         "ITEM_STATUS_CHANGED",
-        "PAYMENT_ADDED"
+        "PAYMENT_ADDED",
+        "PAYMENT_DELETED"
       ]
       if (
         relevantEvents.includes(type) &&

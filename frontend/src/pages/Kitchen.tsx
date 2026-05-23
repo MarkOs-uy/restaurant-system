@@ -32,7 +32,7 @@ export default function Kitchen() {
   useEffect(() => {
     if (!station) return
     localStorage.setItem("kitchen_station_id", String(station))
-    wsService.connect(station)
+    wsService.connect()
     fetchItems()
     fetchStation()
   }, [station])
@@ -132,9 +132,12 @@ export default function Kitchen() {
 
       console.log("Kitchen WS EVENT:", event)
 
-      const { type, target, target_id } = event
+      const { type, data } = event
 
-      if (target === "station" && Number(target_id) !== station) {
+      if (
+        data?.station_id &&
+        Number(data.station_id) !== station
+      ) {
         return
       }
 

@@ -158,6 +158,7 @@ else
 fi
 
 systemctl enable avahi-daemon >/dev/null
+hostnamectl set-hostname $HOSTNAME_LOCAL
 systemctl restart avahi-daemon
 success "mDNS activo como ${HOSTNAME_LOCAL}.local"
 

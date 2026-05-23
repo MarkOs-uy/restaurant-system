@@ -1,12 +1,13 @@
 import { useEffect, useReducer, useRef, useState } from "react"
-import { WS_URL, apiFetch } from "../api"
+import { apiFetch } from "../api"
 import { CashMovementType,
   OrderStatus,
   PaymentMethod,
   WSEvent,  
    } from "../types"
 import type { CashRegisterDashboard, CashMovement, CashRegisterCloseSummary } from "../types"
-import { parseWSEvent } from "../ws"
+import type { WSEventParsed } from "../ws"
+import { wsService } from "../services/wsService"
 import { moneyToNumber } from "../utils/money"
 
 interface Order {
@@ -448,9 +449,6 @@ export default function CashierPage() {
 
 
   useEffect(()=>{
-    let ws:WebSocket | null = null
-    let reconnectTimer:any = null
-
     let fetching = false
     let pending = false
 
@@ -478,96 +476,79 @@ export default function CashierPage() {
     init()
 
 
-    const connect = ()=>{
+    wsService.connect()
 
-      ws = new WebSocket(`${WS_URL}/ws?token=${localStorage.getItem("token")}`)
+    const handler = async ({ type, data }: WSEventParsed) => {
+      switch (type) {
 
-      ws.onopen = ()=>{
-        console.log("Cashier WS connected")
-      }
-
-      ws.onmessage = async (event) => {
-
-        const { type, data } = parseWSEvent(event)
-
-        switch (type) {
-
-          case WSEvent.CASH_MOVEMENT_ADDED:
-            dispatch({
-              type: "ADD_MOVEMENT",
-              payload: {
-                ...data.movement,
-                amount: moneyToNumber(data.movement.amount)
-              }
-            })
-          break
-
-          case WSEvent.CASH_MOVEMENT_DELETED:
-            dispatch({
-              type: "DELETE_MOVEMENT",
-              payload:{
-                movement_id: data.movement_id,
-                amount: moneyToNumber(data.amount),
-                movement_type: data.movement_type
-              }
-            })
-          break
-
-          case WSEvent.PAYMENT_ADDED:
-          case WSEvent.PAYMENT_DELETED:
-            scheduleOrdersRefresh()
-            scheduleDashboardRefresh()
-            if (selectedOrderRef.current?.id === data.order_id) {
-              await selectOrder(data.order_id)
+        case WSEvent.CASH_MOVEMENT_ADDED:
+          dispatch({
+            type: "ADD_MOVEMENT",
+            payload: {
+              ...data.movement,
+              amount: moneyToNumber(data.movement.amount)
             }
-          break
+          })
+        break
 
-          case WSEvent.ORDER_UPDATED:
-            scheduleOrdersRefresh()
-            if (selectedOrderRef.current?.id === data.order_id) {
-              await selectOrder(data.order_id)
+        case WSEvent.CASH_MOVEMENT_DELETED:
+          dispatch({
+            type: "DELETE_MOVEMENT",
+            payload:{
+              movement_id: data.movement_id,
+              amount: moneyToNumber(data.amount),
+              movement_type: data.movement_type
             }
-          break
+          })
+        break
 
-          case "ORDER_STATUS_CHANGED":
-            dispatch({
-              type:"UPDATE_ORDER_STATUS",
-              payload:{
-                order_id:data.order_id,
-                status:data.status
-              }
-            })
-          break
+        case WSEvent.PAYMENT_ADDED:
+        case WSEvent.PAYMENT_DELETED:
+          scheduleOrdersRefresh()
+          scheduleDashboardRefresh()
+          if (selectedOrderRef.current?.id === data.order_id) {
+            await selectOrder(data.order_id)
+          }
+        break
 
-          case "ORDER_CLOSED":
-            dispatch({
-              type:"REMOVE_ORDER",
-              payload:data.order_id
-            })
-            scheduleOrdersRefresh()
-            scheduleDashboardRefresh()
-          break
+        case WSEvent.ORDER_UPDATED:
+          scheduleOrdersRefresh()
+          if (selectedOrderRef.current?.id === data.order_id) {
+            await selectOrder(data.order_id)
+          }
+        break
 
-          case WSEvent.CASH_REGISTER_UPDATED:
-            scheduleDashboardRefresh()
-          break
-        }
-      }
+        case "ORDER_STATUS_CHANGED":
+          dispatch({
+            type:"UPDATE_ORDER_STATUS",
+            payload:{
+              order_id:data.order_id,
+              status:data.status
+            }
+          })
+        break
 
-      ws.onclose = ()=>{
-        reconnectTimer = setTimeout(connect,2000)
-      }
+        case "ORDER_CLOSED":
+          dispatch({
+            type:"REMOVE_ORDER",
+            payload:data.order_id
+          })
+          scheduleOrdersRefresh()
+          scheduleDashboardRefresh()
+        break
 
-      ws.onerror = ()=>{
-        ws?.close()
+        case WSEvent.CASH_REGISTER_UPDATED:
+          scheduleDashboardRefresh()
+        break
       }
     }
 
-    connect()
+    wsService.subscribe(handler)
 
     return ()=>{
-      ws?.close()
-      if (reconnectTimer) clearTimeout(reconnectTimer)
+      wsService.unsubscribe(handler)
+      if (dashboardTimer.current) clearTimeout(dashboardTimer.current)
+      if (ordersTimer.current) clearTimeout(ordersTimer.current)
     }
   },[])
 
@@ -600,10 +581,21 @@ export default function CashierPage() {
         />
         <button
           onClick={async () => {
+            const amount = Number(openingAmount)
+            if (!openingAmount || isNaN(amount)) {
+              alert("Ingrese un monto válido")
+              return
+            }
+            if (amount < 0) {
+              alert("El monto no puede ser negativo")
+              return
+            }
             try {
               await apiFetch("/cash-register/open", {
                 method: "POST",
-                body: { opening_amount: openingAmount }
+                body: {
+                  opening_amount: amount
+                }
               })
               await fetchDashboard()
             } catch (err: any) {

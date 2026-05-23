@@ -28,17 +28,9 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.close(code=1008)
             return
 
-        station_id_param = websocket.query_params.get("station_id")
-
-        try:
-            station_id = int(station_id_param) if station_id_param else None
-        except ValueError:
-            station_id = None
-
         connected = await manager.connect(
             websocket,
-            auth_user,
-            station_id
+            auth_user
         )
 
         if not connected:

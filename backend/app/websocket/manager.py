@@ -21,9 +21,6 @@ class ConnectionManager:
         # restaurant -> role -> connections
         self._by_role = defaultdict(lambda: defaultdict(set))
 
-        # restaurant -> station -> connections
-        self._by_station = defaultdict(lambda: defaultdict(set))
-
         # user -> connection_count
         self._user_connections = defaultdict(int)
 
@@ -31,7 +28,7 @@ class ConnectionManager:
     # CONNECT
     # =========================
 
-    async def connect(self, websocket: WebSocket, user, station_id=None):
+    async def connect(self, websocket: WebSocket, user):
 
         if self._user_connections[user.id] >= MAX_CONNECTIONS_PER_USER:
             logger.warning(
@@ -45,8 +42,7 @@ class ConnectionManager:
 
         conn = {
             "ws": websocket,
-            "user": user,
-            "station_id": station_id
+            "user": user
         }
 
         ws_id = id(websocket)
@@ -55,17 +51,13 @@ class ConnectionManager:
         self._by_restaurant[user.restaurant_id].add(ws_id)
         self._by_role[user.restaurant_id][user.role].add(ws_id)
 
-        if station_id:
-            self._by_station[user.restaurant_id][station_id].add(ws_id)
-
         self._user_connections[user.id] += 1
 
         logger.info(
-            "WS connected r=%s user=%s role=%s station=%s",
+            "WS connected r=%s user=%s role=%s",
             user.restaurant_id,
             user.id,
-            user.role,
-            station_id
+            user.role
         )
 
         return True
@@ -85,14 +77,10 @@ class ConnectionManager:
 
         user = conn["user"]
         restaurant_id = user.restaurant_id
-        station_id = conn["station_id"]
 
         self._by_restaurant[restaurant_id].discard(ws_id)
 
         self._by_role[restaurant_id][user.role].discard(ws_id)
-
-        if station_id:
-            self._by_station[restaurant_id][station_id].discard(ws_id)
 
         self._user_connections[user.id] -= 1
 
@@ -131,18 +119,6 @@ class ConnectionManager:
         for ws_id in targets:
             await self._safe_send(ws_id, message)
 
-
-    async def send_to_station(
-        self,
-        restaurant_id: int,
-        station_id: int,
-        message: dict
-    ):
-
-        targets = list(self._by_station[restaurant_id].get(station_id, []))
-        logger.debug("WS station send: r=%s station=%s connections=%s", restaurant_id, station_id, len(targets))
-        for ws_id in targets:
-            await self._safe_send(ws_id, message)
 
     async def broadcast(
         self,

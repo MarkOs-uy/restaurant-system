@@ -2,6 +2,7 @@ import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { apiFetch } from "../api"
 import { jwtDecode } from "jwt-decode"
+import toast from "react-hot-toast"
 
 export default function LoginPage() {
 
@@ -25,7 +26,8 @@ export default function LoginPage() {
         headers: {
           "Content-Type": "application/x-www-form-urlencoded"
         },
-        body: formData.toString()
+        body: formData.toString(),
+        suppressErrorToast: true
       })
 
       const token = data.access_token
@@ -69,7 +71,24 @@ export default function LoginPage() {
 
       console.error("Login error:", error)
 
-      alert(error?.message || "Credenciales inválidas")
+      const message =
+        error?.status === 401
+          ? "Usuario o contraseña incorrectos"
+          : error?.message || "No pudimos iniciar sesión"
+
+      toast.error(message, {
+        duration: 4500,
+        style: {
+          border: "1px solid #fecaca",
+          background: "#fff7f7",
+          color: "#7f1d1d",
+          fontWeight: 600
+        },
+        iconTheme: {
+          primary: "#dc2626",
+          secondary: "#fff"
+        }
+      })
 
     }
 
