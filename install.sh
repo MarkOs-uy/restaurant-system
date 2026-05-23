@@ -53,6 +53,89 @@ compose() {
   docker compose -f "$COMPOSE_FILE" "$@"
 }
 
+desktop_dir_for_user() {
+  local username="$1"
+  local home_dir
+
+  home_dir="$(getent passwd "$username" | cut -d: -f6)"
+  [ -n "$home_dir" ] || return 1
+
+  if [ -d "${home_dir}/Desktop" ]; then
+    printf "%s/Desktop" "$home_dir"
+  elif [ -d "${home_dir}/Escritorio" ]; then
+    printf "%s/Escritorio" "$home_dir"
+  else
+    printf "%s/Desktop" "$home_dir"
+  fi
+}
+
+install_desktop_shortcuts() {
+  local target_user="${SUDO_USER:-}"
+  local desktop_dir
+  local target_group
+
+  if [ -z "$target_user" ] || [ "$target_user" = "root" ]; then
+    target_user="$(logname 2>/dev/null || true)"
+  fi
+
+  if [ -z "$target_user" ]; then
+    warn "No pude detectar el usuario de escritorio; omito accesos directos."
+    return
+  fi
+
+  target_group="$(id -gn "$target_user" 2>/dev/null || true)"
+  if [ -z "$target_group" ]; then
+    warn "No pude detectar el grupo de ${target_user}; omito accesos directos."
+    return
+  fi
+
+  desktop_dir="$(desktop_dir_for_user "$target_user" || true)"
+
+  if [ -z "$desktop_dir" ]; then
+    warn "No pude detectar el escritorio de ${target_user}; omito accesos directos."
+    return
+  fi
+
+  install -d -m 0755 -o "$target_user" -g "$target_group" "$desktop_dir"
+
+  cat > "${desktop_dir}/POS Restaurant - Iniciar.desktop" << EOF
+[Desktop Entry]
+Type=Application
+Name=POS Restaurant - Iniciar
+Comment=Iniciar el servidor POS Restaurant
+Exec=/usr/bin/env bash "${APP_DIR}/start_server.sh"
+Icon=utilities-terminal
+Terminal=true
+Categories=Utility;
+EOF
+
+  cat > "${desktop_dir}/POS Restaurant - Detener.desktop" << EOF
+[Desktop Entry]
+Type=Application
+Name=POS Restaurant - Detener
+Comment=Detener el servidor POS Restaurant
+Exec=/usr/bin/env bash "${APP_DIR}/stop_server.sh"
+Icon=process-stop
+Terminal=true
+Categories=Utility;
+EOF
+
+  chown "$target_user:$target_group" \
+    "${desktop_dir}/POS Restaurant - Iniciar.desktop" \
+    "${desktop_dir}/POS Restaurant - Detener.desktop"
+
+  chmod +x \
+    "${desktop_dir}/POS Restaurant - Iniciar.desktop" \
+    "${desktop_dir}/POS Restaurant - Detener.desktop"
+
+  if command -v gio >/dev/null 2>&1; then
+    sudo -u "$target_user" gio set "${desktop_dir}/POS Restaurant - Iniciar.desktop" metadata::trusted true >/dev/null 2>&1 || true
+    sudo -u "$target_user" gio set "${desktop_dir}/POS Restaurant - Detener.desktop" metadata::trusted true >/dev/null 2>&1 || true
+  fi
+
+  success "Accesos directos creados en ${desktop_dir}"
+}
+
 wait_for_postgres() {
   local ready=0
 
@@ -92,6 +175,13 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 cd "$APP_DIR"
+
+section "Preparando scripts de control"
+chmod +x \
+  "${APP_DIR}/start_server.sh" \
+  "${APP_DIR}/stop_server.sh" \
+  "${APP_DIR}/uninstall.sh"
+success "Scripts de inicio, cierre y desinstalacion listos"
 
 section "Instalando dependencias del sistema"
 apt-get update -qq
@@ -277,6 +367,9 @@ systemctl restart pos-zeroconf
 systemctl enable pos-restaurant >/dev/null
 success "Servicios systemd registrados"
 
+section "Creando accesos directos"
+install_desktop_shortcuts
+
 LOCAL_IP="$(get_local_ip)"
 if [ -z "$LOCAL_IP" ]; then
   LOCAL_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
@@ -300,7 +393,10 @@ fi
 
 printf "\n%sComandos utiles:%s\n" "$BOLD" "$RESET"
 printf "  Logs:       cd %s && docker compose -f %s logs -f\n" "$APP_DIR" "$COMPOSE_FILE"
+printf "  Iniciar:    %s/start_server.sh\n" "$APP_DIR"
+printf "  Detener:    %s/stop_server.sh\n" "$APP_DIR"
 printf "  Reiniciar:  systemctl restart pos-restaurant\n"
 printf "  Estado:     systemctl status pos-restaurant\n"
+printf "  Desinstalar: sudo bash %s/uninstall.sh\n" "$APP_DIR"
 printf "  Backup:     ls -lh %s/backups\n" "$APP_DIR"
 printf "\n"
