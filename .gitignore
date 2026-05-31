@@ -32,3 +32,5 @@ htmlcov/
 
 # Backups
 backups/
+PROJECT_SUMMARY.md
+analyze_project.py
