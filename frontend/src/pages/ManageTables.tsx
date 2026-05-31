@@ -158,6 +158,8 @@ export default function ManageTables() {
                     <option value="circle">Circular</option>
                     <option value="square">Cuadrada</option>
                     <option value="rectangle">Rectangular</option>
+                    <option value="rectangle-horizontal">Rectangular horizontal</option>
+                    <option value="rectangle-vertical">Rectangular vertical</option>
                 </select>
                 </td>
 
@@ -245,6 +247,8 @@ export default function ManageTables() {
                         <option value="circle">Circular</option>
                         <option value="square">Cuadrada</option>
                         <option value="rectangle">Rectangular</option>
+                        <option value="rectangle-horizontal">Rectangular horizontal</option>
+                        <option value="rectangle-vertical">Rectangular vertical</option>
                     </select>
                 </td>
 

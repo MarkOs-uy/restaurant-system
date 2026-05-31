@@ -131,7 +131,7 @@ export default function UsersPage() {
               <th>Usuario</th>
               <th>Rol</th>
               <th>Activo</th>
-              <th style={{ width: 260 }}>Acciones</th>
+              <th style={{ width: 300 }}>Acciones</th>
             </tr>
           </thead>
 

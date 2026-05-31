@@ -1,5 +1,5 @@
 # 📊 Project Summary
-Generated: 2026-05-18 15:56:02.938826
+Generated: 2026-05-24 17:12:57.551741
 
 ## 📁 Estructura del proyecto
 
@@ -16,6 +16,7 @@ Generated: 2026-05-18 15:56:02.938826
         - 5aa86605f254_add_discount_to_orders.py
         - 6ba12f28852f_cambios_en_cashregister.py
         - 6e40084bfae8_create_event_outbox.py
+        - 72a2554e30d4_rename_users_name_to_users_username.py
         - 7b0b567ffe9e_add_discount_to_orders.py
         - 7fd07db91f0d_refactor_restaurant_layout_structure.py
         - 900c4d6546a2_creando_tabla_de_eventos.py
@@ -132,6 +133,8 @@ Generated: 2026-05-18 15:56:02.938826
         - event_cleanup.py
         - event_service.py
         - event_worker.py
+      - utils/
+        - money.py
       - websocket/
         - manager.py
         - ws.py
@@ -1087,6 +1090,51 @@ def downgrade():
     op.drop_index("ix_event_outbox_restaurant", table_name="event_outbox")
 
     op.drop_table("event_outbox")
+```
+
+---
+
+### .\backend\alembic\versions\72a2554e30d4_rename_users_name_to_users_username.py
+
+**Funciones (2):**
+- upgrade
+- downgrade
+
+**Clases (0):**
+
+**Imports (4):**
+- typing.Sequence
+- typing.Union
+- alembic.op
+- sqlalchemy
+
+```python
+"""rename users.name to users.username
+
+Revision ID: 72a2554e30d4
+Revises: 6e40084bfae8
+Create Date: 2026-05-20 21:50:28.197239
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+
+
+# revision identifiers, used by Alembic.
+revision: str = '72a2554e30d4'
+down_revision: Union[str, Sequence[str], None] = '6e40084bfae8'
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    op.alter_column('users', 'name', new_column_name='username')
+
+def downgrade() -> None:
+    op.alter_column('users', 'username', new_column_name='name')
+
 ```
 
 ---
@@ -2380,18 +2428,23 @@ def tenant_query(db: Session, model, user: User):
 
 ### .\backend\app\dependencies\auth.py
 
-**Funciones (1):**
+**Funciones (3):**
+- authenticate_token
 - get_current_user
+- __init__
 
-**Clases (0):**
+**Clases (2):**
+- AuthError
+- AuthUser
 
-**Imports (7):**
+**Imports (8):**
 - fastapi.Depends
 - fastapi.HTTPException
 - fastapi.security.OAuth2PasswordBearer
 - sqlalchemy.orm.Session
 - app.db.session.get_db
 - app.models.user.User
+- app.models.user.UserRole
 - app.core.security.decode_access_token
 
 ```python
@@ -2400,10 +2453,59 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.core.security import decode_access_token
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+
+
+class AuthError(Exception):
+    pass
+
+
+class AuthUser:
+
+    def __init__(self, user: User):
+
+        self.user = user
+        self.id = user.id
+        self.role = user.role
+        self.restaurant_id = user.restaurant_id
+
+
+def authenticate_token(db: Session, token: str) -> AuthUser:
+
+    payload = decode_access_token(token)
+
+    if not payload:
+        raise AuthError("invalid token")
+
+    try:
+        user_id = int(payload.get("sub"))
+        restaurant_id = int(payload.get("restaurant_id"))
+        role = UserRole(payload.get("role"))
+    except (TypeError, ValueError):
+        raise AuthError("invalid token payload")
+
+    user = (
+        db.query(User)
+        .filter(
+            User.id == user_id,
+            User.restaurant_id == restaurant_id
+        )
+        .first()
+    )
+
+    if not user:
+        raise AuthError("user not found")
+
+    if not user.active:
+        raise AuthError("inactive user")
+
+    if user.role != role:
+        raise AuthError("role mismatch")
+
+    return AuthUser(user)
 
 
 def get_current_user(
@@ -2411,39 +2513,21 @@ def get_current_user(
     db: Session = Depends(get_db)
 ):
 
-    payload = decode_access_token(token)
-
-    if not payload:
-        raise HTTPException(
-            status_code=401,
-            detail="Token inválido"
-        )
-
     try:
-        user_id = int(payload.get("sub"))
-    except (TypeError, ValueError):
+        auth_user = authenticate_token(db, token)
+    except AuthError as exc:
+        if str(exc) == "inactive user":
+            raise HTTPException(
+                status_code=403,
+                detail="Usuario inactivo"
+            )
         raise HTTPException(
             status_code=401,
             detail="Token inválido"
         )
 
-    user = db.query(User).filter(
-        User.id == user_id
-    ).first()
+    return auth_user.user
 
-    if not user:
-        raise HTTPException(
-            status_code=401,
-            detail="Usuario no encontrado"
-        )
-
-    if not user.active:
-        raise HTTPException(
-            status_code=403,
-            detail="Usuario inactivo"
-        )
-
-    return user
 ```
 
 ---
@@ -2526,7 +2610,7 @@ all_staff = require_roles(UserRole.ADMIN, UserRole.WAITER, UserRole.KITCHEN, Use
 **Clases (1):**
 - CashMovementService
 
-**Imports (7):**
+**Imports (8):**
 - sqlalchemy.orm.Session
 - app.models.cash_movement.CashMovement
 - app.models.cash_register.CashRegister
@@ -2534,6 +2618,7 @@ all_staff = require_roles(UserRole.ADMIN, UserRole.WAITER, UserRole.KITCHEN, Use
 - app.domain.errors.error_codes.ErrorCode
 - app.models.user.UserRole
 - app.services.event_service.EventService
+- app.utils.money.money
 
 ```python
 from sqlalchemy.orm import Session
@@ -2543,6 +2628,7 @@ from app.domain.errors.base import DomainError
 from app.domain.errors.error_codes import ErrorCode
 from app.models.user import UserRole
 from app.services.event_service import EventService
+from app.utils.money import money
 
 
 class CashMovementService:
@@ -2594,7 +2680,7 @@ class CashMovementService:
                 "movement": {
                     "id": movement.id,
                     "type": movement.type,
-                    "amount": float(movement.amount),
+                    "amount": money(movement.amount),
                     "reason": movement.reason,
                     "created_at": movement.created_at.isoformat()
                 }
@@ -2639,7 +2725,7 @@ class CashMovementService:
             event_type="CASH_MOVEMENT_DELETED",
             payload={
                 "movement_id": movement_id,
-                "amount": float(amount),
+                "amount": money(amount),
                 "movement_type": movement_type
             },
             target="role",
@@ -2668,7 +2754,7 @@ class CashMovementService:
 **Clases (1):**
 - CashRegisterService
 
-**Imports (14):**
+**Imports (15):**
 - decimal.Decimal
 - sqlalchemy.orm.Session
 - sqlalchemy.func
@@ -2683,6 +2769,7 @@ class CashMovementService:
 - app.domain.errors.base.DomainError
 - app.domain.errors.error_codes.ErrorCode
 - app.core.serialization.decimal_dict_to_float
+- app.utils.money.money
 
 ```python
 from decimal import Decimal
@@ -2700,6 +2787,7 @@ from app.models.cash_movement import CashMovementType
 from app.domain.errors.base import DomainError
 from app.domain.errors.error_codes import ErrorCode
 from app.core.serialization import decimal_dict_to_float
+from app.utils.money import money
 
 logger = logging.getLogger("app.domain.cash_register")
 
@@ -2800,7 +2888,7 @@ class CashRegisterService:
             raise DomainError(
                 "opening amount must be greater than or equal to zero",
                 ErrorCode.INVALID_OPERATION,
-                context={"opening_amount": float(opening_amount)}
+                context={"opening_amount": money(opening_amount)}
             )
 
         existing = self.db.query(CashRegister).filter(
@@ -2835,7 +2923,7 @@ class CashRegisterService:
             raise DomainError(
                 "counted cash must be greater than or equal to zero",
                 ErrorCode.CASH_REGISTER_INVALID_COUNT,
-                context={"counted_cash": float(counted_cash)}
+                context={"counted_cash": money(counted_cash)}
             )
 
         cash_register = self._get_open_cash_register(
@@ -3609,7 +3697,7 @@ def get_order_service(
 **Clases (1):**
 - OrderService
 
-**Imports (20):**
+**Imports (21):**
 - sqlalchemy.orm.Session
 - sqlalchemy.orm.joinedload
 - sqlalchemy.func
@@ -3629,6 +3717,7 @@ def get_order_service(
 - app.domain.order.constants.ACTIVE_ORDER_STATUSES
 - app.domain.errors.base.DomainError
 - app.domain.errors.error_codes.ErrorCode
+- app.utils.money.money
 - app.domain.cash_register.cash_register_service.CashRegisterService
 
 ```python
@@ -3649,6 +3738,7 @@ from app.domain.order.order_transitions import is_valid_order_transition
 from app.domain.order.constants import ACTIVE_ORDER_STATUSES
 from app.domain.errors.base import DomainError
 from app.domain.errors.error_codes import ErrorCode
+from app.utils.money import money
 
 logger = logging.getLogger("app.domain.order")
 
@@ -3730,8 +3820,8 @@ class OrderService:
                     "id": item.id,
                     "product_name": item.product.name,
                     "quantity": item.quantity,
-                    "unit_price": float(item.unit_price),
-                    "subtotal": float(item.quantity * item.unit_price),
+                    "unit_price": money(item.unit_price),
+                    "subtotal": money(item.quantity * item.unit_price),
                     "status": item.status.value
                 }
                 for item in order.items
@@ -3739,16 +3829,16 @@ class OrderService:
             "payments": [
                 {
                     "id": p.id,
-                    "amount": float(p.amount),
+                    "amount": money(p.amount),
                     "method": p.method
                 }
                 for p in order.payments
             ],
-            "total": float(total),
-            "subtotal": float(subtotal),
-            "discount": float(order.discount or 0),
-            "total_paid": float(total_paid),
-            "remaining": float(remaining)
+            "total": money(total),
+            "subtotal": money(subtotal),
+            "discount": money(order.discount or 0),
+            "total_paid": money(total_paid),
+            "remaining": money(remaining)
         }
 
     # -------------------------
@@ -3781,7 +3871,7 @@ class OrderService:
                 ],
                 "total": total,
                 "subtotal": subtotal,
-                "discount": float(order.discount or 0),
+                "discount": money(order.discount or 0),
                 "total_paid": total_paid,
                 "remaining": remaining
             })
@@ -3825,8 +3915,8 @@ class OrderService:
                 "Discount cannot exceed order subtotal",
                 ErrorCode.INVALID_OPERATION,
                 context={
-                    "discount": float(discount),
-                    "subtotal": float(subtotal)
+                    "discount": money(discount),
+                    "subtotal": money(subtotal)
                 }
             )
         new_total = subtotal - discount
@@ -3835,9 +3925,9 @@ class OrderService:
                 "Discount would make paid amount exceed order total",
                 ErrorCode.INVALID_OPERATION,
                 context={
-                    "discount": float(discount),
-                    "new_total": float(new_total),
-                    "total_paid": float(total_paid)
+                    "discount": money(discount),
+                    "new_total": money(new_total),
+                    "total_paid": money(total_paid)
                 }
             )
         logger.info("Descuento aplicado order_id=%s discount=%s", order.id, discount)
@@ -4096,9 +4186,9 @@ class OrderService:
                 "product_id": item.product_id,
                 "product_name": item.product.name,
                 "quantity": item.quantity,
-                "unit_price": float(item.unit_price),
+                "unit_price": money(item.unit_price),
                 "status": item.status.value,
-                "subtotal": float(item.quantity * item.unit_price)
+                "subtotal": money(item.quantity * item.unit_price)
             }
             for item in pending_items
         ]
@@ -4126,8 +4216,8 @@ class OrderService:
                 "Payment exceeds remaining balance",
                 ErrorCode.PAYMENT_EXCEEDS_REMAINING,
                 context={
-                    "amount": float(amount),
-                    "remaining": float(remaining)
+                    "amount": money(amount),
+                    "remaining": money(remaining)
                 }
             )
         logger.info("Pago agregado order_id=%s amount=%s method=%s", order.id, amount, method)
@@ -4145,7 +4235,7 @@ class OrderService:
             self.events.emit(
                 restaurant_id=order.restaurant_id,
                 event_type="PAYMENT_ADDED",
-                payload={"order_id": order.id, "amount": float(amount), "method": method},
+                payload={"order_id": order.id, "amount": money(amount), "method": method},
                 target="role",
                 target_id=role.value
             )
@@ -4198,7 +4288,7 @@ class OrderService:
                 event_type="PAYMENT_DELETED",
                 payload={
                     "order_id": order_id,
-                    "amount": float(amount),
+                    "amount": money(amount),
                     "method": method
                 },
                 target="role",
@@ -4232,7 +4322,7 @@ class OrderService:
             raise DomainError(
                 f"La orden no está paga. Saldo: {remaining:.2f}",
                 ErrorCode.ORDER_HAS_REMAINING_BALANCE,
-                context={"remaining": float(remaining)}
+                context={"remaining": money(remaining)}
             )
 
         if not order.items:
@@ -5635,7 +5725,7 @@ async def _process_event(data: dict):
 
         message = {
             "type": event_type,
-            "data": payload
+            "payload": payload
         }
 
         logger.debug(
@@ -5663,10 +5753,18 @@ async def _process_event(data: dict):
 
         elif target == "station":
 
-            await manager.send_to_station(
+            station_payload = {
+                **payload,
+                "station_id": int(target_id)
+            }
+
+            await manager.send_to_role(
                 restaurant_id,
-                int(target_id),
-                message
+                UserRole.KITCHEN,
+                {
+                    "type": event_type,
+                    "payload": station_payload
+                }
             )
 
         else:
@@ -5746,6 +5844,7 @@ async def redis_event_listener():
                     pass
 
             logger.info("Redis listener stopped")
+
 ```
 
 ---
@@ -8534,10 +8633,10 @@ class PaymentOut(BaseSchema):
 **Imports (8):**
 - asyncio
 - logging
-- sqlalchemy.delete
 - sqlalchemy.and_
 - datetime.datetime
 - datetime.timedelta
+- datetime.timezone
 - app.db.session.SessionLocal
 - app.models.event_outbox.EventOutbox
 
@@ -8545,8 +8644,8 @@ class PaymentOut(BaseSchema):
 import asyncio
 import logging
 
-from sqlalchemy import delete, and_
-from datetime import datetime, timedelta
+from sqlalchemy import and_
+from datetime import datetime, timedelta, timezone
 
 from app.db.session import SessionLocal
 from app.models.event_outbox import EventOutbox
@@ -8582,7 +8681,7 @@ class EventCleanup:
 
         try:
 
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
 
             processed_cutoff = now - timedelta(days=3)
             failed_cutoff = now - timedelta(days=7)
@@ -8692,7 +8791,7 @@ class EventService:
 - json
 - logging
 - datetime.datetime
-- datetime.timedelta
+- datetime.timezone
 - sqlalchemy.select
 - sqlalchemy.orm.Session
 - app.db.session.SessionLocal
@@ -8706,7 +8805,7 @@ class EventService:
 import asyncio
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -8784,7 +8883,7 @@ class EventWorker:
                     await self._deliver_event(event)
 
                     event.status = "processed"
-                    event.processed_at = datetime.utcnow()
+                    event.processed_at = datetime.now(timezone.utc)
 
                 except Exception as e:
 
@@ -8823,7 +8922,7 @@ class EventWorker:
 
         message = {
             "type": event.event_type,
-            "payload": event.payload
+            "payload": payload
         }
 
         # ---- websocket delivery ----
@@ -8845,10 +8944,18 @@ class EventWorker:
 
         elif event.target == "station":
 
-            await manager.send_to_station(
+            station_payload = {
+                **payload,
+                "station_id": int(event.target_id)
+            }
+
+            await manager.send_to_role(
                 event.restaurant_id,
-                int(event.target_id),
-                message
+                UserRole.KITCHEN,
+                {
+                    "type": event.event_type,
+                    "payload": station_payload
+                }
             )
 
         # ---- redis replication ----
@@ -8864,6 +8971,50 @@ class EventWorker:
                 "target_id": event.target_id
             })
         )
+
+```
+
+---
+
+### .\backend\app\utils\money.py
+
+**Funciones (2):**
+- to_decimal
+- money
+
+**Clases (0):**
+
+**Imports (2):**
+- decimal.Decimal
+- decimal.ROUND_HALF_UP
+
+```python
+# app/utils/money.py
+
+from decimal import Decimal, ROUND_HALF_UP
+
+
+TWOPLACES = Decimal("0.01")
+
+
+def to_decimal(value) -> Decimal:
+    """
+    Convierte input a Decimal seguro.
+    """
+    return Decimal(str(value))
+
+
+def money(value) -> str:
+    """
+    Convierte un valor numérico a string monetario.
+    """
+    if value is None:
+        value = Decimal("0")
+
+    if not isinstance(value, Decimal):
+        value = Decimal(str(value))
+
+    return str(value.quantize(TWOPLACES, rounding=ROUND_HALF_UP))
 ```
 
 ---
@@ -8907,9 +9058,6 @@ class ConnectionManager:
         # restaurant -> role -> connections
         self._by_role = defaultdict(lambda: defaultdict(set))
 
-        # restaurant -> station -> connections
-        self._by_station = defaultdict(lambda: defaultdict(set))
-
         # user -> connection_count
         self._user_connections = defaultdict(int)
 
@@ -8917,7 +9065,7 @@ class ConnectionManager:
     # CONNECT
     # =========================
 
-    async def connect(self, websocket: WebSocket, user, station_id=None):
+    async def connect(self, websocket: WebSocket, user):
 
         if self._user_connections[user.id] >= MAX_CONNECTIONS_PER_USER:
             logger.warning(
@@ -8931,8 +9079,7 @@ class ConnectionManager:
 
         conn = {
             "ws": websocket,
-            "user": user,
-            "station_id": station_id
+            "user": user
         }
 
         ws_id = id(websocket)
@@ -8941,17 +9088,13 @@ class ConnectionManager:
         self._by_restaurant[user.restaurant_id].add(ws_id)
         self._by_role[user.restaurant_id][user.role].add(ws_id)
 
-        if station_id:
-            self._by_station[user.restaurant_id][station_id].add(ws_id)
-
         self._user_connections[user.id] += 1
 
         logger.info(
-            "WS connected r=%s user=%s role=%s station=%s",
+            "WS connected r=%s user=%s role=%s",
             user.restaurant_id,
             user.id,
-            user.role,
-            station_id
+            user.role
         )
 
         return True
@@ -8971,14 +9114,10 @@ class ConnectionManager:
 
         user = conn["user"]
         restaurant_id = user.restaurant_id
-        station_id = conn["station_id"]
 
         self._by_restaurant[restaurant_id].discard(ws_id)
 
         self._by_role[restaurant_id][user.role].discard(ws_id)
-
-        if station_id:
-            self._by_station[restaurant_id][station_id].discard(ws_id)
 
         self._user_connections[user.id] -= 1
 
@@ -9017,18 +9156,6 @@ class ConnectionManager:
         for ws_id in targets:
             await self._safe_send(ws_id, message)
 
-
-    async def send_to_station(
-        self,
-        restaurant_id: int,
-        station_id: int,
-        message: dict
-    ):
-
-        targets = list(self._by_station[restaurant_id].get(station_id, []))
-        logger.debug("WS station send: r=%s station=%s connections=%s", restaurant_id, station_id, len(targets))
-        for ws_id in targets:
-            await self._safe_send(ws_id, message)
 
     async def broadcast(
         self,
@@ -9071,49 +9198,37 @@ class ConnectionManager:
 
 
 manager = ConnectionManager()
+
 ```
 
 ---
 
 ### .\backend\app\websocket\ws.py
 
-**Funciones (1):**
-- __init__
+**Funciones (0):**
 
-**Clases (1):**
-- AuthUser
+**Clases (0):**
 
-**Imports (9):**
+**Imports (8):**
 - fastapi.APIRouter
 - fastapi.WebSocket
 - fastapi.WebSocketDisconnect
 - sqlalchemy.orm.Session
 - app.websocket.manager.manager
-- app.core.security.decode_access_token
 - app.db.session.SessionLocal
-- app.models.user.User
-- app.models.user.UserRole
+- app.dependencies.auth.AuthError
+- app.dependencies.auth.authenticate_token
 
 ```python
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
 from app.websocket.manager import manager
-from app.core.security import decode_access_token
 from app.db.session import SessionLocal
-from app.models.user import User, UserRole
+from app.dependencies.auth import AuthError, authenticate_token
 
 
 router = APIRouter()
-
-
-class AuthUser:
-
-    def __init__(self, user: User):
-
-        self.id = user.id
-        self.role = user.role
-        self.restaurant_id = user.restaurant_id
 
 
 @router.websocket("/ws")
@@ -9125,61 +9240,19 @@ async def websocket_endpoint(websocket: WebSocket):
         await websocket.close(code=1008)
         return
 
-    payload = decode_access_token(token)
-
-    if not payload:
-        await websocket.close(code=1008)
-        return
-
-    user_id = payload.get("sub")
-    restaurant_id = payload.get("restaurant_id")
-    role = payload.get("role")
-
-    if not user_id or not restaurant_id or not role:
-        await websocket.close(code=1008)
-        return
-
     db: Session = SessionLocal()
 
     try:
 
-        user = (
-            db.query(User)
-            .filter(
-                User.id == user_id,
-                User.restaurant_id == restaurant_id,
-                User.active == True
-            )
-            .first()
-        )
-
-        if not user:
-            await websocket.close(code=1008)
-            return
-
         try:
-            user_role = UserRole(role)
-        except ValueError:
+            auth_user = authenticate_token(db, token)
+        except AuthError:
             await websocket.close(code=1008)
             return
-
-        if user.role != user_role:
-            await websocket.close(code=1008)
-            return
-
-        station_id_param = websocket.query_params.get("station_id")
-
-        try:
-            station_id = int(station_id_param) if station_id_param else None
-        except ValueError:
-            station_id = None
-
-        auth_user = AuthUser(user)
 
         connected = await manager.connect(
             websocket,
-            auth_user,
-            station_id
+            auth_user
         )
 
         if not connected:
@@ -9197,6 +9270,7 @@ async def websocket_endpoint(websocket: WebSocket):
     finally:
 
         db.close()
+
 ```
 
 ---
@@ -9211,41 +9285,52 @@ async def websocket_endpoint(websocket: WebSocket):
 
 **Clases (0):**
 
-**Imports (6):**
-- socket
-- time
+**Imports (7):**
+- os
 - signal
+- socket
 - sys
-- zeroconf.Zeroconf
+- time
 - zeroconf.ServiceInfo
+- zeroconf.Zeroconf
 
 ```python
 #!/usr/bin/env python3
 """
-POS Zeroconf announcer
-Anuncia los servicios del POS en la red local.
+POS Zeroconf announcer.
 
-Servicios publicados:
-- _pos._tcp.local  → descubrimiento del POS
-- _http._tcp.local → acceso web
-- _ws._tcp.local   → websocket
+Publishes the POS services on the local network so phones/tablets can discover
+the server. The hostname itself (pos.local by default) is provided by Avahi on
+the Linux host; this script publishes service metadata and ports.
 """
 
-import socket
-import time
+import os
 import signal
+import socket
 import sys
-from zeroconf import Zeroconf, ServiceInfo
+import time
+
+from zeroconf import ServiceInfo, Zeroconf
 
 
-def get_local_ip():
-    """Obtiene la IP local de la máquina"""
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-        s.connect(("8.8.8.8", 80))
-        return s.getsockname()[0]
+HOSTNAME = os.getenv("POS_HOSTNAME", "pos.local").rstrip(".")
+FRONTEND_PORT = int(os.getenv("POS_FRONTEND_PORT", "5173"))
+BACKEND_PORT = int(os.getenv("POS_BACKEND_PORT", "8000"))
+SERVICE_NAME = os.getenv("POS_SERVICE_NAME", "restaurant-pos")
 
 
-def create_service(service_type, name, port, ip):
+def get_local_ip() -> str:
+    """Return the LAN IP without requiring the destination to be reachable."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect(("8.8.8.8", 80))
+            return sock.getsockname()[0]
+    except OSError:
+        hostname = socket.gethostname()
+        return socket.gethostbyname(hostname)
+
+
+def create_service(service_type: str, name: str, port: int, ip: str) -> ServiceInfo:
     return ServiceInfo(
         service_type,
         f"{name}.{service_type}",
@@ -9253,57 +9338,52 @@ def create_service(service_type, name, port, ip):
         port=port,
         properties={
             "version": "1.0",
-            "service": name
+            "hostname": HOSTNAME,
+            "service": name,
         },
-        server="pos.local."
+        server=f"{HOSTNAME}.",
     )
 
 
-def main():
-
+def main() -> None:
     ip = get_local_ip()
 
     print("POS Zeroconf announcer")
     print("IP detectada:", ip)
+    print("Hostname:", f"{HOSTNAME}.")
 
     zeroconf = Zeroconf()
 
     services = [
-
         create_service(
             "_pos._tcp.local.",
-            "restaurant-pos",
-            80,
-            ip
+            SERVICE_NAME,
+            FRONTEND_PORT,
+            ip,
         ),
-
         create_service(
             "_http._tcp.local.",
-            "restaurant-pos-web",
-            80,
-            ip
+            f"{SERVICE_NAME}-web",
+            FRONTEND_PORT,
+            ip,
         ),
-
         create_service(
             "_ws._tcp.local.",
-            "restaurant-pos-ws",
-            8000,
-            ip
-        )
-
+            f"{SERVICE_NAME}-ws",
+            BACKEND_PORT,
+            ip,
+        ),
     ]
 
     for service in services:
         zeroconf.register_service(service)
-        print("Servicio publicado:", service.name)
+        print("Servicio publicado:", service.name, "puerto:", service.port)
 
     print("\nPOS disponible en:")
-    print(f"http://pos.local")
-    print(f"http://{ip}")
+    print(f"http://{HOSTNAME}:{FRONTEND_PORT}")
+    print(f"http://{ip}:{FRONTEND_PORT}")
 
-    print("\nCtrl+C para detener")
-
-    def shutdown(sig, frame):
+    def shutdown(_sig, _frame) -> None:
         print("\nCerrando Zeroconf...")
         for service in services:
             zeroconf.unregister_service(service)
@@ -9319,6 +9399,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 ```
 
 ---

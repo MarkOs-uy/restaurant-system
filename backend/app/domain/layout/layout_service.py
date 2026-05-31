@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from app.models.restaurant_layout import RestaurantLayout
 from app.schemas.layout import LayoutUpdate
+from app.services.event_service import EventService
 import logging
 
 logger = logging.getLogger("app.domain.layout")
@@ -10,6 +11,7 @@ class LayoutService:
 
     def __init__(self, db: Session):
         self.db = db
+        self.events = EventService(db)
 
 
     def get_layout(self, restaurant_id: int):
@@ -46,6 +48,11 @@ class LayoutService:
         layout.grid_size = data.grid_size
         layout.snap_to_grid = data.snap_to_grid
 
+        self.events.emit(
+            restaurant_id=restaurant_id,
+            event_type="LAYOUT_UPDATED",
+            payload={"restaurant_id": restaurant_id}
+        )
         self.db.commit()
         self.db.refresh(layout)
 

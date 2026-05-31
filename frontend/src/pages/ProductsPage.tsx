@@ -183,12 +183,12 @@ export default function ProductsPage() {
 
                 <tr
                   style={{
-                    background: "#e9e9e9",
+                    background: "rgba(255, 255, 255, 0.04)",
                     cursor: "pointer"
                   }}
                   onClick={() => toggleCategory(categoryName)}
                 >
-                  <td colSpan={6} style={{ fontWeight: "bold" }}>
+                  <td colSpan={6} style={{ fontWeight: "bold", color: "var(--color-primary)" }}>
                     {openCategories[categoryName] ? "▼" : "▶"} {categoryName}
                   </td>
                 </tr>

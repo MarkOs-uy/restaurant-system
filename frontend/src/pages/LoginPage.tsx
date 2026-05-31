@@ -46,7 +46,7 @@ export default function LoginPage() {
       switch (role) {
 
         case "ADMIN":
-          navigate("/")
+          navigate("/admin")
           break
 
         case "WAITER":
@@ -79,14 +79,15 @@ export default function LoginPage() {
       toast.error(message, {
         duration: 4500,
         style: {
-          border: "1px solid #fecaca",
-          background: "#fff7f7",
-          color: "#7f1d1d",
-          fontWeight: 600
+          border: "1px solid rgba(239, 68, 68, 0.25)",
+          background: "#161c24",
+          color: "#fca5a5",
+          fontWeight: 600,
+          borderRadius: "10px"
         },
         iconTheme: {
-          primary: "#dc2626",
-          secondary: "#fff"
+          primary: "#ef4444",
+          secondary: "#161c24"
         }
       })
 
@@ -98,39 +99,42 @@ export default function LoginPage() {
     <div
       style={{
         height: "100vh",
+        width: "100vw",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "#f5f5f5"
+        background: "radial-gradient(circle at top, #1a233a 0%, #0c0f17 100%)",
+        position: "fixed",
+        top: 0,
+        left: 0,
+        zIndex: 9999
       }}
     >
       <form
         onSubmit={login}
         style={{
-          background: "white",
-          padding: 40,
-          borderRadius: 10,
-          boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
-          width: 320,
+          background: "rgba(22, 28, 45, 0.45)",
+          backdropFilter: "blur(12px) saturate(180%)",
+          WebkitBackdropFilter: "blur(12px) saturate(180%)",
+          border: "1px solid var(--color-border)",
+          padding: "40px",
+          borderRadius: "var(--radius-lg)",
+          boxShadow: "var(--shadow-lg), var(--shadow-glass)",
+          width: "360px",
           display: "flex",
           flexDirection: "column",
-          gap: 15
+          gap: "20px"
         }}
       >
 
-        <h2 style={{ textAlign: "center", marginBottom: 10 }}>
-          🍽️ Restaurant POS
+        <h2 style={{ textAlign: "center", marginBottom: "10px", fontSize: "28px", fontWeight: "700", letterSpacing: "-0.5px" }}>
+          🍳 <span style={{ color: "var(--color-primary)" }}>Marcha</span>
         </h2>
 
         <input
           placeholder="Usuario"
           value={username}
           onChange={e => setUsername(e.target.value)}
-          style={{
-            padding: 10,
-            borderRadius: 6,
-            border: "1px solid #ccc"
-          }}
         />
 
         <input
@@ -138,23 +142,15 @@ export default function LoginPage() {
           placeholder="Contraseña"
           value={password}
           onChange={e => setPassword(e.target.value)}
-          style={{
-            padding: 10,
-            borderRadius: 6,
-            border: "1px solid #ccc"
-          }}
         />
 
         <button
           type="submit"
+          className="btn-primary"
           style={{
-            padding: 10,
-            borderRadius: 6,
-            border: "none",
-            background: "#2d8cff",
-            color: "white",
-            fontWeight: "bold",
-            cursor: "pointer"
+            padding: "12px",
+            fontSize: "16px",
+            marginTop: "10px"
           }}
         >
           Ingresar

@@ -120,17 +120,31 @@ Terminal=true
 Categories=Utility;
 EOF
 
+  cat > "${desktop_dir}/POS Restaurant - Actualizar.desktop" << EOF
+[Desktop Entry]
+Type=Application
+Name=POS Restaurant - Actualizar
+Comment=Actualizar POS Restaurant desde el repositorio
+Exec=/usr/bin/env bash "${APP_DIR}/update.sh"
+Icon=software-update-available
+Terminal=true
+Categories=Utility;
+EOF
+
   chown "$target_user:$target_group" \
     "${desktop_dir}/POS Restaurant - Iniciar.desktop" \
-    "${desktop_dir}/POS Restaurant - Detener.desktop"
+    "${desktop_dir}/POS Restaurant - Detener.desktop" \
+    "${desktop_dir}/POS Restaurant - Actualizar.desktop"
 
   chmod +x \
     "${desktop_dir}/POS Restaurant - Iniciar.desktop" \
-    "${desktop_dir}/POS Restaurant - Detener.desktop"
+    "${desktop_dir}/POS Restaurant - Detener.desktop" \
+    "${desktop_dir}/POS Restaurant - Actualizar.desktop"
 
   if command -v gio >/dev/null 2>&1; then
     sudo -u "$target_user" gio set "${desktop_dir}/POS Restaurant - Iniciar.desktop" metadata::trusted true >/dev/null 2>&1 || true
     sudo -u "$target_user" gio set "${desktop_dir}/POS Restaurant - Detener.desktop" metadata::trusted true >/dev/null 2>&1 || true
+    sudo -u "$target_user" gio set "${desktop_dir}/POS Restaurant - Actualizar.desktop" metadata::trusted true >/dev/null 2>&1 || true
   fi
 
   success "Accesos directos creados en ${desktop_dir}"
@@ -180,8 +194,9 @@ section "Preparando scripts de control"
 chmod +x \
   "${APP_DIR}/start_server.sh" \
   "${APP_DIR}/stop_server.sh" \
+  "${APP_DIR}/update.sh" \
   "${APP_DIR}/uninstall.sh"
-success "Scripts de inicio, cierre y desinstalacion listos"
+success "Scripts de inicio, cierre, actualizacion y desinstalacion listos"
 
 section "Instalando dependencias del sistema"
 apt-get update -qq
@@ -189,6 +204,7 @@ apt-get install -y \
   avahi-daemon \
   ca-certificates \
   curl \
+  git \
   gnupg \
   iproute2 \
   libnss-mdns \
@@ -395,6 +411,7 @@ printf "\n%sComandos utiles:%s\n" "$BOLD" "$RESET"
 printf "  Logs:       cd %s && docker compose -f %s logs -f\n" "$APP_DIR" "$COMPOSE_FILE"
 printf "  Iniciar:    %s/start_server.sh\n" "$APP_DIR"
 printf "  Detener:    %s/stop_server.sh\n" "$APP_DIR"
+printf "  Actualizar: %s/update.sh\n" "$APP_DIR"
 printf "  Reiniciar:  systemctl restart pos-restaurant\n"
 printf "  Estado:     systemctl status pos-restaurant\n"
 printf "  Desinstalar: sudo bash %s/uninstall.sh\n" "$APP_DIR"

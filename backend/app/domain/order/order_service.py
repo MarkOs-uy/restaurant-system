@@ -209,7 +209,7 @@ class OrderService:
             )
         logger.info("Descuento aplicado order_id=%s discount=%s", order.id, discount)
         order.discount = discount
-        for role in [UserRole.WAITER, UserRole.CASHIER]:
+        for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
             self.events.emit(
                 restaurant_id=order.restaurant_id,
                 event_type="ORDER_UPDATED",
@@ -292,7 +292,7 @@ class OrderService:
         )
 
         if order.status != previous_status:
-            for role in [UserRole.WAITER, UserRole.CASHIER]:
+            for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
                 self.events.emit(
                     restaurant_id=order.restaurant_id,
                     event_type="ORDER_STATUS_CHANGED",
@@ -301,7 +301,7 @@ class OrderService:
                     target_id=role.value
                 )
 
-        for role in [UserRole.WAITER, UserRole.CASHIER]:
+        for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
             logger.debug("ORDER_UPDATED emit order_id=%s", order.id)
             self.events.emit(
                 restaurant_id=order.restaurant_id,
@@ -369,21 +369,23 @@ class OrderService:
         logger.info("Estado de orden actualizado order_id=%s from=%s to=%s", order.id, previous_status.value, new_status.value)
         # Emit events solo si cambio
         if previous_status != new_status:
+            for role in [UserRole.ADMIN, UserRole.WAITER]:
+                self.events.emit(
+                    restaurant_id=order.restaurant_id,
+                    event_type="ORDER_STATUS_CHANGED",
+                    payload={"order_id": order.id, "status": new_status.value},
+                    target="role",
+                    target_id=role.value
+                )
+
+        for role in [UserRole.ADMIN, UserRole.WAITER]:
             self.events.emit(
                 restaurant_id=order.restaurant_id,
-                event_type="ORDER_STATUS_CHANGED",
-                payload={"order_id": order.id, "status": new_status.value},
+                event_type="ORDER_UPDATED",
+                payload={"order_id": order.id},
                 target="role",
-                target_id=UserRole.WAITER.value
+                target_id=role.value
             )
-
-        self.events.emit(
-            restaurant_id=order.restaurant_id,
-            event_type="ORDER_UPDATED",
-            payload={"order_id": order.id},
-            target="role",
-            target_id=UserRole.WAITER.value
-        )
         self.db.commit()
         self.db.refresh(order)
         return order
@@ -448,13 +450,14 @@ class OrderService:
                 target_id=str(station_id)
             )
         if order.status != previous_status:
-            self.events.emit(
-                restaurant_id=order.restaurant_id,
-                event_type="ORDER_STATUS_CHANGED",
-                payload={"order_id": order.id, "status": order.status.value},
-                target="role",
-                target_id=UserRole.WAITER.value
-            )
+            for role in [UserRole.ADMIN, UserRole.WAITER]:
+                self.events.emit(
+                    restaurant_id=order.restaurant_id,
+                    event_type="ORDER_STATUS_CHANGED",
+                    payload={"order_id": order.id, "status": order.status.value},
+                    target="role",
+                    target_id=role.value
+                )
         self.db.commit()
         # 🔹 Convertir a JSON serializable
         result = [
@@ -508,7 +511,7 @@ class OrderService:
         self.db.add(payment)
 
         # Emitir eventos
-        for role in [UserRole.WAITER, UserRole.CASHIER]:
+        for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
             self.events.emit(
                 restaurant_id=order.restaurant_id,
                 event_type="PAYMENT_ADDED",
@@ -559,7 +562,7 @@ class OrderService:
 
         self.db.delete(payment)
 
-        for role in [UserRole.WAITER, UserRole.CASHIER]:
+        for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
             self.events.emit(
                 restaurant_id=restaurant_id,
                 event_type="PAYMENT_DELETED",
@@ -621,7 +624,7 @@ class OrderService:
         order.closed_at = func.now()
 
         # Emitir evento
-        for role in [UserRole.WAITER, UserRole.CASHIER]:
+        for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
             self.events.emit(
                 restaurant_id=order.restaurant_id,
                 event_type="ORDER_CLOSED",
@@ -690,7 +693,7 @@ class OrderService:
         self.db.delete(item)
         self.recalculate_order_status(order)
         # 🔔 EVENTO
-        for role in [UserRole.WAITER, UserRole.CASHIER]:
+        for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
             self.events.emit(
                 restaurant_id=restaurant_id,
                 event_type="ORDER_UPDATED",

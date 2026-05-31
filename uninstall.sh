@@ -93,6 +93,7 @@ if [ -n "$TARGET_USER" ]; then
   if [ -n "${DESKTOP_DIR:-}" ]; then
     rm -f "${DESKTOP_DIR}/POS Restaurant - Iniciar.desktop"
     rm -f "${DESKTOP_DIR}/POS Restaurant - Detener.desktop"
+    rm -f "${DESKTOP_DIR}/POS Restaurant - Actualizar.desktop"
     success "Accesos directos quitados de ${DESKTOP_DIR}"
   else
     warn "No pude detectar el escritorio del usuario"

@@ -10,6 +10,8 @@ import CategoriesPage from "./pages/CategoriesPage"
 import StationsPage from "./pages/StationsPage"
 import UsersPage from "./pages/UsersPage"
 import ProductsPage from "./pages/ProductsPage"
+import AdminHomePage from "./pages/AdminHomePage"
+import ReportsPage from "./pages/ReportsPage"
 import ProtectedRoute from "./components/ProtectedRoute"
 import KitchenStations from "./pages/KitchenStations"
 import ManageTables from "./pages/ManageTables"
@@ -59,7 +61,7 @@ function App() {
       />
       {/* NAVBAR DINÁMICO */}
       {role && (
-        <nav className="navbar" style={{ padding: 10 }}>
+        <nav className="navbar">
           <span className="navbar span" style={{ marginRight: 20 }}>
             Rol: <strong>{role}</strong>
           </span>
@@ -72,6 +74,8 @@ function App() {
           {isAdmin && (
             <>
               {" | "}
+              <Link to="/admin">Inicio Admin</Link>
+              {" | "}
               <Link to="/tables/manage">Administración de Mesas</Link>
               {" | "}
               <Link to="/admin/products">Productos</Link>
@@ -81,6 +85,8 @@ function App() {
               <Link to="/admin/stations">Estaciones</Link>
               {" | "}
               <Link to="/admin/users">Usuarios</Link>
+              {" | "}
+              <Link to="/admin/reports">Reportes</Link>
             </>
           )}
 
@@ -100,6 +106,16 @@ function App() {
       <Routes>
         {/* LOGIN libre */}
         <Route path="/login" element={<LoginPage />} />
+
+        {/* ADMIN HOME */}
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute allowedRoles={["ADMIN"]}>
+              <AdminHomePage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* MESAS */}
         <Route
@@ -207,6 +223,16 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["ADMIN"]}>
               <UsersPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ADMIN REPORTS */}
+        <Route
+          path="/admin/reports"
+          element={
+            <ProtectedRoute allowedRoles={["ADMIN"]}>
+              <ReportsPage />
             </ProtectedRoute>
           }
         />

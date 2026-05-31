@@ -98,7 +98,7 @@ export default function CategoriesPage() {
           <thead>
             <tr>
               <th>Nombre</th>
-              <th style={{ width: 200 }}>Acciones</th>
+              <th style={{ width: 300 }}>Acciones</th>
             </tr>
           </thead>
 

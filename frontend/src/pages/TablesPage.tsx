@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom"
 import { apiFetch } from "../api"
 import { showToast } from "../utils/showToast"
 import toast from "react-hot-toast"
+import { wsService } from "../services/wsService"
+import type { WSEventParsed } from "../ws"
 
 interface Table {
   id: number
@@ -35,6 +37,12 @@ interface DragState {
   y: number
 }
 
+const normalizeShape = (shape: string) => shape.split("-")[0]
+const getRectangleOrientation = (shape: string) =>
+  shape.endsWith("-vertical") ? "vertical" : "horizontal"
+const rectangleShape = (orientation: "horizontal" | "vertical") =>
+  `rectangle-${orientation}`
+
 export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
 
   const [tables, setTables] = useState<Table[]>([])
@@ -49,6 +57,7 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
   const [newTableForm, setNewTableForm] = useState({
     number: "",
     shape: "circle",
+    orientation: "horizontal" as "horizontal" | "vertical",
     capacity: 4
   })
 
@@ -119,12 +128,12 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
   }
 
   const getTableColor = (table: Table) => {
-    if (!table.order_status) return "#bdc3c7"   // gris claro (libre)
-    if (table.order_status === "OPEN") return "#f1c40f"   // amarillo
-    if (table.order_status === "SENT") return "#e67e22"   // naranja
-    if (table.order_status === "READY") return "#27ae60"  // verde fuerte
-    if (table.order_status === "PAYING") return "#8e44ad" // violeta
-    return "#95a5a6"
+    if (!table.order_status) return "#1e293b"   // Slate oscuro (libre)
+    if (table.order_status === "OPEN") return "#f59e0b"   // Naranja/Amarillo cálido
+    if (table.order_status === "SENT") return "#ef4444"   // Rojo vibrante
+    if (table.order_status === "READY") return "#10b981"  // Verde esmeralda
+    if (table.order_status === "PAYING") return "#8b5cf6" // Violeta místico
+    return "#637381"
   }
 
   // -------------------------
@@ -169,9 +178,21 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
   }
 
   const getTableDimensions = (table: Pick<Table, "capacity" | "shape">) => {
+    const shape = normalizeShape(table.shape)
     const size = 60 + (table.capacity || 4) * 10
+    const rectangleHeight = 100
+    const rectangleWidth = 100 + (table.capacity || 4) * 16
+
+    if (shape === "rectangle") {
+      const isVertical = getRectangleOrientation(table.shape) === "vertical"
+      return {
+        width: isVertical ? rectangleHeight : rectangleWidth,
+        height: isVertical ? rectangleWidth : rectangleHeight
+      }
+    }
+
     return {
-      width: table.shape === "rectangle" ? size * 1.4 : size,
+      width: size,
       height: size
     }
   }
@@ -203,7 +224,9 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
         number,
         x: 50,
         y: 50,
-        shape: newTableForm.shape,
+        shape: newTableForm.shape === "rectangle"
+          ? rectangleShape(newTableForm.orientation)
+          : newTableForm.shape,
         capacity: newTableForm.capacity
       }
     })
@@ -211,9 +234,34 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
     setNewTableForm({
       number: "",
       shape: "circle",
+      orientation: "horizontal",
       capacity: 4
     })
     setShowForm(false)
+  }
+
+  const rotateTable = async (table: Table) => {
+    if (normalizeShape(table.shape) !== "rectangle") return
+
+    const nextOrientation =
+      getRectangleOrientation(table.shape) === "vertical"
+        ? "horizontal"
+        : "vertical"
+
+    const updated = await apiFetch(`/tables/${table.id}`, {
+      method: "PATCH",
+      body: {
+        shape: rectangleShape(nextOrientation)
+      }
+    })
+
+    setTables(prev =>
+      prev.map(t =>
+        t.id === table.id
+          ? { ...t, shape: updated.shape }
+          : t
+      )
+    )
   }
 
   // -------------------------
@@ -292,8 +340,38 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
   useEffect(() => {
     loadLayout()
     loadTables()
-    const interval = setInterval(loadTables, 5000)
-    return () => clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
+    const relevantEvents = new Set([
+      "ORDER_UPDATED",
+      "ORDER_STATUS_CHANGED",
+      "ORDER_CLOSED",
+      "ITEM_STATUS_CHANGED",
+      "PAYMENT_ADDED",
+      "PAYMENT_DELETED",
+      "TABLE_CREATED",
+      "TABLE_UPDATED",
+      "TABLE_POSITION_UPDATED",
+      "TABLE_ACTIVATED",
+      "TABLE_DEACTIVATED",
+      "LAYOUT_UPDATED"
+    ])
+
+    const handler = ({ type }: WSEventParsed) => {
+      if (!relevantEvents.has(type)) return
+
+      if (type === "LAYOUT_UPDATED") {
+        loadLayout()
+      }
+
+      loadTables()
+    }
+
+    wsService.subscribe(handler)
+    return () => {
+      wsService.unsubscribe(handler)
+    }
   }, [])
 
   useEffect(() => {
@@ -420,7 +498,7 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
             onChange={(e) =>
               setLayout({ ...layout, grid_size: Number(e.target.value) })
             }
-            style={{ width: 60 }}
+            style={{ width: 80 }}
           />
 
           <label
@@ -486,13 +564,32 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
           <select
             value={newTableForm.shape}
             onChange={(e) =>
-              setNewTableForm({ ...newTableForm, shape: e.target.value })
+              setNewTableForm({
+                ...newTableForm,
+                shape: e.target.value
+              })
             }
           >
             <option value="circle">Circular</option>
             <option value="square">Cuadrada</option>
             <option value="rectangle">Rectangular</option>
           </select>
+
+          {newTableForm.shape === "rectangle" && (
+            <select
+              value={newTableForm.orientation}
+              onChange={(e) =>
+                setNewTableForm({
+                  ...newTableForm,
+                  orientation: e.target.value as "horizontal" | "vertical"
+                })
+              }
+              style={{ marginLeft: 10 }}
+            >
+              <option value="horizontal">Horizontal</option>
+              <option value="vertical">Vertical</option>
+            </select>
+          )}
 
           <input
             type="number"
@@ -503,11 +600,11 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
             style={{ marginLeft: 10 }}
           />
 
-          <button onClick={createTable} style={{ marginLeft: 10 }}>
+          <button onClick={createTable} style={{ marginLeft: 10, background: "#0c0f17" }}>
             Crear
           </button>
 
-          <button onClick={() => setShowForm(false)} style={{ marginLeft: 10 }}>
+          <button onClick={() => setShowForm(false)} style={{ marginLeft: 10, background: "#0c0f17" }}>
             Cancelar
           </button>
         </div>
@@ -519,16 +616,17 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
           position: "relative",
           width: layout.width,
           height: layout.height,
-          background: "#f5f5f5",
+          background: "#0c0f17",
           borderRadius: 20,
-          border: "2px solid #ddd",
+          border: "1px solid var(--color-border)",
           overflow: "hidden",
           margin: "0 auto",
           backgroundImage: `
-            linear-gradient(#ddd 1px, transparent 1px),
-            linear-gradient(90deg, #ddd 1px, transparent 1px)
+            linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px)
           `,
-          backgroundSize: `${layout.grid_size}px ${layout.grid_size}px`
+          backgroundSize: `${layout.grid_size}px ${layout.grid_size}px`,
+          boxShadow: "var(--shadow-lg), var(--shadow-glass)"
         }}
       >
 
@@ -537,7 +635,9 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
           let borderRadius = "12px"
           const { width, height } = getTableDimensions(t)
 
-          if (t.shape === "circle") {
+          const normalizedShape = normalizeShape(t.shape)
+
+          if (normalizedShape === "circle") {
             borderRadius = "50%"
           }
 
@@ -591,19 +691,46 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
                 height,
                 borderRadius,
                 background: getTableColor(t),
+                border: t.order_status ? "none" : "1px dashed rgba(255, 255, 255, 0.15)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: 22,
                 fontWeight: "bold",
                 cursor: dragging === t.id ? "grabbing" : editMode ? "grab" : "pointer",
-                boxShadow: "0 4px 10px rgba(0,0,0,0.2)",
+                boxShadow: dragging === t.id 
+                  ? "var(--shadow-lg)" 
+                  : `0 6px 20px rgba(0,0,0,0.35), 0 0 12px ${getTableColor(t)}2b, inset 0 1px 1px rgba(255, 255, 255, 0.08)`,
                 userSelect: "none",
                 touchAction: "none",
-                transition: dragging === t.id ? "none" : "transform 0.1s"
+                transition: dragging === t.id ? "none" : "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)"
               }}
 
             >
+                {editMode && normalizedShape === "rectangle" && (
+                  <button
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      rotateTable(t)
+                    }}
+                    title="Girar mesa"
+                    style={{
+                      position: "absolute",
+                      top: -10,
+                      right: -10,
+                      width: 28,
+                      height: 28,
+                      padding: 0,
+                      borderRadius: "50%",
+                      fontSize: 16,
+                      zIndex: 2
+                    }}
+                  >
+                    ↻
+                  </button>
+                )}
+
                 <div style={{ textAlign: "center", color: "#fff" }}>
                   <div style={{ fontSize: 18, fontWeight: "bold" }}>
                     {t.number}
@@ -644,7 +771,7 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
 
                 <tr key={t.id}>
                   <td>{t.number}</td>
-                  <td>{t.shape}</td>
+                  <td>{normalizeShape(t.shape)}</td>
                   <td>{t.capacity}</td>
 
                   <td>

@@ -430,19 +430,25 @@ export default function OrderDetail() {
         </ul>
         
         <div style={{
-          background: "#fff",
-          color: "#111",
-          padding: 15,
-          borderRadius: 8,
-          marginTop: 10
+          background: "rgba(255, 255, 255, 0.03)",
+          border: "1px solid var(--color-border)",
+          color: "var(--color-text-primary)",
+          padding: "20px",
+          borderRadius: "var(--radius-md)",
+          marginTop: "16px",
+          boxShadow: "var(--shadow-glass)"
         }}>
-          <p>Subtotal: ${subtotal.toFixed(2)}</p>
+          <p style={{ marginBottom: "8px", fontSize: "15px", color: "var(--color-text-secondary)" }}>
+            Subtotal: ${subtotal.toFixed(2)}
+          </p>
 
-          <p style={{ color: (order?.discount ?? 0) > 0 ? "red" : "#555" }}>
+          <p style={{ color: (order?.discount ?? 0) > 0 ? "#ef4444" : "var(--color-text-secondary)", marginBottom: "12px", fontSize: "15px" }}>
             Descuento: {(order?.discount ?? 0) > 0 ? "-" : ""}${(order?.discount ?? 0).toFixed(2)}
           </p>
 
-          <h3>Total: ${total.toFixed(2)}</h3>
+          <h3 style={{ fontSize: "22px", fontWeight: "700", borderTop: "1px solid var(--color-border)", paddingTop: "12px", margin: 0, color: "var(--color-primary)" }}>
+            Total: ${total.toFixed(2)}
+          </h3>
         </div>
 
         {/* ENVIAR A COCINA */}
@@ -566,21 +572,21 @@ export default function OrderDetail() {
 
             <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
               <button
-                className="btn btn-primary"
+                className="btn btn-payment-cash"
                 onClick={() => registerPayment("CASH")}
               >
               💵 Efectivo
               </button>
 
               <button
-                className="btn btn-primary"
+                className="btn btn-payment-card"
                 onClick={() => registerPayment("CARD")}
               >
               💳 Tarjeta
               </button>
 
               <button
-                className="btn btn-primary"
+                className="btn btn-payment-transfer"
                 onClick={() => registerPayment("TRANSFER")}
               >
               🏦 Transferencia

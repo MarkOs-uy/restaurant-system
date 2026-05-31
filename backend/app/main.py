@@ -12,7 +12,7 @@ from app.services.event_cleanup import EventCleanup
 from app.events.redis_listener import redis_event_listener
 
 # routers
-from app.routers import tables, orders, products, cash_register, category, order_items, stations, auth, users, kitchen
+from app.routers import tables, orders, products, cash_register, category, order_items, stations, auth, users, kitchen, reports
 from app.routers import layout
 
 from app.domain.errors.base import DomainError
@@ -91,6 +91,7 @@ app.include_router(kitchen.router, prefix="/api")
 app.include_router(order_items.router, prefix="/api")
 app.include_router(orders.router, prefix="/api")
 app.include_router(products.router, prefix="/api")
+app.include_router(reports.router, prefix="/api")
 app.include_router(stations.router, prefix="/api")
 app.include_router(tables.router, prefix="/api")
 app.include_router(users.router, prefix="/api")

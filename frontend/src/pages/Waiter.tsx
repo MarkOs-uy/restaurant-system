@@ -219,11 +219,14 @@ export default function Waiter() {
           className="card"
           style={{
             border: ready
-              ? "2px solid dodgerblue"
-              : "1px solid #ccc",
+              ? "1px solid var(--status-inprogress)"
+              : "1px solid var(--color-border)",
             backgroundColor: ready
-              ? "#eef6ff"
-              : "white",
+              ? "rgba(59, 130, 246, 0.1)"
+              : "rgba(22, 28, 45, 0.4)",
+            boxShadow: ready
+              ? "0 0 16px rgba(59, 130, 246, 0.15)"
+              : "var(--shadow-sm)",
             marginBottom: 20
           }}
         >

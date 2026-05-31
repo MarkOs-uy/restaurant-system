@@ -84,14 +84,15 @@ class OrderItemService:
             target_id=str(item.product.station_id)
         )
 
-        # mozos
-        self.events.emit(
-            restaurant_id=order.restaurant_id,
-            event_type="ITEM_STATUS_CHANGED",
-            payload=payload,
-            target="role",
-            target_id=UserRole.WAITER.value
-        )
+        # salón / administración
+        for role in [UserRole.ADMIN, UserRole.WAITER]:
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type="ITEM_STATUS_CHANGED",
+                payload=payload,
+                target="role",
+                target_id=role.value
+            )
 
         # evento READY
         if new_status == OrderItemStatus.READY:
@@ -110,16 +111,17 @@ class OrderItemService:
 
         # cambio estado orden
         if order.status != previous_status:
-            self.events.emit(
-                restaurant_id=order.restaurant_id,
-                event_type="ORDER_STATUS_CHANGED",
-                payload={
-                    "order_id": order.id,
-                    "status": order.status.value
-                },
-                target="role",
-                target_id=UserRole.WAITER.value
-            )
+            for role in [UserRole.ADMIN, UserRole.WAITER]:
+                self.events.emit(
+                    restaurant_id=order.restaurant_id,
+                    event_type="ORDER_STATUS_CHANGED",
+                    payload={
+                        "order_id": order.id,
+                        "status": order.status.value
+                    },
+                    target="role",
+                    target_id=role.value
+                )
         self.db.commit()
         self.db.refresh(item)
         return item

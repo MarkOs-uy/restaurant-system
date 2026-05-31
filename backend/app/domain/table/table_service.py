@@ -9,6 +9,7 @@ from app.domain.order.constants import ACTIVE_ORDER_STATUSES
 
 from app.domain.errors.base import DomainError
 from app.domain.errors.error_codes import ErrorCode
+from app.services.event_service import EventService
 
 import logging
 
@@ -19,6 +20,7 @@ class TableService:
 
     def __init__(self, db: Session):
         self.db = db
+        self.events = EventService(db)
 
     # -------------------------
     # Listar mesas
@@ -158,6 +160,12 @@ class TableService:
             shape=table_in.shape
         )
         self.db.add(table)
+        self.db.flush()
+        self.events.emit(
+            restaurant_id=restaurant_id,
+            event_type="TABLE_CREATED",
+            payload={"table_id": table.id}
+        )
         self.db.commit()
         self.db.refresh(table)
         return table
@@ -195,6 +203,11 @@ class TableService:
 
         for field, value in update_data.items():
             setattr(table, field, value)
+        self.events.emit(
+            restaurant_id=restaurant_id,
+            event_type="TABLE_UPDATED",
+            payload={"table_id": table.id}
+        )
         self.db.commit()
         self.db.refresh(table)
         return table
@@ -214,6 +227,15 @@ class TableService:
         table.x = data.x
         table.y = data.y
 
+        self.events.emit(
+            restaurant_id=restaurant_id,
+            event_type="TABLE_POSITION_UPDATED",
+            payload={
+                "table_id": table.id,
+                "x": table.x,
+                "y": table.y
+            }
+        )
         self.db.commit()
         self.db.refresh(table)
         return table
@@ -226,6 +248,11 @@ class TableService:
         table = self._get_table(restaurant_id, table_id, active_only=True)
         logger.info("Mesa desactivada r=%s table_id=%s", restaurant_id, table_id)
         table.active = False
+        self.events.emit(
+            restaurant_id=restaurant_id,
+            event_type="TABLE_DEACTIVATED",
+            payload={"table_id": table.id}
+        )
         self.db.commit()
         return {"message": "Table deactivated"}
 
@@ -237,6 +264,11 @@ class TableService:
         table = self._get_table(restaurant_id, table_id)
         logger.info("Mesa activada r=%s table_id=%s", restaurant_id, table_id)
         table.active = True
+        self.events.emit(
+            restaurant_id=restaurant_id,
+            event_type="TABLE_ACTIVATED",
+            payload={"table_id": table.id}
+        )
         self.db.commit()
         return {"message": "Table activated"}    
     

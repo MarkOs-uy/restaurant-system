@@ -181,10 +181,10 @@ return (
           key={orderId}
           className="card"
           style={{
-            border: "2px solid #ddd",
+            border: "1px solid var(--color-border)",
             marginBottom: 20,
-            background: "#fafafa",
-            boxShadow: "0 3px 10px rgba(0,0,0,0.08)"
+            background: "rgba(22, 28, 45, 0.4)",
+            boxShadow: "var(--shadow-md)"
           }}
         >
 
@@ -197,7 +197,7 @@ return (
                   marginLeft: 15,
                   fontSize: 16,
                   fontWeight: "normal",
-                  color: "#666"
+                  color: "var(--color-text-secondary)"
                 }}
               >
                 ⏱ {getWaitingTime(order.created_at)}
@@ -216,12 +216,13 @@ return (
                 justifyContent: "space-between",
                 marginBottom: 12,
                 padding: 12,
-                border: "1px solid #eee",
+                border: "1px solid var(--color-border)",
                 borderRadius: 6,
                 background:
                   item.status === "SENT"
-                    ? "#fff3cd"
-                    : "white"
+                    ? "rgba(245, 158, 11, 0.12)"
+                    : "rgba(255, 255, 255, 0.02)",
+                color: "var(--color-text-primary)"
               }}
             >
 
