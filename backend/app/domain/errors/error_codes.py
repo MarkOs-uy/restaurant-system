@@ -56,4 +56,4 @@ class ErrorCode(str, Enum):
     STATION_NAME_ALREADY_EXISTS = "station_name_already_exists"
 
     # PERMISSIONS
-    PERMISSION_DENIED = "Permission_denied"
+    PERMISSION_DENIED = "permission_denied"

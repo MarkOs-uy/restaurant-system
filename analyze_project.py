@@ -18,7 +18,7 @@ def analyze_file(filepath):
     imports = []
 
     for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             functions.append(node.name)
         elif isinstance(node, ast.ClassDef):
             classes.append(node.name)

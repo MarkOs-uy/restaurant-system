@@ -1,8 +1,8 @@
 # schemas/waiter.py
 
-from pydantic import BaseModel
+from .base import BaseSchema
 
-class WaiterItemOut(BaseModel):
+class WaiterItemOut(BaseSchema):
     id: int
     product_name: str
     quantity: int

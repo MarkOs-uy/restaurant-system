@@ -354,6 +354,7 @@ class OrderService:
     def update_status(self, order: Order, new_status: OrderStatus):
         if order.status == new_status:
             return order
+
         if not is_valid_order_transition(order.status, new_status):
             raise DomainError(
                 "Invalid order status transition",
@@ -364,28 +365,24 @@ class OrderService:
                     "order_id": order.id
                 }
             )
+
         previous_status = order.status
         order.status = new_status
-        logger.info("Estado de orden actualizado order_id=%s from=%s to=%s", order.id, previous_status.value, new_status.value)
-        # Emit events solo si cambio
-        if previous_status != new_status:
-            for role in [UserRole.ADMIN, UserRole.WAITER]:
-                self.events.emit(
-                    restaurant_id=order.restaurant_id,
-                    event_type="ORDER_STATUS_CHANGED",
-                    payload={"order_id": order.id, "status": new_status.value},
-                    target="role",
-                    target_id=role.value
-                )
+
+        logger.info(
+            "Estado de orden actualizado order_id=%s from=%s to=%s",
+            order.id, previous_status.value, new_status.value
+        )
 
         for role in [UserRole.ADMIN, UserRole.WAITER]:
             self.events.emit(
                 restaurant_id=order.restaurant_id,
-                event_type="ORDER_UPDATED",
-                payload={"order_id": order.id},
+                event_type="ORDER_STATUS_CHANGED",
+                payload={"order_id": order.id, "status": new_status.value},
                 target="role",
                 target_id=role.value
             )
+
         self.db.commit()
         self.db.refresh(order)
         return order
@@ -611,7 +608,10 @@ class OrderService:
                 ErrorCode.ORDER_EMPTY
             )
 
-        not_delivered = [i for i in order.items if i.status != OrderItemStatus.DELIVERED]
+        not_delivered = [
+            i for i in order.items
+            if i.status not in [OrderItemStatus.DELIVERED, OrderItemStatus.CANCELLED]
+        ]
 
         if not_delivered:
             raise DomainError(

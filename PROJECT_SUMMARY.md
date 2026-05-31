@@ -1,5 +1,5 @@
 # 📊 Project Summary
-Generated: 2026-05-24 17:12:57.551741
+Generated: 2026-05-31 10:40:12.642051
 
 ## 📁 Estructura del proyecto
 
@@ -74,6 +74,9 @@ Generated: 2026-05-24 17:12:57.551741
         - product/
           - dependencies.py
           - product_service.py
+        - reports/
+          - dependencies.py
+          - report_service.py
         - stations/
           - dependencies.py
           - station_service.py
@@ -110,6 +113,7 @@ Generated: 2026-05-24 17:12:57.551741
         - orders.py
         - order_items.py
         - products.py
+        - reports.py
         - stations.py
         - tables.py
         - users.py
@@ -181,7 +185,7 @@ from datetime import datetime
 
 EXCLUDE_DIRS = {"venv", "__pycache__", ".git", ".idea", ".vscode", "node_modules"}
 OUTPUT_FILE = "PROJECT_SUMMARY.md"
-INCLUDE_CODE = True  # Cambia a True si quieres incluir el código completo
+INCLUDE_CODE = True
 
 def analyze_file(filepath):
     with open(filepath, "r", encoding="utf-8") as f:
@@ -1687,7 +1691,7 @@ def downgrade() -> None:
 
 **Clases (0):**
 
-**Imports (25):**
+**Imports (26):**
 - fastapi.FastAPI
 - fastapi.Request
 - fastapi.responses.JSONResponse
@@ -1709,6 +1713,7 @@ def downgrade() -> None:
 - app.routers.auth
 - app.routers.users
 - app.routers.kitchen
+- app.routers.reports
 - app.routers.layout
 - app.domain.errors.base.DomainError
 - app.websocket.ws
@@ -1729,7 +1734,7 @@ from app.services.event_cleanup import EventCleanup
 from app.events.redis_listener import redis_event_listener
 
 # routers
-from app.routers import tables, orders, products, cash_register, category, order_items, stations, auth, users, kitchen
+from app.routers import tables, orders, products, cash_register, category, order_items, stations, auth, users, kitchen, reports
 from app.routers import layout
 
 from app.domain.errors.base import DomainError
@@ -1808,6 +1813,7 @@ app.include_router(kitchen.router, prefix="/api")
 app.include_router(order_items.router, prefix="/api")
 app.include_router(orders.router, prefix="/api")
 app.include_router(products.router, prefix="/api")
+app.include_router(reports.router, prefix="/api")
 app.include_router(stations.router, prefix="/api")
 app.include_router(tables.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
@@ -3558,16 +3564,18 @@ def get_layout_service(db: Session = Depends(get_db)):
 **Clases (1):**
 - LayoutService
 
-**Imports (4):**
+**Imports (5):**
 - sqlalchemy.orm.Session
 - app.models.restaurant_layout.RestaurantLayout
 - app.schemas.layout.LayoutUpdate
+- app.services.event_service.EventService
 - logging
 
 ```python
 from sqlalchemy.orm import Session
 from app.models.restaurant_layout import RestaurantLayout
 from app.schemas.layout import LayoutUpdate
+from app.services.event_service import EventService
 import logging
 
 logger = logging.getLogger("app.domain.layout")
@@ -3577,6 +3585,7 @@ class LayoutService:
 
     def __init__(self, db: Session):
         self.db = db
+        self.events = EventService(db)
 
 
     def get_layout(self, restaurant_id: int):
@@ -3613,10 +3622,16 @@ class LayoutService:
         layout.grid_size = data.grid_size
         layout.snap_to_grid = data.snap_to_grid
 
+        self.events.emit(
+            restaurant_id=restaurant_id,
+            event_type="LAYOUT_UPDATED",
+            payload={"restaurant_id": restaurant_id}
+        )
         self.db.commit()
         self.db.refresh(layout)
 
         return layout
+
 ```
 
 ---
@@ -3932,7 +3947,7 @@ class OrderService:
             )
         logger.info("Descuento aplicado order_id=%s discount=%s", order.id, discount)
         order.discount = discount
-        for role in [UserRole.WAITER, UserRole.CASHIER]:
+        for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
             self.events.emit(
                 restaurant_id=order.restaurant_id,
                 event_type="ORDER_UPDATED",
@@ -4015,7 +4030,7 @@ class OrderService:
         )
 
         if order.status != previous_status:
-            for role in [UserRole.WAITER, UserRole.CASHIER]:
+            for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
                 self.events.emit(
                     restaurant_id=order.restaurant_id,
                     event_type="ORDER_STATUS_CHANGED",
@@ -4024,7 +4039,7 @@ class OrderService:
                     target_id=role.value
                 )
 
-        for role in [UserRole.WAITER, UserRole.CASHIER]:
+        for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
             logger.debug("ORDER_UPDATED emit order_id=%s", order.id)
             self.events.emit(
                 restaurant_id=order.restaurant_id,
@@ -4092,21 +4107,23 @@ class OrderService:
         logger.info("Estado de orden actualizado order_id=%s from=%s to=%s", order.id, previous_status.value, new_status.value)
         # Emit events solo si cambio
         if previous_status != new_status:
+            for role in [UserRole.ADMIN, UserRole.WAITER]:
+                self.events.emit(
+                    restaurant_id=order.restaurant_id,
+                    event_type="ORDER_STATUS_CHANGED",
+                    payload={"order_id": order.id, "status": new_status.value},
+                    target="role",
+                    target_id=role.value
+                )
+
+        for role in [UserRole.ADMIN, UserRole.WAITER]:
             self.events.emit(
                 restaurant_id=order.restaurant_id,
-                event_type="ORDER_STATUS_CHANGED",
-                payload={"order_id": order.id, "status": new_status.value},
+                event_type="ORDER_UPDATED",
+                payload={"order_id": order.id},
                 target="role",
-                target_id=UserRole.WAITER.value
+                target_id=role.value
             )
-
-        self.events.emit(
-            restaurant_id=order.restaurant_id,
-            event_type="ORDER_UPDATED",
-            payload={"order_id": order.id},
-            target="role",
-            target_id=UserRole.WAITER.value
-        )
         self.db.commit()
         self.db.refresh(order)
         return order
@@ -4171,13 +4188,14 @@ class OrderService:
                 target_id=str(station_id)
             )
         if order.status != previous_status:
-            self.events.emit(
-                restaurant_id=order.restaurant_id,
-                event_type="ORDER_STATUS_CHANGED",
-                payload={"order_id": order.id, "status": order.status.value},
-                target="role",
-                target_id=UserRole.WAITER.value
-            )
+            for role in [UserRole.ADMIN, UserRole.WAITER]:
+                self.events.emit(
+                    restaurant_id=order.restaurant_id,
+                    event_type="ORDER_STATUS_CHANGED",
+                    payload={"order_id": order.id, "status": order.status.value},
+                    target="role",
+                    target_id=role.value
+                )
         self.db.commit()
         # 🔹 Convertir a JSON serializable
         result = [
@@ -4231,7 +4249,7 @@ class OrderService:
         self.db.add(payment)
 
         # Emitir eventos
-        for role in [UserRole.WAITER, UserRole.CASHIER]:
+        for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
             self.events.emit(
                 restaurant_id=order.restaurant_id,
                 event_type="PAYMENT_ADDED",
@@ -4282,7 +4300,7 @@ class OrderService:
 
         self.db.delete(payment)
 
-        for role in [UserRole.WAITER, UserRole.CASHIER]:
+        for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
             self.events.emit(
                 restaurant_id=restaurant_id,
                 event_type="PAYMENT_DELETED",
@@ -4344,7 +4362,7 @@ class OrderService:
         order.closed_at = func.now()
 
         # Emitir evento
-        for role in [UserRole.WAITER, UserRole.CASHIER]:
+        for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
             self.events.emit(
                 restaurant_id=order.restaurant_id,
                 event_type="ORDER_CLOSED",
@@ -4413,7 +4431,7 @@ class OrderService:
         self.db.delete(item)
         self.recalculate_order_status(order)
         # 🔔 EVENTO
-        for role in [UserRole.WAITER, UserRole.CASHIER]:
+        for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
             self.events.emit(
                 restaurant_id=restaurant_id,
                 event_type="ORDER_UPDATED",
@@ -4666,14 +4684,15 @@ class OrderItemService:
             target_id=str(item.product.station_id)
         )
 
-        # mozos
-        self.events.emit(
-            restaurant_id=order.restaurant_id,
-            event_type="ITEM_STATUS_CHANGED",
-            payload=payload,
-            target="role",
-            target_id=UserRole.WAITER.value
-        )
+        # salón / administración
+        for role in [UserRole.ADMIN, UserRole.WAITER]:
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type="ITEM_STATUS_CHANGED",
+                payload=payload,
+                target="role",
+                target_id=role.value
+            )
 
         # evento READY
         if new_status == OrderItemStatus.READY:
@@ -4692,16 +4711,17 @@ class OrderItemService:
 
         # cambio estado orden
         if order.status != previous_status:
-            self.events.emit(
-                restaurant_id=order.restaurant_id,
-                event_type="ORDER_STATUS_CHANGED",
-                payload={
-                    "order_id": order.id,
-                    "status": order.status.value
-                },
-                target="role",
-                target_id=UserRole.WAITER.value
-            )
+            for role in [UserRole.ADMIN, UserRole.WAITER]:
+                self.events.emit(
+                    restaurant_id=order.restaurant_id,
+                    event_type="ORDER_STATUS_CHANGED",
+                    payload={
+                        "order_id": order.id,
+                        "status": order.status.value
+                    },
+                    target="role",
+                    target_id=role.value
+                )
         self.db.commit()
         self.db.refresh(item)
         return item
@@ -4948,6 +4968,317 @@ class ProductService:
         self.db.commit()
         self.db.refresh(product)
         return product
+```
+
+---
+
+### .\backend\app\domain\reports\dependencies.py
+
+**Funciones (1):**
+- get_report_service
+
+**Clases (0):**
+
+**Imports (4):**
+- fastapi.Depends
+- sqlalchemy.orm.Session
+- app.db.session.get_db
+- report_service.ReportService
+
+```python
+from fastapi import Depends
+from sqlalchemy.orm import Session
+
+from app.db.session import get_db
+from .report_service import ReportService
+
+
+def get_report_service(
+    db: Session = Depends(get_db)
+) -> ReportService:
+    return ReportService(db)
+
+```
+
+---
+
+### .\backend\app\domain\reports\report_service.py
+
+**Funciones (11):**
+- __init__
+- get_sales_report
+- get_products_report
+- get_product_evolution_report
+- _closed_orders_query
+- _product_rows
+- _summarize_products
+- _order_total
+- _date_bounds
+- _empty_days
+- _money
+
+**Clases (1):**
+- ReportService
+
+**Imports (12):**
+- datetime.date
+- datetime.datetime
+- datetime.time
+- datetime.timedelta
+- decimal.Decimal
+- sqlalchemy.orm.Session
+- sqlalchemy.orm.joinedload
+- app.models.order.Order
+- app.models.order.OrderStatus
+- app.models.order_item.OrderItem
+- app.models.order_item.OrderItemStatus
+- app.models.product.Product
+
+```python
+from datetime import date, datetime, time, timedelta
+from decimal import Decimal
+
+from sqlalchemy.orm import Session, joinedload
+
+from app.models.order import Order, OrderStatus
+from app.models.order_item import OrderItem, OrderItemStatus
+from app.models.product import Product
+
+
+class ReportService:
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get_sales_report(
+        self,
+        restaurant_id: int,
+        start_date: date,
+        end_date: date
+    ):
+        totals_by_day = self._empty_days(start_date, end_date)
+
+        for order in self._closed_orders_query(restaurant_id, start_date, end_date):
+            if not order.closed_at:
+                continue
+
+            day = order.closed_at.date().isoformat()
+            totals_by_day[day] += self._order_total(order)
+
+        series = [
+            {"date": day, "total": self._money(total)}
+            for day, total in sorted(totals_by_day.items())
+        ]
+        non_zero_days = [point for point in series if point["total"] > 0]
+
+        return {
+            "series": series,
+            "max_day": max(non_zero_days, key=lambda point: point["total"], default=None),
+            "min_day": min(non_zero_days, key=lambda point: point["total"], default=None)
+        }
+
+    def get_products_report(
+        self,
+        restaurant_id: int,
+        start_date: date,
+        end_date: date,
+        category_id: int | None = None
+    ):
+        start_today = datetime.combine(date.today(), time.min)
+        end_today = datetime.combine(date.today() + timedelta(days=1), time.min)
+        start, end = self._date_bounds(start_date, end_date)
+
+        period_items = self._summarize_products(
+            restaurant_id=restaurant_id,
+            rows=self._product_rows(restaurant_id, start, end, category_id),
+            category_id=category_id
+        )
+        today_items = [
+            item
+            for item in self._summarize_products(
+                restaurant_id=restaurant_id,
+                rows=self._product_rows(restaurant_id, start_today, end_today, category_id),
+                category_id=category_id
+            )
+            if item["quantity"] > 0
+        ]
+
+        top_products = sorted(
+            [item for item in period_items if item["quantity"] > 0],
+            key=lambda item: (item["quantity"], item["total"], item["name"]),
+            reverse=True
+        )[:10]
+        least_products = sorted(
+            period_items,
+            key=lambda item: (item["quantity"], item["total"], item["name"])
+        )[:10]
+
+        return {
+            "today_best_seller": max(
+                today_items,
+                key=lambda item: (item["quantity"], item["total"]),
+                default=None
+            ),
+            "top_products": top_products,
+            "least_products": least_products
+        }
+
+    def get_product_evolution_report(
+        self,
+        restaurant_id: int,
+        product_id: int,
+        start_date: date,
+        end_date: date
+    ):
+        totals_by_day = self._empty_days(start_date, end_date)
+        start, end = self._date_bounds(start_date, end_date)
+
+        rows = (
+            self.db.query(Order.closed_at, OrderItem.quantity, OrderItem.unit_price)
+            .join(OrderItem, OrderItem.order_id == Order.id)
+            .filter(
+                Order.restaurant_id == restaurant_id,
+                Order.status == OrderStatus.CLOSED,
+                Order.closed_at >= start,
+                Order.closed_at < end,
+                OrderItem.product_id == product_id,
+                OrderItem.status != OrderItemStatus.CANCELLED
+            )
+            .all()
+        )
+
+        for closed_at, quantity, unit_price in rows:
+            if closed_at:
+                totals_by_day[closed_at.date().isoformat()] += quantity * unit_price
+
+        return {
+            "series": [
+                {"date": day, "total": self._money(total)}
+                for day, total in sorted(totals_by_day.items())
+            ]
+        }
+
+    def _closed_orders_query(
+        self,
+        restaurant_id: int,
+        start_date: date,
+        end_date: date
+    ):
+        start, end = self._date_bounds(start_date, end_date)
+
+        return (
+            self.db.query(Order)
+            .options(joinedload(Order.items))
+            .filter(
+                Order.restaurant_id == restaurant_id,
+                Order.status == OrderStatus.CLOSED,
+                Order.closed_at >= start,
+                Order.closed_at < end
+            )
+        )
+
+    def _product_rows(
+        self,
+        restaurant_id: int,
+        range_start: datetime,
+        range_end: datetime,
+        category_id: int | None
+    ):
+        query = (
+            self.db.query(
+                Product.id,
+                Product.name,
+                Product.category_id,
+                OrderItem.quantity,
+                OrderItem.unit_price
+            )
+            .join(OrderItem, OrderItem.product_id == Product.id)
+            .join(Order, Order.id == OrderItem.order_id)
+            .filter(
+                Order.restaurant_id == restaurant_id,
+                Order.status == OrderStatus.CLOSED,
+                Order.closed_at >= range_start,
+                Order.closed_at < range_end,
+                OrderItem.status != OrderItemStatus.CANCELLED
+            )
+        )
+
+        if category_id is not None:
+            query = query.filter(Product.category_id == category_id)
+
+        return query.all()
+
+    def _summarize_products(
+        self,
+        restaurant_id: int,
+        rows,
+        category_id: int | None
+    ):
+        totals: dict[int, dict] = {}
+        products_query = self.db.query(Product).filter(Product.restaurant_id == restaurant_id)
+
+        if category_id is not None:
+            products_query = products_query.filter(Product.category_id == category_id)
+
+        for product in products_query.all():
+            totals[product.id] = {
+                "product_id": product.id,
+                "name": product.name,
+                "category_id": product.category_id,
+                "quantity": 0,
+                "total": Decimal("0")
+            }
+
+        for product_id, name, product_category_id, quantity, unit_price in rows:
+            if product_id not in totals:
+                totals[product_id] = {
+                    "product_id": product_id,
+                    "name": name,
+                    "category_id": product_category_id,
+                    "quantity": 0,
+                    "total": Decimal("0")
+                }
+
+            totals[product_id]["quantity"] += quantity
+            totals[product_id]["total"] += quantity * unit_price
+
+        return [
+            {
+                **item,
+                "total": self._money(item["total"])
+            }
+            for item in totals.values()
+        ]
+
+    def _order_total(self, order: Order) -> Decimal:
+        subtotal = sum(
+            (
+                item.quantity * item.unit_price
+                for item in order.items
+                if item.status != OrderItemStatus.CANCELLED
+            ),
+            Decimal("0")
+        )
+        return max(subtotal - (order.discount or Decimal("0")), Decimal("0"))
+
+    def _date_bounds(self, start_date: date, end_date: date):
+        start = datetime.combine(start_date, time.min)
+        end = datetime.combine(end_date + timedelta(days=1), time.min)
+        return start, end
+
+    def _empty_days(self, start_date: date, end_date: date) -> dict[str, Decimal]:
+        days: dict[str, Decimal] = {}
+        current = start_date
+
+        while current <= end_date:
+            days[current.isoformat()] = Decimal("0")
+            current += timedelta(days=1)
+
+        return days
+
+    def _money(self, value: Decimal | int | float) -> float:
+        return float(round(Decimal(value), 2))
+
 ```
 
 ---
@@ -5220,7 +5551,7 @@ def get_table_service(db: Session = Depends(get_db)):
 **Clases (1):**
 - TableService
 
-**Imports (10):**
+**Imports (11):**
 - sqlalchemy.orm.Session
 - sqlalchemy.orm.joinedload
 - sqlalchemy.func
@@ -5230,6 +5561,7 @@ def get_table_service(db: Session = Depends(get_db)):
 - app.domain.order.constants.ACTIVE_ORDER_STATUSES
 - app.domain.errors.base.DomainError
 - app.domain.errors.error_codes.ErrorCode
+- app.services.event_service.EventService
 - logging
 
 ```python
@@ -5244,6 +5576,7 @@ from app.domain.order.constants import ACTIVE_ORDER_STATUSES
 
 from app.domain.errors.base import DomainError
 from app.domain.errors.error_codes import ErrorCode
+from app.services.event_service import EventService
 
 import logging
 
@@ -5254,6 +5587,7 @@ class TableService:
 
     def __init__(self, db: Session):
         self.db = db
+        self.events = EventService(db)
 
     # -------------------------
     # Listar mesas
@@ -5393,6 +5727,12 @@ class TableService:
             shape=table_in.shape
         )
         self.db.add(table)
+        self.db.flush()
+        self.events.emit(
+            restaurant_id=restaurant_id,
+            event_type="TABLE_CREATED",
+            payload={"table_id": table.id}
+        )
         self.db.commit()
         self.db.refresh(table)
         return table
@@ -5430,6 +5770,11 @@ class TableService:
 
         for field, value in update_data.items():
             setattr(table, field, value)
+        self.events.emit(
+            restaurant_id=restaurant_id,
+            event_type="TABLE_UPDATED",
+            payload={"table_id": table.id}
+        )
         self.db.commit()
         self.db.refresh(table)
         return table
@@ -5449,6 +5794,15 @@ class TableService:
         table.x = data.x
         table.y = data.y
 
+        self.events.emit(
+            restaurant_id=restaurant_id,
+            event_type="TABLE_POSITION_UPDATED",
+            payload={
+                "table_id": table.id,
+                "x": table.x,
+                "y": table.y
+            }
+        )
         self.db.commit()
         self.db.refresh(table)
         return table
@@ -5461,6 +5815,11 @@ class TableService:
         table = self._get_table(restaurant_id, table_id, active_only=True)
         logger.info("Mesa desactivada r=%s table_id=%s", restaurant_id, table_id)
         table.active = False
+        self.events.emit(
+            restaurant_id=restaurant_id,
+            event_type="TABLE_DEACTIVATED",
+            payload={"table_id": table.id}
+        )
         self.db.commit()
         return {"message": "Table deactivated"}
 
@@ -5472,6 +5831,11 @@ class TableService:
         table = self._get_table(restaurant_id, table_id)
         logger.info("Mesa activada r=%s table_id=%s", restaurant_id, table_id)
         table.active = True
+        self.events.emit(
+            restaurant_id=restaurant_id,
+            event_type="TABLE_ACTIVATED",
+            payload={"table_id": table.id}
+        )
         self.db.commit()
         return {"message": "Table activated"}    
     
@@ -7648,6 +8012,88 @@ def toggle_product(
         product_id,
         user.restaurant_id
     )
+```
+
+---
+
+### .\backend\app\routers\reports.py
+
+**Funciones (3):**
+- sales_report
+- products_report
+- product_evolution_report
+
+**Clases (0):**
+
+**Imports (8):**
+- datetime.date
+- fastapi.APIRouter
+- fastapi.Depends
+- fastapi.Query
+- app.dependencies.roles.admin_only
+- app.domain.reports.dependencies.get_report_service
+- app.domain.reports.report_service.ReportService
+- app.models.user.User
+
+```python
+from datetime import date
+
+from fastapi import APIRouter, Depends, Query
+
+from app.dependencies.roles import admin_only
+from app.domain.reports.dependencies import get_report_service
+from app.domain.reports.report_service import ReportService
+from app.models.user import User
+
+
+router = APIRouter(prefix="/reports", tags=["reports"])
+
+
+@router.get("/sales")
+def sales_report(
+    start_date: date = Query(...),
+    end_date: date = Query(...),
+    user: User = Depends(admin_only),
+    service: ReportService = Depends(get_report_service)
+):
+    return service.get_sales_report(
+        restaurant_id=user.restaurant_id,
+        start_date=start_date,
+        end_date=end_date
+    )
+
+
+@router.get("/products")
+def products_report(
+    start_date: date = Query(...),
+    end_date: date = Query(...),
+    category_id: int | None = Query(None),
+    user: User = Depends(admin_only),
+    service: ReportService = Depends(get_report_service)
+):
+    return service.get_products_report(
+        restaurant_id=user.restaurant_id,
+        start_date=start_date,
+        end_date=end_date,
+        category_id=category_id
+    )
+
+
+@router.get("/products/{product_id}/evolution")
+def product_evolution_report(
+    product_id: int,
+    start_date: date = Query(...),
+    end_date: date = Query(...),
+    user: User = Depends(admin_only),
+    service: ReportService = Depends(get_report_service)
+):
+    return service.get_product_evolution_report(
+        restaurant_id=user.restaurant_id,
+        product_id=product_id,
+        start_date=start_date,
+        end_date=end_date
+    )
+
 ```
 
 ---
