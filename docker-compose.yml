@@ -23,6 +23,9 @@ services:
       - ./backend/.env
     volumes:
       - ./backend:/app
+      - ./backups:/backups
+    environment:
+      BACKUP_DIR: /backups
 
 
   backup:

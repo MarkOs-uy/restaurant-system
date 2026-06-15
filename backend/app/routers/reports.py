@@ -25,6 +25,20 @@ def sales_report(
     )
 
 
+@router.get("/sales/orders")
+def sales_orders_report(
+    start_date: date = Query(...),
+    end_date: date = Query(...),
+    user: User = Depends(admin_only),
+    service: ReportService = Depends(get_report_service)
+):
+    return service.get_sales_orders_report(
+        restaurant_id=user.restaurant_id,
+        start_date=start_date,
+        end_date=end_date
+    )
+
+
 @router.get("/products")
 def products_report(
     start_date: date = Query(...),

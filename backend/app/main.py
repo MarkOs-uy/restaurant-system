@@ -12,7 +12,7 @@ from app.services.event_cleanup import EventCleanup
 from app.events.redis_listener import redis_event_listener
 
 # routers
-from app.routers import tables, orders, products, cash_register, category, order_items, stations, auth, users, kitchen, reports
+from app.routers import tables, orders, products, cash_register, category, order_items, stations, auth, users, kitchen, reports, backups
 from app.routers import layout
 
 from app.domain.errors.base import DomainError
@@ -85,6 +85,7 @@ app.add_middleware(
 
 # routers
 app.include_router(auth.router, prefix="/api")
+app.include_router(backups.router, prefix="/api")
 app.include_router(cash_register.router, prefix="/api")
 app.include_router(category.router, prefix="/api")
 app.include_router(kitchen.router, prefix="/api")

@@ -25,6 +25,11 @@ const adminActions = [
     title: "Reportes y Métricas",
     description: "Acceder próximamente al centro de reportes.",
     to: "/admin/reports"
+  },
+  {
+    title: "Backups",
+    description: "Ver el último respaldo, generar uno nuevo y enviarlo por correo.",
+    to: "/admin/backups"
   }
 ]
 

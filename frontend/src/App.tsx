@@ -12,6 +12,7 @@ import UsersPage from "./pages/UsersPage"
 import ProductsPage from "./pages/ProductsPage"
 import AdminHomePage from "./pages/AdminHomePage"
 import ReportsPage from "./pages/ReportsPage"
+import BackupsPage from "./pages/BackupsPage"
 import ProtectedRoute from "./components/ProtectedRoute"
 import KitchenStations from "./pages/KitchenStations"
 import ManageTables from "./pages/ManageTables"
@@ -87,6 +88,8 @@ function App() {
               <Link to="/admin/users">Usuarios</Link>
               {" | "}
               <Link to="/admin/reports">Reportes</Link>
+              {" | "}
+              <Link to="/admin/backups">Backups</Link>
             </>
           )}
 
@@ -233,6 +236,16 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["ADMIN"]}>
               <ReportsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ADMIN BACKUPS */}
+        <Route
+          path="/admin/backups"
+          element={
+            <ProtectedRoute allowedRoles={["ADMIN"]}>
+              <BackupsPage />
             </ProtectedRoute>
           }
         />

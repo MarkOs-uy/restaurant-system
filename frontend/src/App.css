@@ -1,4 +1,4 @@
-/* GastroFlow APP STYLES - GLASSMORPHISM & PREMIUM DARK UI */
+﻿/* GastroFlow APP STYLES - GLASSMORPHISM & PREMIUM DARK UI */
 
 #root {
   max-width: 1300px;
@@ -590,6 +590,220 @@ hr {
   font-size: 20px;
 }
 
+.sales-orders-block,
+.backups-page {
+  margin-top: 26px;
+}
+
+.sales-orders-block {
+  padding-top: 24px;
+  border-top: 1px solid var(--color-border);
+}
+
+.sales-orders__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.btn-report {
+  min-width: 124px;
+}
+
+.btn-report:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  transform: none;
+}
+
+.sales-orders__summary,
+.backup-status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.sales-orders__summary div,
+.sales-orders__empty,
+.sales-order,
+.backup-status-grid div {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-sm);
+}
+
+.sales-orders__summary div,
+.backup-status-grid div {
+  padding: 18px;
+}
+
+.sales-orders__summary span,
+.backup-status-grid span {
+  display: block;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sales-orders__summary strong,
+.backup-status-grid strong {
+  display: block;
+  margin-top: 8px;
+  color: var(--color-text-primary);
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}
+
+.sales-orders__empty {
+  padding: 24px;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  text-align: center;
+}
+
+.sales-orders__list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sales-order {
+  padding: 18px;
+}
+
+.sales-order__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.sales-order__header h3 {
+  margin-bottom: 6px;
+}
+
+.sales-order__header p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sales-order__header strong {
+  color: var(--color-text-primary);
+  font-size: 22px;
+  white-space: nowrap;
+}
+
+.sales-order__table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.sales-order__items {
+  margin: 0;
+  min-width: 620px;
+}
+
+.sales-order__items th:nth-child(3),
+.sales-order__items td:nth-child(3) {
+  text-align: center;
+}
+
+.sales-order__items th:nth-child(2),
+.sales-order__items th:nth-child(4),
+.sales-order__items td:nth-child(2),
+.sales-order__items td:nth-child(4) {
+  text-align: right;
+}
+
+.sales-order__totals {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.sales-order__totals strong {
+  color: var(--color-text-primary);
+  font-size: 16px;
+}
+
+.backups-page {
+  width: 100%;
+  padding: 40px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.backups-header p,
+.backup-section__header p {
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.backups-header h1 {
+  margin-bottom: 0;
+}
+
+.backup-section {
+  padding: 26px;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md), var(--shadow-glass);
+}
+
+.backup-section__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+.backup-section__header h2 {
+  margin-bottom: 0;
+}
+
+.backup-email-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.backup-email-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+  flex: 1;
+  min-width: 260px;
+}
+
+.backup-email-note {
+  margin: 14px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
 .today-product {
   margin-bottom: 18px;
 }
@@ -668,7 +882,33 @@ hr {
   }
 
   .sales-summary,
+  .sales-orders__summary,
+  .backup-status-grid,
   .product-ranks-grid {
     grid-template-columns: 1fr;
+  }
+
+  .sales-order__header,
+  .backup-section__header,
+  .backup-email-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sales-order__header strong {
+    white-space: normal;
+  }
+
+  .sales-order__totals {
+    justify-content: flex-start;
+  }
+
+  .sales-orders__actions {
+    justify-content: stretch;
+  }
+
+  .btn-report,
+  .backup-email-form button {
+    width: 100%;
   }
 }

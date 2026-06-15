@@ -121,6 +121,30 @@ class ReportService:
             ]
         }
 
+    def get_sales_orders_report(
+        self,
+        restaurant_id: int,
+        start_date: date,
+        end_date: date
+    ):
+        orders = (
+            self._closed_orders_query(restaurant_id, start_date, end_date)
+            .options(
+                joinedload(Order.items).joinedload(OrderItem.product),
+                joinedload(Order.table)
+            )
+            .order_by(Order.closed_at.desc(), Order.id.desc())
+            .all()
+        )
+
+        return {
+            "orders": [
+                self._serialize_sales_order(order)
+                for order in orders
+                if order.closed_at
+            ]
+        }
+
     def _closed_orders_query(
         self,
         restaurant_id: int,
@@ -223,6 +247,38 @@ class ReportService:
             Decimal("0")
         )
         return max(subtotal - (order.discount or Decimal("0")), Decimal("0"))
+
+    def _serialize_sales_order(self, order: Order):
+        active_items = [
+            item
+            for item in order.items
+            if item.status != OrderItemStatus.CANCELLED
+        ]
+        subtotal = sum(
+            (item.quantity * item.unit_price for item in active_items),
+            Decimal("0")
+        )
+        discount = order.discount or Decimal("0")
+
+        return {
+            "order_id": order.id,
+            "table_number": order.table.number if order.table else None,
+            "closed_at": order.closed_at.isoformat() if order.closed_at else None,
+            "items": [
+                {
+                    "item_id": item.id,
+                    "product_id": item.product_id,
+                    "product_name": item.product.name if item.product else "Producto eliminado",
+                    "unit_price": self._money(item.unit_price),
+                    "quantity": item.quantity,
+                    "line_total": self._money(item.quantity * item.unit_price)
+                }
+                for item in active_items
+            ],
+            "subtotal": self._money(subtotal),
+            "discount": self._money(discount),
+            "total": self._money(max(subtotal - discount, Decimal("0")))
+        }
 
     def _date_bounds(self, start_date: date, end_date: date):
         start = datetime.combine(start_date, time.min)

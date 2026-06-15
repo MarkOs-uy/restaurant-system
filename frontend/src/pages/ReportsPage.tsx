@@ -37,6 +37,29 @@ interface ProductsReport {
   least_products: ProductRankItem[]
 }
 
+interface SalesOrderItem {
+  item_id: number
+  product_id: number
+  product_name: string
+  unit_price: number
+  quantity: number
+  line_total: number
+}
+
+interface SalesOrder {
+  order_id: number
+  table_number: number | null
+  closed_at: string | null
+  items: SalesOrderItem[]
+  subtotal: number
+  discount: number
+  total: number
+}
+
+interface SalesOrdersReport {
+  orders: SalesOrder[]
+}
+
 const money = new Intl.NumberFormat("es-UY", {
   style: "currency",
   currency: "UYU",
@@ -58,8 +81,256 @@ function formatDate(value: string) {
   })
 }
 
+function formatFullDate(value: string) {
+  return new Date(`${value}T00:00:00`).toLocaleDateString("es-UY", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  })
+}
+
+function formatDateTime(value: string | null) {
+  if (!value) return "Sin fecha"
+
+  return new Date(value).toLocaleString("es-UY", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  })
+}
+
 function buildQuery(params: Record<string, string>) {
   return new URLSearchParams(params).toString()
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;")
+}
+
+function buildSalesOrdersPrintHtml(
+  orders: SalesOrder[],
+  startDate: string,
+  endDate: string,
+  output: "pdf" | "print"
+) {
+  const total = orders.reduce((sum, order) => sum + order.total, 0)
+  const title = output === "pdf" ? "Reporte de ventas para PDF" : "Reporte de ventas"
+
+  return `
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Ventas ${escapeHtml(formatFullDate(startDate))} - ${escapeHtml(formatFullDate(endDate))}</title>
+        <style>
+          @page { size: A4; margin: 16mm; }
+          * { box-sizing: border-box; }
+          body {
+            margin: 0;
+            color: #111827;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 12px;
+            line-height: 1.35;
+          }
+          header {
+            display: flex;
+            justify-content: space-between;
+            gap: 24px;
+            margin-bottom: 18px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #111827;
+          }
+          h1 {
+            margin: 0 0 6px;
+            font-size: 22px;
+          }
+          p {
+            margin: 0;
+          }
+          .muted {
+            color: #6b7280;
+          }
+          .summary {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 16px;
+          }
+          .summary div {
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+          }
+          .summary span {
+            display: block;
+            color: #6b7280;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+          }
+          .summary strong {
+            display: block;
+            margin-top: 4px;
+            font-size: 16px;
+          }
+          .order {
+            page-break-inside: avoid;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #d1d5db;
+          }
+          .order-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 8px;
+          }
+          .order-header h2 {
+            margin: 0 0 4px;
+            font-size: 15px;
+          }
+          .order-header strong {
+            font-size: 15px;
+            white-space: nowrap;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+          }
+          th,
+          td {
+            padding: 7px 8px;
+            border: 1px solid #d1d5db;
+            text-align: left;
+          }
+          th {
+            background: #f3f4f6;
+            font-size: 11px;
+            text-transform: uppercase;
+          }
+          .number {
+            text-align: right;
+            white-space: nowrap;
+          }
+          .center {
+            text-align: center;
+          }
+          .totals {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+            font-weight: 700;
+          }
+        </style>
+      </head>
+      <body>
+        <header>
+          <div>
+            <h1>${title}</h1>
+            <p class="muted">Periodo: ${escapeHtml(formatFullDate(startDate))} al ${escapeHtml(formatFullDate(endDate))}</p>
+          </div>
+          <div>
+            <p class="muted">Generado: ${escapeHtml(new Date().toLocaleString("es-UY"))}</p>
+          </div>
+        </header>
+
+        <section class="summary">
+          <div>
+            <span>Ordenes vendidas</span>
+            <strong>${orders.length}</strong>
+          </div>
+          <div>
+            <span>Total vendido</span>
+            <strong>${escapeHtml(money.format(total))}</strong>
+          </div>
+        </section>
+
+        ${orders.map(order => `
+          <section class="order">
+            <div class="order-header">
+              <div>
+                <h2>Orden #${order.order_id}</h2>
+                <p class="muted">${escapeHtml(order.table_number ? `Mesa ${order.table_number}` : "Sin mesa")} - ${escapeHtml(formatDateTime(order.closed_at))}</p>
+              </div>
+              <strong>${escapeHtml(money.format(order.total))}</strong>
+            </div>
+
+            <table>
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th class="number">Precio unitario</th>
+                  <th class="center">Cantidad</th>
+                  <th class="number">Total item</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${order.items.map(item => `
+                  <tr>
+                    <td>${escapeHtml(item.product_name)}</td>
+                    <td class="number">${escapeHtml(money.format(item.unit_price))}</td>
+                    <td class="center">${item.quantity}</td>
+                    <td class="number">${escapeHtml(money.format(item.line_total))}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+
+            <div class="totals">
+              <span>Subtotal ${escapeHtml(money.format(order.subtotal))}</span>
+              ${order.discount > 0 ? `<span>Descuento -${escapeHtml(money.format(order.discount))}</span>` : ""}
+              <span>Total ${escapeHtml(money.format(order.total))}</span>
+            </div>
+          </section>
+        `).join("")}
+      </body>
+    </html>
+  `
+}
+
+function printSalesOrders(
+  orders: SalesOrder[],
+  startDate: string,
+  endDate: string,
+  output: "pdf" | "print"
+) {
+  if (orders.length === 0) return
+
+  const frame = document.createElement("iframe")
+  frame.style.position = "fixed"
+  frame.style.right = "0"
+  frame.style.bottom = "0"
+  frame.style.width = "0"
+  frame.style.height = "0"
+  frame.style.border = "0"
+  document.body.appendChild(frame)
+
+  const printDocument = frame.contentDocument
+  const printWindow = frame.contentWindow
+
+  if (!printDocument || !printWindow) {
+    document.body.removeChild(frame)
+    return
+  }
+
+  printDocument.open()
+  printDocument.write(buildSalesOrdersPrintHtml(orders, startDate, endDate, output))
+  printDocument.close()
+
+  setTimeout(() => {
+    printWindow.focus()
+    printWindow.print()
+    setTimeout(() => document.body.removeChild(frame), 1000)
+  }, 150)
 }
 
 function LineChart({ data, label }: { data: ChartPoint[]; label: string }) {
@@ -182,6 +453,103 @@ function ProductTable({ title, items }: { title: string; items: ProductRankItem[
   )
 }
 
+function SalesOrdersList({
+  orders,
+  startDate,
+  endDate
+}: {
+  orders: SalesOrder[]
+  startDate: string
+  endDate: string
+}) {
+  const total = orders.reduce((sum, order) => sum + order.total, 0)
+
+  return (
+    <div className="sales-orders">
+      <div className="sales-orders__actions">
+        <button
+          type="button"
+          className="btn btn-report"
+          onClick={() => printSalesOrders(orders, startDate, endDate, "pdf")}
+          disabled={orders.length === 0}
+        >
+          Generar PDF
+        </button>
+
+        <button
+          type="button"
+          className="btn btn-report"
+          onClick={() => printSalesOrders(orders, startDate, endDate, "print")}
+          disabled={orders.length === 0}
+        >
+          Imprimir
+        </button>
+      </div>
+
+      <div className="sales-orders__summary">
+        <div>
+          <span>Órdenes vendidas</span>
+          <strong>{orders.length}</strong>
+        </div>
+        <div>
+          <span>Total vendido</span>
+          <strong>{money.format(total)}</strong>
+        </div>
+      </div>
+
+      {orders.length === 0 ? (
+        <div className="sales-orders__empty">Sin ventas realizadas para el rango seleccionado</div>
+      ) : (
+        <div className="sales-orders__list">
+          {orders.map(order => (
+            <article className="sales-order" key={order.order_id}>
+              <div className="sales-order__header">
+                <div>
+                  <h3>Orden #{order.order_id}</h3>
+                  <p>
+                    {order.table_number ? `Mesa ${order.table_number}` : "Sin mesa"} ·{" "}
+                    {formatDateTime(order.closed_at)}
+                  </p>
+                </div>
+                <strong>{money.format(order.total)}</strong>
+              </div>
+
+              <div className="sales-order__table-wrap">
+                <table className="sales-order__items">
+                  <thead>
+                    <tr>
+                      <th>Ítem</th>
+                      <th>Precio unitario</th>
+                      <th>Cantidad</th>
+                      <th>Total ítem</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {order.items.map(item => (
+                      <tr key={item.item_id}>
+                        <td>{item.product_name}</td>
+                        <td>{money.format(item.unit_price)}</td>
+                        <td>{item.quantity}</td>
+                        <td>{money.format(item.line_total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="sales-order__totals">
+                <span>Subtotal {money.format(order.subtotal)}</span>
+                {order.discount > 0 && <span>Descuento -{money.format(order.discount)}</span>}
+                <strong>Total {money.format(order.total)}</strong>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function ReportsPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [products, setProducts] = useState<Product[]>([])
@@ -194,6 +562,7 @@ export default function ReportsPage() {
   const [categoryId, setCategoryId] = useState("all")
   const [selectedProductId, setSelectedProductId] = useState("")
   const [salesReport, setSalesReport] = useState<SalesReport | null>(null)
+  const [salesOrdersReport, setSalesOrdersReport] = useState<SalesOrdersReport | null>(null)
   const [productsReport, setProductsReport] = useState<ProductsReport | null>(null)
   const [productEvolution, setProductEvolution] = useState<ChartPoint[]>([])
 
@@ -223,7 +592,13 @@ export default function ReportsPage() {
         start_date: salesStartDate,
         end_date: salesEndDate
       })
-      setSalesReport(await apiFetch(`/reports/sales?${query}`))
+      const [salesData, salesOrdersData] = await Promise.all([
+        apiFetch(`/reports/sales?${query}`),
+        apiFetch(`/reports/sales/orders?${query}`)
+      ])
+
+      setSalesReport(salesData)
+      setSalesOrdersReport(salesOrdersData)
     }
 
     loadSales()
@@ -317,6 +692,21 @@ export default function ReportsPage() {
                 : "Sin datos"}
             </strong>
           </div>
+        </div>
+
+        <div className="sales-orders-block">
+          <div className="report-section__header">
+            <div>
+              <p>Detalle de ventas</p>
+              <h2>Ventas realizadas por orden</h2>
+            </div>
+          </div>
+
+          <SalesOrdersList
+            orders={salesOrdersReport?.orders || []}
+            startDate={salesStartDate}
+            endDate={salesEndDate}
+          />
         </div>
       </section>
 
