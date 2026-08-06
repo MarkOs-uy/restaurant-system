@@ -11,3 +11,4 @@ class PaymentOut(BaseSchema):
     id: int
     amount: Decimal
     method: PaymentMethod
+

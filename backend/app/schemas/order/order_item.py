@@ -18,7 +18,3 @@ class OrderItemOut(BaseSchema):
     unit_price: Decimal
     subtotal: Decimal
     status: OrderItemStatus
-
-class AddItemRequest(BaseSchema):
-    product_id: int
-    quantity: int = 1

@@ -230,13 +230,15 @@ export default function CashierPage() {
   const methodLabels: Record<string, string> = {
     CASH: "💵 Efectivo",
     CARD: "💳 Tarjeta",
-    TRANSFER: "📲 Transferencia"
+    TRANSFER: "📲 Transferencia",
+    OTHER: "🤝 Otro"
   }
 
   const methodColors: Record<string, string> = {
     CASH: "#2e7d32",
     CARD: "#1565c0",
-    TRANSFER: "#6a1b9a"
+    TRANSFER: "#6a1b9a",
+    OTHER: "#c67213"
   }
 
   const paymentStatusIcon = (order: Order) => {

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, ForeignKey, Numeric, String, Enum
+from sqlalchemy import Column, Integer, ForeignKey, Numeric, String, Enum, Identity
 from sqlalchemy.orm import relationship
 import enum
 
@@ -16,7 +16,7 @@ class OrderItemStatus(str, enum.Enum):
 class OrderItem(Base):
     __tablename__ = "order_items"
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, Identity(), primary_key=True)
 
     restaurant_id = Column(
         Integer,

@@ -53,16 +53,13 @@ export default function CategoriesPage() {
   }
 
   const deleteCategory = async (id: number) => {
-
     if (!confirm("Eliminar categoría?")) return
-
     await apiFetch(
       `/categories/${id}`,
       {
         method: "DELETE",
       }
     )
-
     fetchCategories()
   }
 

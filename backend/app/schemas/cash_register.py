@@ -2,13 +2,14 @@ from datetime import datetime
 from decimal import Decimal
 from pydantic import Field
 from .base import BaseSchema
+from app.models.cash_movement import CashMovementType
 
 
 class CashRegisterOpen(BaseSchema):
     opening_amount: Decimal = Field(ge=Decimal("0"))
 
 
-class CashRegisterOut(BaseSchema):
+class CashRegisterResponse(BaseSchema):
     id: int
     restaurant_id: int
     opening_amount: Decimal
@@ -26,11 +27,6 @@ class CashRegisterSummary(BaseSchema):
     orders_count: int
     average_ticket: Decimal
     by_method: dict[str, Decimal]
-
-class PaymentBreakdown(BaseSchema):
-    method: str
-    total: Decimal
-
 
 class CashRegisterCloseOut(BaseSchema):
     message: str
@@ -51,14 +47,14 @@ class CashRegisterClose(BaseSchema):
 
 
 class CashMovementCreate(BaseSchema):
-    type: str
+    type: CashMovementType
     amount: Decimal = Field(gt=Decimal("0"))
     reason: str
 
 
 class CashMovementOut(BaseSchema):
     id: int
-    type: str
+    type: CashMovementType
     amount: Decimal
     reason: str | None
     created_at: datetime
@@ -75,5 +71,3 @@ class CashRegisterDashboard(BaseSchema):
     by_method: dict[str, Decimal]
     cash_movements: list[CashMovementOut]
     expected_cash: Decimal
-
-

@@ -23,7 +23,7 @@ const adminActions = [
   },
   {
     title: "Reportes y Métricas",
-    description: "Acceder próximamente al centro de reportes.",
+    description: "Acceder al centro de reportes.",
     to: "/admin/reports"
   },
   {

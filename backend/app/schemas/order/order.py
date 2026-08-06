@@ -1,15 +1,16 @@
 from decimal import Decimal
 from app.models.order import OrderStatus
+from datetime import datetime
 from ..base import BaseSchema
 from .order_item import OrderItemOut
 from .payment import PaymentOut
 
 
-class OrderOut(BaseSchema):
+class OrderDetail(BaseSchema):
     id: int
     table_number: int
     status: OrderStatus
-    created_at: str
+    created_at: datetime
     items: list[OrderItemOut]
     payments: list[PaymentOut]
     subtotal: Decimal
@@ -18,20 +19,8 @@ class OrderOut(BaseSchema):
     total_paid: Decimal
     remaining: Decimal
 
-
-class WaiterOrderOut(BaseSchema):
-    id: int
+class OrderResponse(OrderDetail):
     table_id: int
-    table_number: int
-    status: OrderStatus
-    created_at: str
-    items: list[OrderItemOut]
-    subtotal: Decimal
-    discount: Decimal
-    total: Decimal
-    total_paid: Decimal
-    remaining: Decimal
-
 
 class OrderStatusUpdate(BaseSchema):
     status: OrderStatus

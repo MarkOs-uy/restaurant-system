@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { API_URL, getAuthHeaders } from "../api"
+import { apiFetch } from "../api"
 
 import Page from "../components/Page"
 import Card from "../components/Card"
@@ -40,35 +41,17 @@ export default function ProductsPage() {
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({})
 
   const fetchProducts = async () => {
-
-    const res = await fetch(
-      `${API_URL}/products/`,
-      { headers: getAuthHeaders() }
-    )
-
-    const data = await res.json()
+    const data = await apiFetch(`/products/`)
     setProducts(data)
   }
 
   const fetchCategories = async () => {
-
-    const res = await fetch(
-      `${API_URL}/categories/`,
-      { headers: getAuthHeaders() }
-    )
-
-    const data = await res.json()
+    const data = await apiFetch(`/categories/`)
     setCategories(data)
   }
 
   const fetchStations = async () => {
-
-    const res = await fetch(
-      `${API_URL}/stations/`,
-      { headers: getAuthHeaders() }
-    )
-
-    const data = await res.json()
+    const data = await apiFetch(`/stations/`)
     setStations(data)
   }
 

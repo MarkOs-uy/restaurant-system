@@ -1,5 +1,5 @@
 # 📊 Project Summary
-Generated: 2026-05-31 10:40:12.642051
+Generated: 2026-06-23 18:52:33.817978
 
 ## 📁 Estructura del proyecto
 
@@ -11,6 +11,7 @@ Generated: 2026-05-31 10:40:12.642051
       - env.py
       - versions/
         - 0d21e3868b2f_add_draft_status_to_orderstatus.py
+        - 1b3cb23f2af7_add_backup_settings.py
         - 50f5f9de1220_add_table_shape.py
         - 530c9b9f2a9f_initial_schema.py
         - 5aa86605f254_add_discount_to_orders.py
@@ -46,6 +47,11 @@ Generated: 2026-05-31 10:40:12.642051
         - permissions.py
         - roles.py
       - domain/
+        - backup/
+          - backup_service.py
+          - dependencies.py
+        - backups/
+          - backup_service.py
         - cash_register/
           - cash_movement_service.py
           - cash_register_service.py
@@ -77,6 +83,9 @@ Generated: 2026-05-31 10:40:12.642051
         - reports/
           - dependencies.py
           - report_service.py
+        - settings/
+          - dependencies.py
+          - settings_service.py
         - stations/
           - dependencies.py
           - station_service.py
@@ -101,11 +110,13 @@ Generated: 2026-05-31 10:40:12.642051
         - production_station.py
         - restaurant.py
         - restaurant_layout.py
+        - system_settings.py
         - table.py
         - user.py
         - __init__.py
       - routers/
         - auth.py
+        - backups.py
         - cash_register.py
         - category.py
         - kitchen.py
@@ -115,6 +126,7 @@ Generated: 2026-05-31 10:40:12.642051
         - products.py
         - reports.py
         - stations.py
+        - system_settings.py
         - tables.py
         - users.py
       - schemas/
@@ -125,6 +137,7 @@ Generated: 2026-05-31 10:40:12.642051
         - layout.py
         - product.py
         - station.py
+        - system_settings.py
         - table.py
         - user.py
         - waiter.py
@@ -142,9 +155,11 @@ Generated: 2026-05-31 10:40:12.642051
       - websocket/
         - manager.py
         - ws.py
+    - backups/
   - backups/
     - daily/
     - last/
+    - manual/
     - monthly/
     - weekly/
   - frontend/
@@ -185,7 +200,7 @@ from datetime import datetime
 
 EXCLUDE_DIRS = {"venv", "__pycache__", ".git", ".idea", ".vscode", "node_modules"}
 OUTPUT_FILE = "PROJECT_SUMMARY.md"
-INCLUDE_CODE = True
+INCLUDE_CODE = True  # Cambia a True si quieres incluir el código completo
 
 def analyze_file(filepath):
     with open(filepath, "r", encoding="utf-8") as f:
@@ -199,7 +214,7 @@ def analyze_file(filepath):
     imports = []
 
     for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             functions.append(node.name)
         elif isinstance(node, ast.ClassDef):
             classes.append(node.name)
@@ -440,6 +455,112 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Downgrade schema."""
     pass
+
+```
+
+---
+
+### .\backend\alembic\versions\1b3cb23f2af7_add_backup_settings.py
+
+**Funciones (2):**
+- upgrade
+- downgrade
+
+**Clases (0):**
+
+**Imports (4):**
+- typing.Sequence
+- typing.Union
+- alembic.op
+- sqlalchemy
+
+```python
+"""add backup settings
+
+Revision ID: 1b3cb23f2af7
+Revises: 72a2554e30d4
+Create Date: 2026-06-17 16:53:52.703166
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+
+
+# revision identifiers, used by Alembic.
+revision: str = '1b3cb23f2af7'
+down_revision: Union[str, Sequence[str], None] = '72a2554e30d4'
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    op.create_table(
+        "system_settings",
+
+        sa.Column(
+            "restaurant_id",
+            sa.Integer(),
+            nullable=False
+        ),
+
+        sa.Column("smtp_host", sa.String(), nullable=True),
+        sa.Column("smtp_port", sa.Integer(), nullable=True),
+        sa.Column("smtp_user", sa.String(), nullable=True),
+        sa.Column("smtp_password", sa.String(), nullable=True),
+        sa.Column("smtp_from", sa.String(), nullable=True),
+
+        sa.Column(
+            "smtp_use_tls",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.true()
+        ),
+
+        sa.Column("backup_email", sa.String(), nullable=True),
+
+        sa.ForeignKeyConstraint(
+            ["restaurant_id"],
+            ["restaurants.id"],
+            ondelete="CASCADE"
+        ),
+
+        sa.PrimaryKeyConstraint("restaurant_id")
+    )
+
+    op.create_index(
+        "ix_order_items_order_status",
+        "order_items",
+        ["order_id", "status"]
+    )
+
+    op.alter_column(
+        "orders",
+        "closed_at",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_nullable=True
+    )
+
+
+
+def downgrade() -> None:
+
+    op.alter_column(
+        "orders",
+        "closed_at",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_nullable=True
+    )
+
+    op.drop_index(
+        "ix_order_items_order_status",
+        table_name="order_items"
+    )
+
+    op.drop_table("system_settings")
 
 ```
 
@@ -1685,13 +1806,16 @@ def downgrade() -> None:
 
 ### .\backend\app\main.py
 
-**Funciones (2):**
+**Funciones (5):**
+- lifespan
 - root
 - health
+- domain_error_handler
+- unexpected_error_handler
 
 **Clases (0):**
 
-**Imports (26):**
+**Imports (28):**
 - fastapi.FastAPI
 - fastapi.Request
 - fastapi.responses.JSONResponse
@@ -1714,7 +1838,9 @@ def downgrade() -> None:
 - app.routers.users
 - app.routers.kitchen
 - app.routers.reports
+- app.routers.backups
 - app.routers.layout
+- app.routers.system_settings
 - app.domain.errors.base.DomainError
 - app.websocket.ws
 - app.core.config.CORS_ORIGINS
@@ -1734,8 +1860,8 @@ from app.services.event_cleanup import EventCleanup
 from app.events.redis_listener import redis_event_listener
 
 # routers
-from app.routers import tables, orders, products, cash_register, category, order_items, stations, auth, users, kitchen, reports
-from app.routers import layout
+from app.routers import tables, orders, products, cash_register, category, order_items, stations, auth, users, kitchen, reports, backups
+from app.routers import layout, system_settings
 
 from app.domain.errors.base import DomainError
 from app.websocket import ws
@@ -1807,6 +1933,7 @@ app.add_middleware(
 
 # routers
 app.include_router(auth.router, prefix="/api")
+app.include_router(backups.router, prefix="/api")
 app.include_router(cash_register.router, prefix="/api")
 app.include_router(category.router, prefix="/api")
 app.include_router(kitchen.router, prefix="/api")
@@ -1819,6 +1946,7 @@ app.include_router(tables.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(ws.router)
 app.include_router(layout.router, prefix="/api")
+app.include_router(system_settings.router, prefix="/api")
 
 
 @app.get("/")
@@ -1912,9 +2040,6 @@ def seed_tables(db: Session):
 def run():
     db = SessionLocal()
     try:
-        #seed_tables(db)
-        #seed_stations(db)
-        #seed_products(db)
         seed_users(db)
     finally:
         db.close()
@@ -2602,6 +2727,488 @@ kitchen_or_admin = require_roles(UserRole.ADMIN, UserRole.KITCHEN)
 waiter_kitchen_or_admin = require_roles(UserRole.ADMIN, UserRole.WAITER, UserRole.KITCHEN)
 waiter_cashier_or_admin = require_roles(UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER)
 all_staff = require_roles(UserRole.ADMIN, UserRole.WAITER, UserRole.KITCHEN, UserRole.CASHIER)
+```
+
+---
+
+### .\backend\app\domain\backup\backup_service.py
+
+**Funciones (14):**
+- __init__
+- _get_settings
+- status
+- create_backup
+- create_and_email_backup
+- _backup_path
+- _backup_sqlite
+- _backup_postgres
+- _send_backup_email
+- _email_enabled
+- _read_metadata
+- _write_metadata
+- _resolve_backup_dir
+- _latest_backup_file
+
+**Clases (1):**
+- BackupService
+
+**Imports (15):**
+- json
+- os
+- shutil
+- smtplib
+- subprocess
+- datetime.datetime
+- datetime.timezone
+- email.message.EmailMessage
+- pathlib.Path
+- urllib.parse.unquote
+- urllib.parse.urlparse
+- app.models.system_settings.SystemSettings
+- app.domain.errors.base.DomainError
+- app.domain.errors.error_codes.ErrorCode
+- app.db.session.DATABASE_URL
+
+```python
+import json
+import os
+import shutil
+import smtplib
+import subprocess
+from datetime import datetime, timezone
+from email.message import EmailMessage
+from pathlib import Path
+from urllib.parse import unquote, urlparse
+from app.models.system_settings import SystemSettings
+from app.domain.errors.base import DomainError
+from app.domain.errors.error_codes import ErrorCode
+
+from app.db.session import DATABASE_URL
+
+
+class BackupService:
+    def __init__(self, db):
+        self.db = db
+        self.backup_dir = self._resolve_backup_dir()
+        self.metadata_path = (
+            self.backup_dir / "metadata.json"
+        )
+
+    def _get_settings(self,restaurant_id: int):
+        return (
+            self.db.query(SystemSettings)
+            .filter(
+                SystemSettings.restaurant_id
+                == restaurant_id
+            )
+            .first()
+        )
+
+    def status(self, restaurant_id: int):
+        settings = self._get_settings(restaurant_id)
+        self.backup_dir.mkdir(parents=True, exist_ok=True)
+        metadata = self._read_metadata()
+        latest_backup = self._latest_backup_file()
+
+        return {
+            "last_backup_at": latest_backup["modified_at"] if latest_backup else metadata.get("last_backup_at"),
+            "last_backup_file": latest_backup["name"] if latest_backup else metadata.get("last_backup_file"),
+            "last_backup_size": latest_backup["size"] if latest_backup else metadata.get("last_backup_size"),
+            "last_backup_source": latest_backup["source"] if latest_backup else "manual",
+            "email_enabled": self._email_enabled(restaurant_id),
+            "email_from": (settings.smtp_from if settings else None)
+        }
+
+    def create_backup(self, restaurant_id: int):
+        self.backup_dir.mkdir(parents=True, exist_ok=True)
+        created_at = datetime.now(timezone.utc)
+        backup_path = self._backup_path(created_at)
+
+        if DATABASE_URL.startswith("sqlite"):
+            self._backup_sqlite(backup_path)
+        elif DATABASE_URL.startswith("postgresql"):
+            self._backup_postgres(backup_path)
+        else:
+            raise RuntimeError("Motor de base de datos no soportado para backup")
+
+        metadata = {
+            "last_backup_at": created_at.isoformat(),
+            "last_backup_file": str(
+                backup_path.relative_to(self.backup_dir)
+            ),
+            "last_backup_size": backup_path.stat().st_size
+        }
+        self._write_metadata(metadata)
+
+        return metadata
+
+    def create_and_email_backup(self, recipient_email: str, restaurant_id: int):
+        if not self._email_enabled(restaurant_id):
+            raise DomainError(
+                code=ErrorCode.SMTP_NOT_CONFIGURED,
+                detail="SMTP no esta configurado"
+            )
+
+        backup = self.create_backup()
+        backup_path = self.backup_dir / backup["last_backup_file"]
+        self._send_backup_email(recipient_email, backup_path, backup["last_backup_at"], restaurant_id)
+
+        return {
+            **backup,
+            "sent_to": recipient_email
+        }
+
+    def _backup_path(self, created_at: datetime):
+        suffix = ".sqlite3" if DATABASE_URL.startswith("sqlite") else ".dump"
+        manual_dir = self.backup_dir / "manual"
+        manual_dir.mkdir(parents=True, exist_ok=True)
+        return manual_dir / f"backup-{created_at.strftime('%Y%m%d-%H%M%S')}{suffix}"
+
+    def _backup_sqlite(self, backup_path: Path):
+        parsed = urlparse(DATABASE_URL)
+        database_path = unquote(parsed.path)
+
+        if os.name == "nt" and database_path.startswith("/"):
+            database_path = database_path[1:]
+
+        source = Path(database_path)
+        if not source.exists():
+            raise RuntimeError("No se encontro el archivo de base de datos SQLite")
+
+        shutil.copy2(source, backup_path)
+
+    def _backup_postgres(self, backup_path: Path):
+        parsed = urlparse(
+            DATABASE_URL.replace(
+                "postgresql+psycopg2://",
+                "postgresql://"
+            )
+        )
+
+        os.environ["PGPASSWORD"] = parsed.password
+
+        command = [
+            "pg_dump",
+            "-h", parsed.hostname,
+            "-p", str(parsed.port or 5432),
+            "-U", parsed.username,
+            "-d", parsed.path.lstrip("/"),
+            "--format=custom",
+            "--file", str(backup_path)
+        ]
+        result = subprocess.run(command, capture_output=True, text=True)
+
+        if result.returncode != 0:
+            detail = result.stderr.strip() or "No se pudo ejecutar pg_dump"
+            raise RuntimeError(detail)
+
+    def _send_backup_email(self, recipient_email: str, backup_path: Path, created_at: str, restaurant_id: int):
+        settings = self._get_settings(
+            restaurant_id
+        )
+
+        if not settings:
+            raise DomainError(
+                code=ErrorCode.SMTP_NOT_CONFIGURED,
+                detail="SMTP no configurado"
+            )
+
+        smtp_host = settings.smtp_host
+        smtp_port = settings.smtp_port or 587
+        smtp_user = settings.smtp_user or ""
+        smtp_password = settings.smtp_password or ""
+        smtp_from = (
+            settings.smtp_from
+            or smtp_user
+        )
+        smtp_use_tls = settings.smtp_use_tls
+
+        message = EmailMessage()
+        message["Subject"] = "Backup del sistema restaurant"
+        message["From"] = smtp_from
+        message["To"] = recipient_email
+        message.set_content(
+            f"Adjunto backup generado el {created_at}.\n\n"
+            "Este correo fue generado automaticamente por el sistema."
+        )
+
+        message.add_attachment(
+            backup_path.read_bytes(),
+            maintype="application",
+            subtype="octet-stream",
+            filename=backup_path.name
+        )
+
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as smtp:
+            if smtp_use_tls:
+                smtp.starttls()
+            if smtp_user:
+                smtp.login(smtp_user, smtp_password)
+            smtp.send_message(message)
+
+    def _email_enabled(self, restaurant_id: int):
+        settings = self._get_settings(restaurant_id)
+        if not settings:
+            return False
+        return bool(
+            settings.smtp_host
+            and (
+                settings.smtp_from
+                or settings.smtp_user
+            )
+        )
+
+    def _read_metadata(self):
+        if not self.metadata_path.exists():
+            return {}
+
+        try:
+            return json.loads(self.metadata_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return {}
+
+    def _write_metadata(self, metadata: dict):
+        self.metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+
+    def _resolve_backup_dir(self):
+        configured_dir = os.getenv("BACKUP_DIR")
+        if configured_dir:
+            return Path(configured_dir)
+
+        mounted_dir = Path("/backups")
+        if mounted_dir.exists():
+            return mounted_dir
+
+        return Path("backups")
+
+    def _latest_backup_file(self):
+        if not self.backup_dir.exists():
+            return None
+
+        candidates = [
+            path
+            for path in self.backup_dir.rglob("*")
+            if path.is_file()
+            and path.name != "metadata.json"
+            and path.stat().st_size > 0
+        ]
+
+        if not candidates:
+            return None
+
+        latest = max(candidates, key=lambda path: path.stat().st_mtime)
+        stats = latest.stat()
+
+        return {
+            "name": str(latest.relative_to(self.backup_dir)),
+            "modified_at": datetime.fromtimestamp(stats.st_mtime,tz=timezone.utc).isoformat(),
+            "size": stats.st_size,
+            "source": "automatic" if latest.parts[-2] in ("daily", "weekly", "monthly", "last") else "manual"
+        }
+
+```
+
+---
+
+### .\backend\app\domain\backup\dependencies.py
+
+**Funciones (1):**
+- get_backup_service
+
+**Clases (0):**
+
+**Imports (4):**
+- fastapi.Depends
+- sqlalchemy.orm.Session
+- app.db.session.get_db
+- backup_service.BackupService
+
+```python
+from fastapi import Depends
+from sqlalchemy.orm import Session
+
+from app.db.session import get_db
+from .backup_service import BackupService
+
+
+def get_backup_service(
+    db: Session = Depends(get_db)
+) -> BackupService:
+    return BackupService(db)
+```
+
+---
+
+### .\backend\app\domain\backups\backup_service.py
+
+**Funciones (11):**
+- __init__
+- status
+- create_backup
+- create_and_email_backup
+- _backup_path
+- _backup_sqlite
+- _backup_postgres
+- _send_backup_email
+- _email_enabled
+- _read_metadata
+- _write_metadata
+
+**Clases (1):**
+- BackupService
+
+**Imports (11):**
+- json
+- os
+- shutil
+- smtplib
+- subprocess
+- datetime.datetime
+- email.message.EmailMessage
+- pathlib.Path
+- urllib.parse.unquote
+- urllib.parse.urlparse
+- app.db.session.DATABASE_URL
+
+```python
+import json
+import os
+import shutil
+import smtplib
+import subprocess
+from datetime import datetime
+from email.message import EmailMessage
+from pathlib import Path
+from urllib.parse import unquote, urlparse
+
+from app.db.session import DATABASE_URL
+
+
+class BackupService:
+    def __init__(self):
+        self.backup_dir = Path(os.getenv("BACKUP_DIR", "backups"))
+        self.metadata_path = self.backup_dir / "metadata.json"
+
+    def status(self):
+        self.backup_dir.mkdir(parents=True, exist_ok=True)
+        metadata = self._read_metadata()
+
+        return {
+            "last_backup_at": metadata.get("last_backup_at"),
+            "last_backup_file": metadata.get("last_backup_file"),
+            "last_backup_size": metadata.get("last_backup_size"),
+            "email_enabled": self._email_enabled(),
+            "email_from": os.getenv("SMTP_FROM", os.getenv("SMTP_USER", "")) or None
+        }
+
+    def create_backup(self):
+        self.backup_dir.mkdir(parents=True, exist_ok=True)
+        created_at = datetime.now()
+        backup_path = self._backup_path(created_at)
+
+        if DATABASE_URL.startswith("sqlite"):
+            self._backup_sqlite(backup_path)
+        elif DATABASE_URL.startswith("postgresql"):
+            self._backup_postgres(backup_path)
+        else:
+            raise RuntimeError("Motor de base de datos no soportado para backup")
+
+        metadata = {
+            "last_backup_at": created_at.isoformat(),
+            "last_backup_file": backup_path.name,
+            "last_backup_size": backup_path.stat().st_size
+        }
+        self._write_metadata(metadata)
+
+        return metadata
+
+    def create_and_email_backup(self, recipient_email: str):
+        if not self._email_enabled():
+            raise RuntimeError("SMTP no esta configurado")
+
+        backup = self.create_backup()
+        backup_path = self.backup_dir / backup["last_backup_file"]
+        self._send_backup_email(recipient_email, backup_path, backup["last_backup_at"])
+
+        return {
+            **backup,
+            "sent_to": recipient_email
+        }
+
+    def _backup_path(self, created_at: datetime):
+        suffix = ".sqlite3" if DATABASE_URL.startswith("sqlite") else ".dump"
+        return self.backup_dir / f"backup-{created_at.strftime('%Y%m%d-%H%M%S')}{suffix}"
+
+    def _backup_sqlite(self, backup_path: Path):
+        parsed = urlparse(DATABASE_URL)
+        database_path = unquote(parsed.path)
+
+        if os.name == "nt" and database_path.startswith("/"):
+            database_path = database_path[1:]
+
+        source = Path(database_path)
+        if not source.exists():
+            raise RuntimeError("No se encontro el archivo de base de datos SQLite")
+
+        shutil.copy2(source, backup_path)
+
+    def _backup_postgres(self, backup_path: Path):
+        command = ["pg_dump", "--format=custom", "--file", str(backup_path), DATABASE_URL]
+        result = subprocess.run(command, capture_output=True, text=True)
+
+        if result.returncode != 0:
+            detail = result.stderr.strip() or "No se pudo ejecutar pg_dump"
+            raise RuntimeError(detail)
+
+    def _send_backup_email(self, recipient_email: str, backup_path: Path, created_at: str):
+        smtp_host = os.getenv("SMTP_HOST", "")
+        smtp_port = int(os.getenv("SMTP_PORT", "587"))
+        smtp_user = os.getenv("SMTP_USER", "")
+        smtp_password = os.getenv("SMTP_PASSWORD", "")
+        smtp_from = os.getenv("SMTP_FROM", smtp_user)
+        smtp_use_tls = os.getenv("SMTP_USE_TLS", "true").lower() in ("1", "true", "yes", "on")
+
+        message = EmailMessage()
+        message["Subject"] = "Backup del sistema restaurant"
+        message["From"] = smtp_from
+        message["To"] = recipient_email
+        message.set_content(
+            f"Adjunto backup generado el {created_at}.\n\n"
+            "Este correo fue generado automaticamente por el sistema."
+        )
+
+        message.add_attachment(
+            backup_path.read_bytes(),
+            maintype="application",
+            subtype="octet-stream",
+            filename=backup_path.name
+        )
+
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as smtp:
+            if smtp_use_tls:
+                smtp.starttls()
+            if smtp_user:
+                smtp.login(smtp_user, smtp_password)
+            smtp.send_message(message)
+
+    def _email_enabled(self):
+        return bool(
+            os.getenv("SMTP_HOST")
+            and os.getenv("SMTP_FROM", os.getenv("SMTP_USER", ""))
+        )
+
+    def _read_metadata(self):
+        if not self.metadata_path.exists():
+            return {}
+
+        try:
+            return json.loads(self.metadata_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return {}
+
+    def _write_metadata(self, metadata: dict):
+        self.metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+
 ```
 
 ---
@@ -3392,7 +3999,14 @@ class ErrorCode(str, Enum):
     STATION_NAME_ALREADY_EXISTS = "station_name_already_exists"
 
     # PERMISSIONS
-    PERMISSION_DENIED = "Permission_denied"
+    PERMISSION_DENIED = "permission_denied"
+
+    # EMAIL
+    EMAIL_NOT_CONFIGURED = "email_not_configured"
+    SMTP_NOT_CONFIGURED = "smtp_not_configured"
+    SMTP_HOST_NOT_CONFIGURED = "smtp_host_not_configured"
+    BACKUP_EMAIL_NOT_CONFIGURED = "backup_email_not_configured"
+    EMAIL_SEND_FAILURE = "email_send_failure"
 
 ```
 
@@ -4092,6 +4706,7 @@ class OrderService:
     def update_status(self, order: Order, new_status: OrderStatus):
         if order.status == new_status:
             return order
+
         if not is_valid_order_transition(order.status, new_status):
             raise DomainError(
                 "Invalid order status transition",
@@ -4102,28 +4717,24 @@ class OrderService:
                     "order_id": order.id
                 }
             )
+
         previous_status = order.status
         order.status = new_status
-        logger.info("Estado de orden actualizado order_id=%s from=%s to=%s", order.id, previous_status.value, new_status.value)
-        # Emit events solo si cambio
-        if previous_status != new_status:
-            for role in [UserRole.ADMIN, UserRole.WAITER]:
-                self.events.emit(
-                    restaurant_id=order.restaurant_id,
-                    event_type="ORDER_STATUS_CHANGED",
-                    payload={"order_id": order.id, "status": new_status.value},
-                    target="role",
-                    target_id=role.value
-                )
+
+        logger.info(
+            "Estado de orden actualizado order_id=%s from=%s to=%s",
+            order.id, previous_status.value, new_status.value
+        )
 
         for role in [UserRole.ADMIN, UserRole.WAITER]:
             self.events.emit(
                 restaurant_id=order.restaurant_id,
-                event_type="ORDER_UPDATED",
-                payload={"order_id": order.id},
+                event_type="ORDER_STATUS_CHANGED",
+                payload={"order_id": order.id, "status": new_status.value},
                 target="role",
                 target_id=role.value
             )
+
         self.db.commit()
         self.db.refresh(order)
         return order
@@ -4349,7 +4960,10 @@ class OrderService:
                 ErrorCode.ORDER_EMPTY
             )
 
-        not_delivered = [i for i in order.items if i.status != OrderItemStatus.DELIVERED]
+        not_delivered = [
+            i for i in order.items
+            if i.status not in [OrderItemStatus.DELIVERED, OrderItemStatus.CANCELLED]
+        ]
 
         if not_delivered:
             raise DomainError(
@@ -5004,15 +5618,17 @@ def get_report_service(
 
 ### .\backend\app\domain\reports\report_service.py
 
-**Funciones (11):**
+**Funciones (13):**
 - __init__
 - get_sales_report
 - get_products_report
 - get_product_evolution_report
+- get_sales_orders_report
 - _closed_orders_query
 - _product_rows
 - _summarize_products
 - _order_total
+- _serialize_sales_order
 - _date_bounds
 - _empty_days
 - _money
@@ -5158,6 +5774,30 @@ class ReportService:
             ]
         }
 
+    def get_sales_orders_report(
+        self,
+        restaurant_id: int,
+        start_date: date,
+        end_date: date
+    ):
+        orders = (
+            self._closed_orders_query(restaurant_id, start_date, end_date)
+            .options(
+                joinedload(Order.items).joinedload(OrderItem.product),
+                joinedload(Order.table)
+            )
+            .order_by(Order.closed_at.desc(), Order.id.desc())
+            .all()
+        )
+
+        return {
+            "orders": [
+                self._serialize_sales_order(order)
+                for order in orders
+                if order.closed_at
+            ]
+        }
+
     def _closed_orders_query(
         self,
         restaurant_id: int,
@@ -5261,6 +5901,38 @@ class ReportService:
         )
         return max(subtotal - (order.discount or Decimal("0")), Decimal("0"))
 
+    def _serialize_sales_order(self, order: Order):
+        active_items = [
+            item
+            for item in order.items
+            if item.status != OrderItemStatus.CANCELLED
+        ]
+        subtotal = sum(
+            (item.quantity * item.unit_price for item in active_items),
+            Decimal("0")
+        )
+        discount = order.discount or Decimal("0")
+
+        return {
+            "order_id": order.id,
+            "table_number": order.table.number if order.table else None,
+            "closed_at": order.closed_at.isoformat() if order.closed_at else None,
+            "items": [
+                {
+                    "item_id": item.id,
+                    "product_id": item.product_id,
+                    "product_name": item.product.name if item.product else "Producto eliminado",
+                    "unit_price": self._money(item.unit_price),
+                    "quantity": item.quantity,
+                    "line_total": self._money(item.quantity * item.unit_price)
+                }
+                for item in active_items
+            ],
+            "subtotal": self._money(subtotal),
+            "discount": self._money(discount),
+            "total": self._money(max(subtotal - discount, Decimal("0")))
+        }
+
     def _date_bounds(self, start_date: date, end_date: date):
         start = datetime.combine(start_date, time.min)
         end = datetime.combine(end_date + timedelta(days=1), time.min)
@@ -5279,6 +5951,206 @@ class ReportService:
     def _money(self, value: Decimal | int | float) -> float:
         return float(round(Decimal(value), 2))
 
+```
+
+---
+
+### .\backend\app\domain\settings\dependencies.py
+
+**Funciones (1):**
+- get_settings_service
+
+**Clases (0):**
+
+**Imports (4):**
+- fastapi.Depends
+- sqlalchemy.orm.Session
+- app.db.session.get_db
+- settings_service.SettingsService
+
+```python
+from fastapi import Depends
+from sqlalchemy.orm import Session
+
+from app.db.session import get_db
+from .settings_service import SettingsService
+
+
+def get_settings_service(
+    db: Session = Depends(get_db)
+) -> SettingsService:
+    return SettingsService(db)
+```
+
+---
+
+### .\backend\app\domain\settings\settings_service.py
+
+**Funciones (5):**
+- __init__
+- get_settings
+- serialize_settings
+- update_settings
+- send_test_email
+
+**Clases (1):**
+- SettingsService
+
+**Imports (7):**
+- sqlalchemy.orm.Session
+- email.message.EmailMessage
+- smtplib
+- app.models.system_settings.SystemSettings
+- app.schemas.system_settings.SettingsUpdateRequest
+- app.domain.errors.base.DomainError
+- app.domain.errors.error_codes.ErrorCode
+
+```python
+from sqlalchemy.orm import Session
+
+from email.message import EmailMessage
+import smtplib
+
+from app.models.system_settings import SystemSettings
+from app.schemas.system_settings import SettingsUpdateRequest
+from app.domain.errors.base import DomainError
+from app.domain.errors.error_codes import ErrorCode
+
+
+class SettingsService:
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get_settings(
+        self,
+        restaurant_id: int
+    ) -> SystemSettings:
+
+        settings = (
+            self.db.query(SystemSettings)
+            .filter(
+                SystemSettings.restaurant_id == restaurant_id
+            )
+            .first()
+        )
+
+        if not settings:
+
+            settings = SystemSettings(
+                restaurant_id=restaurant_id,
+                smtp_use_tls=True
+            )
+
+            self.db.add(settings)
+            self.db.commit()
+            self.db.refresh(settings)
+
+        return settings
+
+    def serialize_settings(
+        self,
+        settings: SystemSettings
+    ):
+
+        return {
+            "smtp_host": settings.smtp_host,
+            "smtp_port": settings.smtp_port,
+            "smtp_user": settings.smtp_user,
+            "smtp_from": settings.smtp_from,
+            "smtp_use_tls": settings.smtp_use_tls,
+            "backup_email": settings.backup_email,
+
+            # nunca devolver password
+            "smtp_password_configured": bool(
+                settings.smtp_password
+            )
+        }
+
+    def update_settings(
+        self,
+        restaurant_id: int,
+        data: SettingsUpdateRequest
+    ) -> SystemSettings:
+
+        settings = self.get_settings(
+            restaurant_id
+        )
+
+        settings.smtp_host = data.smtp_host
+        settings.smtp_port = data.smtp_port
+        settings.smtp_user = data.smtp_user
+        settings.smtp_from = data.smtp_from
+        settings.smtp_use_tls = data.smtp_use_tls
+        settings.backup_email = data.backup_email
+
+        if data.smtp_password:
+            settings.smtp_password = data.smtp_password
+
+        self.db.commit()
+        self.db.refresh(settings)
+
+        return settings
+    
+    def send_test_email(
+        self,
+        restaurant_id: int
+    ):
+
+        settings = self.get_settings(
+            restaurant_id
+        )
+
+        if not settings.smtp_host:
+            raise DomainError(
+                "SMTP Host no configurado",
+                ErrorCode.SMTP_HOST_NOT_CONFIGURED
+            )
+
+        if not settings.backup_email:
+            raise DomainError(
+                "Correo de backup no configurado",
+                ErrorCode.BACKUP_EMAIL_NOT_CONFIGURED
+            )
+
+        smtp_host = settings.smtp_host
+        smtp_port = settings.smtp_port or 587
+        smtp_user = settings.smtp_user or ""
+        smtp_password = settings.smtp_password or ""
+        smtp_from = settings.smtp_from or smtp_user
+        smtp_use_tls = settings.smtp_use_tls
+
+        message = EmailMessage()
+
+        message["Subject"] = "Prueba de correo"
+        message["From"] = smtp_from
+        message["To"] = settings.backup_email
+
+        message.set_content(
+            "La configuración SMTP del sistema funciona correctamente."
+        )
+
+        with smtplib.SMTP(
+            smtp_host,
+            smtp_port,
+            timeout=30
+        ) as smtp:
+
+            if smtp_use_tls:
+                smtp.starttls()
+
+            if smtp_user:
+                smtp.login(
+                    smtp_user,
+                    smtp_password
+                )
+
+            smtp.send_message(message)
+
+        return {
+            "success": True,
+            "sent_to": settings.backup_email
+        }
 ```
 
 ---
@@ -6031,7 +6903,9 @@ class UserService:
 
 ### .\backend\app\events\redis_listener.py
 
-**Funciones (0):**
+**Funciones (2):**
+- _process_event
+- redis_event_listener
 
 **Clases (0):**
 
@@ -6994,9 +7868,13 @@ class Restaurant(Base):
         back_populates="restaurant",
         cascade="all, delete-orphan"
     )
-
-
-
+    settings = relationship(
+        "SystemSettings",
+        back_populates="restaurant",
+        uselist=False,
+        cascade="all, delete-orphan",
+        passive_deletes=True
+    )
 ```
 
 ---
@@ -7038,6 +7916,71 @@ class RestaurantLayout(Base):
     snap_to_grid = Column(Boolean, default=True)
 
     background_image = Column(String, nullable=True)
+```
+
+---
+
+### .\backend\app\models\system_settings.py
+
+**Funciones (0):**
+
+**Clases (1):**
+- SystemSettings
+
+**Imports (7):**
+- sqlalchemy.Column
+- sqlalchemy.Integer
+- sqlalchemy.String
+- sqlalchemy.Boolean
+- sqlalchemy.ForeignKey
+- sqlalchemy.orm.relationship
+- app.db.base_class.Base
+
+```python
+# app/models/system_settings.py
+
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Boolean,
+    ForeignKey
+)
+from sqlalchemy.orm import relationship
+
+from app.db.base_class import Base
+
+class SystemSettings(Base):
+    __tablename__ = "system_settings"
+
+    restaurant_id = Column(
+        Integer,
+        ForeignKey(
+            "restaurants.id",
+            ondelete="CASCADE"
+        ),
+        primary_key=True
+    )
+
+    smtp_host = Column(String)
+    smtp_port = Column(Integer,nullable=True)
+    smtp_user = Column(String)
+    smtp_password = Column(String)
+
+    smtp_from = Column(String)
+
+    smtp_use_tls = Column(
+        Boolean,
+        nullable=False,
+        default=True
+    )
+
+    backup_email = Column(String)
+
+    restaurant = relationship(
+        "Restaurant",
+        back_populates="settings"
+    )
 ```
 
 ---
@@ -7203,7 +8146,7 @@ class User(Base):
 
 **Clases (0):**
 
-**Imports (14):**
+**Imports (15):**
 - table.Table
 - order.Order
 - product.Product
@@ -7218,6 +8161,7 @@ class User(Base):
 - restaurant_layout.RestaurantLayout
 - cash_movement.CashMovement
 - event_outbox.EventOutbox
+- system_settings.SystemSettings
 
 ```python
 from .table import Table
@@ -7234,6 +8178,7 @@ from .domain_event import DomainEvent
 from .restaurant_layout import RestaurantLayout
 from .cash_movement import CashMovement
 from .event_outbox import EventOutbox
+from .system_settings import SystemSettings
 
 ```
 
@@ -7320,6 +8265,83 @@ def get_me(
     user: User = Depends(get_current_user)
 ):
     return user
+```
+
+---
+
+### .\backend\app\routers\backups.py
+
+**Funciones (3):**
+- backup_status
+- create_backup
+- create_and_email_backup
+
+**Clases (1):**
+- BackupEmailRequest
+
+**Imports (8):**
+- fastapi.APIRouter
+- fastapi.Depends
+- fastapi.HTTPException
+- pydantic.BaseModel
+- app.dependencies.roles.admin_only
+- app.domain.backup.backup_service.BackupService
+- app.models.user.User
+- app.domain.backup.dependencies.get_backup_service
+
+```python
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+
+from app.dependencies.roles import admin_only
+from app.domain.backup.backup_service import BackupService
+from app.models.user import User
+from app.domain.backup.dependencies import get_backup_service
+
+
+router = APIRouter(prefix="/backups", tags=["backups"])
+
+
+class BackupEmailRequest(BaseModel):
+    email: str
+
+
+@router.get("/status")
+def backup_status(
+    user: User = Depends(admin_only),
+    service: BackupService = Depends(
+        get_backup_service
+    )
+):
+    return service.status(
+        user.restaurant_id
+    )
+
+
+@router.post("")
+def create_backup(
+    user: User = Depends(admin_only),
+    service: BackupService = Depends(
+        get_backup_service
+    )
+):
+    return service.create_backup(user.restaurant_id)
+
+
+
+@router.post("/email")
+def create_and_email_backup(
+    data: BackupEmailRequest,
+    user: User = Depends(admin_only),
+    service: BackupService = Depends(
+        get_backup_service
+    )
+):
+    if "@" not in data.email or "." not in data.email:
+        raise HTTPException(status_code=400, detail="Correo electronico invalido")
+
+    return service.create_and_email_backup(data.email, user.restaurant_id)
+
 ```
 
 ---
@@ -7883,7 +8905,8 @@ def cancel_payment(
 
 ### .\backend\app\routers\order_items.py
 
-**Funciones (0):**
+**Funciones (1):**
+- update_item_status
 
 **Clases (0):**
 
@@ -8018,8 +9041,9 @@ def toggle_product(
 
 ### .\backend\app\routers\reports.py
 
-**Funciones (3):**
+**Funciones (4):**
 - sales_report
+- sales_orders_report
 - products_report
 - product_evolution_report
 
@@ -8057,6 +9081,20 @@ def sales_report(
     service: ReportService = Depends(get_report_service)
 ):
     return service.get_sales_report(
+        restaurant_id=user.restaurant_id,
+        start_date=start_date,
+        end_date=end_date
+    )
+
+
+@router.get("/sales/orders")
+def sales_orders_report(
+    start_date: date = Query(...),
+    end_date: date = Query(...),
+    user: User = Depends(admin_only),
+    service: ReportService = Depends(get_report_service)
+):
+    return service.get_sales_orders_report(
         restaurant_id=user.restaurant_id,
         start_date=start_date,
         end_date=end_date
@@ -8213,6 +9251,93 @@ def get_station_items(
     return service.get_station_items(
         user.restaurant_id,
         station_id
+    )
+```
+
+---
+
+### .\backend\app\routers\system_settings.py
+
+**Funciones (3):**
+- update_settings
+- get_settings
+- test_email
+
+**Clases (0):**
+
+**Imports (7):**
+- fastapi.APIRouter
+- fastapi.Depends
+- app.dependencies.roles.admin_only
+- app.models.user.User
+- app.schemas.system_settings.SettingsUpdateRequest
+- app.domain.settings.dependencies.get_settings_service
+- app.domain.settings.settings_service.SettingsService
+
+```python
+from fastapi import APIRouter, Depends
+
+from app.dependencies.roles import admin_only
+from app.models.user import User
+
+from app.schemas.system_settings import (
+    SettingsUpdateRequest
+)
+
+from app.domain.settings.dependencies import (
+    get_settings_service
+)
+
+from app.domain.settings.settings_service import (
+    SettingsService
+)
+
+router = APIRouter(
+    prefix="/settings",
+    tags=["settings"]
+)
+
+@router.put("")
+def update_settings(
+    data: SettingsUpdateRequest,
+    user: User = Depends(admin_only),
+    service: SettingsService = Depends(
+        get_settings_service
+    )
+):
+    settings = service.update_settings(
+        user.restaurant_id,
+        data
+    )
+
+    return service.serialize_settings(
+        settings
+    )
+
+@router.get("")
+def get_settings(
+    user: User = Depends(admin_only),
+    service: SettingsService = Depends(
+        get_settings_service
+    )
+):
+    settings = service.get_settings(
+        user.restaurant_id
+    )
+
+    return service.serialize_settings(
+        settings
+    )
+
+@router.post("/test-email")
+def test_email(
+    user: User = Depends(admin_only),
+    service: SettingsService = Depends(
+        get_settings_service
+    )
+):
+    return service.send_test_email(
+        user.restaurant_id
     )
 ```
 
@@ -8743,14 +9868,10 @@ class ProductMenu(BaseSchema):
 - StationUpdate
 - StationOut
 
-**Imports (3):**
-- decimal.Decimal
-- typing.Optional
+**Imports (1):**
 - base.BaseSchema
 
 ```python
-from decimal import Decimal
-from typing import Optional
 from .base import BaseSchema
 
 class StationCreate(BaseSchema):
@@ -8763,6 +9884,31 @@ class StationOut(BaseSchema):
     id: int
     name: str
     active: bool
+```
+
+---
+
+### .\backend\app\schemas\system_settings.py
+
+**Funciones (0):**
+
+**Clases (1):**
+- SettingsUpdateRequest
+
+**Imports (1):**
+- base.BaseSchema
+
+```python
+from .base import BaseSchema
+
+class SettingsUpdateRequest(BaseSchema):
+    smtp_host: str | None = None
+    smtp_port: int | None = None
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_from: str | None = None
+    smtp_use_tls: bool = True
+    backup_email: str | None = None
 ```
 
 ---
@@ -8891,14 +10037,14 @@ class UserOut(BaseSchema):
 - WaiterItemOut
 
 **Imports (1):**
-- pydantic.BaseModel
+- base.BaseSchema
 
 ```python
 # schemas/waiter.py
 
-from pydantic import BaseModel
+from .base import BaseSchema
 
-class WaiterItemOut(BaseModel):
+class WaiterItemOut(BaseSchema):
     id: int
     product_name: str
     quantity: int
@@ -9069,8 +10215,9 @@ class PaymentOut(BaseSchema):
 
 ### .\backend\app\services\event_cleanup.py
 
-**Funciones (2):**
+**Funciones (3):**
 - __init__
+- run
 - cleanup
 
 **Clases (1):**
@@ -9227,7 +10374,10 @@ class EventService:
 
 ### .\backend\app\services\event_worker.py
 
-**Funciones (0):**
+**Funciones (3):**
+- run
+- _process_batch
+- _deliver_event
 
 **Clases (1):**
 - EventWorker
@@ -9467,9 +10617,13 @@ def money(value) -> str:
 
 ### .\backend\app\websocket\manager.py
 
-**Funciones (2):**
+**Funciones (6):**
 - __init__
+- connect
 - disconnect
+- send_to_role
+- broadcast
+- _safe_send
 
 **Clases (1):**
 - ConnectionManager
@@ -9651,7 +10805,8 @@ manager = ConnectionManager()
 
 ### .\backend\app\websocket\ws.py
 
-**Funciones (0):**
+**Funciones (1):**
+- websocket_endpoint
 
 **Clases (0):**
 

@@ -1,19 +1,24 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from contextlib import asynccontextmanager
 import asyncio
 import logging
+from pathlib import Path
 
 from app import models
 from app.services.event_worker import EventWorker
 from app.services.event_cleanup import EventCleanup
 from app.events.redis_listener import redis_event_listener
 
+from app.scheduler.scheduler import scheduler
+from app.scheduler.backup_jobs import register_jobs
+
 # routers
-from app.routers import tables, orders, products, cash_register, category, order_items, stations, auth, users, kitchen, reports, backups
-from app.routers import layout
+from app.routers import tables, orders, products, cash_register, category, order_items
+from app.routers import layout, system_settings, stations, auth, users, kitchen, reports, backups
 
 from app.domain.errors.base import DomainError
 from app.websocket import ws
@@ -46,9 +51,19 @@ async def lifespan(app: FastAPI):
     cleanup_task = asyncio.create_task(cleanup.run())
     logger.info("Event cleanup iniciado")
 
+    # Scheduler
+    logger.info("Iniciando scheduler...")
+    register_jobs()
+    scheduler.start()
+    logger.info("Scheduler iniciado")
+
     yield
 
     logger.info("Backend apagándose...")
+
+    # Detener scheduler
+    scheduler.shutdown(wait=False)
+    logger.info("Scheduler detenido")
 
     # Cancelar redis
     redis_task.cancel()
@@ -73,6 +88,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan, redirect_slashes=False)
+uploads_dir = Path(__file__).resolve().parent.parent / "uploads"
+uploads_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 # CORS
 app.add_middleware(
@@ -98,6 +116,7 @@ app.include_router(tables.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(ws.router)
 app.include_router(layout.router, prefix="/api")
+app.include_router(system_settings.router, prefix="/api")
 
 
 @app.get("/")
@@ -106,6 +125,7 @@ def root():
 
 
 @app.get("/health")
+@app.get("/api/health")
 def health():
     return {
         "status": "ok",

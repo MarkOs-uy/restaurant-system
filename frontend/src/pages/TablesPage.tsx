@@ -64,13 +64,15 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
   const [showForm, setShowForm] = useState(false)
   const positionTimers = useRef<Record<number, any>>({})
   const floorRef = useRef<HTMLDivElement | null>(null)
+  const backgroundInputRef = useRef<HTMLInputElement | null>(null)
   const draggingRef = useRef<DragState | null>(null)
 
   const [layout, setLayout] = useState({
     width: 900,
     height: 500,
     grid_size: 40,
-    snap_to_grid: true
+    snap_to_grid: true,
+    background_image: null as string | null
   })
 
   // -------------------------
@@ -92,6 +94,23 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
       body: layout
     })
     showToast("Layout guardado")
+  }
+
+  const uploadBackground = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      showToast("Seleccioná un archivo de imagen")
+      return
+    }
+
+    const formData = new FormData()
+    formData.append("file", file)
+
+    const updatedLayout = await apiFetch("/layout/background", {
+      method: "POST",
+      body: formData
+    })
+    setLayout(updatedLayout)
+    showToast("Fondo del plano actualizado")
   }
 
   // -------------------------
@@ -518,6 +537,25 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
             Snap
           </label>
 
+          <input
+            ref={backgroundInputRef}
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) uploadBackground(file)
+              e.target.value = ""
+            }}
+            style={{ display: "none" }}
+          />
+
+          <button
+            type="button"
+            onClick={() => backgroundInputRef.current?.click()}
+          >
+            Fondo
+          </button>
+
           <button
             onClick={saveLayout}
           >
@@ -624,8 +662,11 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
           backgroundImage: `
             linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
             linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px)
+            ${layout.background_image ? `, url("${layout.background_image}")` : ""}
           `,
-          backgroundSize: `${layout.grid_size}px ${layout.grid_size}px`,
+          backgroundPosition: `0 0, 0 0${layout.background_image ? ", center" : ""}`,
+          backgroundRepeat: `repeat, repeat${layout.background_image ? ", no-repeat" : ""}`,
+          backgroundSize: `${layout.grid_size}px ${layout.grid_size}px, ${layout.grid_size}px ${layout.grid_size}px${layout.background_image ? ", contain" : ""}`,
           boxShadow: "var(--shadow-lg), var(--shadow-glass)"
         }}
       >

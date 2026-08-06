@@ -12,3 +12,5 @@ from .domain_event import DomainEvent
 from .restaurant_layout import RestaurantLayout
 from .cash_movement import CashMovement
 from .event_outbox import EventOutbox
+from .system_settings import SystemSettings
+from .enums import BackupFrequency

@@ -1,7 +1,7 @@
 from decimal import Decimal
-from typing import Optional
 from .base import BaseSchema
-
+from .category import CategoryRef
+from .station import StationRef
 
 class ProductCreate(BaseSchema):
     name: str
@@ -9,24 +9,18 @@ class ProductCreate(BaseSchema):
     category_id: int
     station_id: int
 
-
 class ProductUpdate(BaseSchema):
-    name: Optional[str] = None
-    price: Optional[Decimal] = None
-    category_id: Optional[int] = None
-    station_id: Optional[int] = None
+    name: str | None = None
+    price: Decimal | None = None
+    category_id: int | None = None
+    station_id: int | None = None
 
-
-class ProductOut(BaseSchema):
+class ProductResponse(BaseSchema):
     id: int
     name: str
     price: Decimal
     category_id: int
     station_id: int
     active: bool
-
-
-class ProductMenu(BaseSchema):
-    id: int
-    name: str
-    price: Decimal
+    category: CategoryRef
+    station: StationRef

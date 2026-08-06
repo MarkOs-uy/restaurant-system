@@ -1,9 +1,4 @@
-from fastapi import HTTPException
 from sqlalchemy.orm import Session
-
-from app.models.order_item import OrderItem, OrderItemStatus
-from app.models.user import User, UserRole
-from app.models.order import OrderStatus
 
 from app.domain.order.order_service import OrderService
 from app.domain.order_item.order_item_transitions import can_transition
@@ -12,19 +7,30 @@ from app.domain.errors.error_codes import ErrorCode
 
 from app.services.event_service import EventService
 
-
+from app.models.order_item import OrderItem, OrderItemStatus
+from app.models.user import User, UserRole
+from app.models.order import OrderStatus
 
 class OrderItemService:
 
-    def __init__(self, db: Session):
+    """
+    Servicio encargado de la lógica de negocio relacionada con los items de las ordenes.
+
+    Responsabilidades:
+    - Gestionar el ciclo de vida de las items.
+    - Validar las reglas de negocio.
+    - Acceder a la base de datos mediante SQLAlchemy.
+    - Lanzar DomainError cuando una operación no pueda completarse.
+    """
+
+    def __init__(self, db: Session) -> None:
         self.db = db
         self.events = EventService(db)
 
     # -------------------------
     # Obtener item
     # -------------------------
-    
-    def get_item(self, item_id: int, restaurant_id: int):
+    def _get_item(self, item_id: int, restaurant_id: int) -> OrderItem:
         item = (
             self.db.query(OrderItem)
             .filter(
@@ -37,31 +43,81 @@ class OrderItemService:
             raise DomainError(
                 "Item no encontrado",
                 ErrorCode.ITEM_NOT_FOUND,
-                context={"Item:": item_id })
+                context={"item_id": item_id})
         return item
+
+    # -----------------------------------------------------------------------------
+    # Procesar transición de estado del item y recalcular estado de la orden
+    # -----------------------------------------------------------------------------
+    def _process_status_transition(
+        self,
+        item: OrderItem,
+        new_status: OrderItemStatus,
+        user: User,
+        order_service: OrderService
+    ) -> OrderStatus:
+        order = item.order
+        if order.status == OrderStatus.CLOSED:
+            raise DomainError(
+                "No se pueden modificar items en una orden cerrada",
+                ErrorCode.ORDER_ALREADY_CLOSED,
+                context={"order_id": order.id}
+            )
+        if new_status == OrderItemStatus.IN_PROGRESS and user.role != UserRole.KITCHEN:
+            raise DomainError(
+                "Sólo COCINA puede comenzar items",
+                ErrorCode.ITEM_STATUS_ROLE_FORBIDDEN,
+                context={"required_role": "KITCHEN"}
+            )
+        if new_status == OrderItemStatus.READY and user.role != UserRole.KITCHEN:
+            raise DomainError(
+                "Sólo COCINA puede marcar items como listos",
+                ErrorCode.ITEM_STATUS_ROLE_FORBIDDEN,
+                context={"required_role": "KITCHEN"}
+            )
+        if new_status == OrderItemStatus.DELIVERED and user.role != UserRole.WAITER:
+            raise DomainError(
+                "Sólo MOZO puede entregar items",
+                ErrorCode.ITEM_STATUS_ROLE_FORBIDDEN,
+                context={"required_role": "WAITER"}
+            )
+        if not can_transition(item.status, new_status):
+            raise DomainError(
+                f"Transición inválida desde {item.status.value} a {new_status.value}",
+                ErrorCode.ITEM_INVALID_TRANSITION,
+                context={
+                    "from": item.status.value,
+                    "to": new_status.value
+                }
+            )
+        item.status = new_status
+        previous_status = order.status
+        new_order_status = order_service._calculate_order_status(order)
+        order_service._set_status(order, new_order_status)
+        return previous_status
 
     # -------------------------
     # Actualizar estado
     # -------------------------
-
     def update_status(
         self,
         item_id: int,
         new_status: OrderItemStatus,
         user: User
-    ):
-        item = self.get_item(item_id, user.restaurant_id)
+    ) -> OrderItem:
+        item = self._get_item(item_id, user.restaurant_id)
 
         order = item.order
         order_service = OrderService(self.db)
 
-        previous_status = self.change_item_status(
+        previous_status = self._process_status_transition(
             item,
             new_status,
             user,
             order_service
         )
-
+        self.db.commit()
+        self.db.refresh(item)
         # =========================
         # EVENTOS
         # =========================
@@ -122,61 +178,4 @@ class OrderItemService:
                     target="role",
                     target_id=role.value
                 )
-        self.db.commit()
-        self.db.refresh(item)
         return item
-    
-    # -------------------------
-    # Cambiar estado
-    # -------------------------
-
-    def change_item_status(
-        self,
-        item: OrderItem,
-        new_status: OrderItemStatus,
-        user: User,
-        order_service: OrderService
-    ):
-        order = item.order
-        if order.status == OrderStatus.CLOSED:
-            raise DomainError(
-                "No se pueden modificar items en una orden cerrada",
-                ErrorCode.ORDER_ALREADY_CLOSED,
-                context={"order_id": order.id}
-            )
-
-        # reglas por rol
-        if new_status == OrderItemStatus.IN_PROGRESS and user.role != UserRole.KITCHEN:
-            raise DomainError(
-                "Sólo COCINA puede comenzar items",
-                ErrorCode.ITEM_STATUS_ROLE_FORBIDDEN,
-                context={"required_role": "KITCHEN"}
-            )
-
-        if new_status == OrderItemStatus.READY and user.role != UserRole.KITCHEN:
-            raise DomainError(
-                "Sólo COCINA puede marcar items como listos",
-                ErrorCode.ITEM_STATUS_ROLE_FORBIDDEN,
-                context={"required_role": "KITCHEN"}
-            )
-
-        if new_status == OrderItemStatus.DELIVERED and user.role != UserRole.WAITER:
-            raise DomainError(
-                "Sólo MOZO puede entregar items",
-                ErrorCode.ITEM_STATUS_ROLE_FORBIDDEN,
-                context={"required_role": "WAITER"}
-            )
-
-        if not can_transition(item.status, new_status):
-            raise DomainError(
-                f"Transición inválida desde {item.status.value} a {new_status.value}",
-                ErrorCode.ITEM_INVALID_TRANSITION,
-                context={
-                    "from": item.status.value,
-                    "to": new_status.value
-                }
-            )
-        item.status = new_status
-        previous_status = order.status
-        order_service.recalculate_order_status(order)
-        return previous_status

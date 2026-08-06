@@ -5,6 +5,7 @@ from sqlalchemy import (
     DateTime,
     JSON,
     ForeignKey,
+    Identity,
     func
 )
 
@@ -15,7 +16,7 @@ class EventOutbox(Base):
 
     __tablename__ = "event_outbox"
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, Identity(), primary_key=True)
 
     restaurant_id = Column(
         Integer,

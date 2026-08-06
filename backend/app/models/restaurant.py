@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, Identity
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 import uuid
@@ -9,7 +9,7 @@ from app.db.base_class import Base
 class Restaurant(Base):
     __tablename__ = "restaurants"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, Identity(), primary_key=True, index=True)
 
     name = Column(String, nullable=False)
 
@@ -47,5 +47,10 @@ class Restaurant(Base):
         back_populates="restaurant",
         cascade="all, delete-orphan"
     )
-
-
+    settings = relationship(
+        "SystemSettings",
+        back_populates="restaurant",
+        uselist=False,
+        cascade="all, delete-orphan",
+        passive_deletes=True
+    )

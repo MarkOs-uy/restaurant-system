@@ -591,6 +591,13 @@ export default function OrderDetail() {
               >
               🏦 Transferencia
               </button>
+
+              <button
+                className="btn btn-payment-other"
+                onClick={() => registerPayment("OTHER")}
+              >
+              🤝 Otro
+              </button>
             </div>
           </div>
         )}

@@ -1,6 +1,6 @@
 import enum
 import uuid
-from sqlalchemy import Column, Integer, Numeric, ForeignKey, String, DateTime, Enum, Index
+from sqlalchemy import Column, Integer, Numeric, ForeignKey, String, DateTime, Enum, Index, Identity
 from sqlalchemy.sql import func
 from app.db.base_class import Base
 from sqlalchemy.orm import relationship
@@ -18,7 +18,7 @@ class OrderStatus(str, enum.Enum):
 class Order(Base):
     __tablename__ = "orders"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, Identity(), primary_key=True, index=True)
     restaurant_id = Column(
         Integer,
         ForeignKey("restaurants.id"),

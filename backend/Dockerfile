@@ -1,16 +1,25 @@
-FROM python:3.11-slim
+FROM python:3.11-slim-bookworm
 
-# Evita archivos pyc y buffer raro
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# Primero copiamos requirements para cachear dependencias
 COPY requirements.txt .
 
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        wget \
+        gnupg && \
+    echo "deb http://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" > /etc/apt/sources.list.d/pgdg.list && \
+    wget -qO- https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor > /etc/apt/trusted.gpg.d/postgresql.gpg && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        postgresql-client-15 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
 RUN pip install --no-cache-dir -r requirements.txt
-RUN apt-get update && apt-get install -y postgresql-client
 
 COPY . .
 

@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Column, Integer, String, Enum, ForeignKey, Boolean
+from sqlalchemy import Column, Integer, String, Enum, ForeignKey, Boolean, Identity
 from sqlalchemy.orm import relationship
 
 from app.db.base_class import Base
@@ -15,7 +15,7 @@ class UserRole(str, enum.Enum):
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, Identity(), primary_key=True)
 
     restaurant_id = Column(
         Integer,

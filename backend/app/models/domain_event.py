@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, JSON, DateTime, func, ForeignKey
+from sqlalchemy import Column, Integer, String, JSON, DateTime, func, ForeignKey, Identity
 from sqlalchemy.orm import relationship
 
 from app.db.base_class import Base
@@ -8,7 +8,7 @@ class DomainEvent(Base):
 
     __tablename__ = "domain_events"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, Identity(), primary_key=True, index=True)
 
     restaurant_id = Column(
         Integer,

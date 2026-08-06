@@ -1,11 +1,11 @@
 from app.db.base_class import Base
 from sqlalchemy.orm import relationship
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, UniqueConstraint, Identity
 
 class ProductionStation(Base):
     __tablename__ = "production_stations"
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, Identity(), primary_key=True)
     restaurant_id = Column(ForeignKey("restaurants.id"), nullable=False)
     name = Column(String, nullable=False)
     active = Column(Boolean, default=True)

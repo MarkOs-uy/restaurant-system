@@ -18,7 +18,7 @@ class ErrorCode(str, Enum):
     # ORDER ITEMS
     ITEM_NOT_FOUND = "item_not_found"
     ITEM_NOT_IN_ORDER = "item_not_in_order"
-    ITEM_ALREADY_SEND = "item_already_send"
+    ITEM_ALREADY_SENT = "item_already_sent"
     NOT_PENDING_ITEMS_TO_SEND = "not_pending_items_to_send"
     ITEM_STATUS_ROLE_FORBIDDEN = "item_status_role_forbidden"
     ITEM_INVALID_TRANSITION = "item_invalid_transition"
@@ -43,17 +43,54 @@ class ErrorCode(str, Enum):
 
     # PRODUCTS
     PRODUCT_NOT_FOUND = "product_not_found"
+    PRODUCT_ALREADY_EXISTS = "product_already_exists"
+    INVALID_PRODUCT_NAME = "invalid_product_name"
 
     # USERS
     USER_NOT_FOUND = "user_not_found"
     USERNAME_ALREADY_EXISTS = "username_already_exists"
+    USER_CANNOT_DEACTIVATE_SELF = "user_cannot_deactivate_self"
 
     # CATEGORIES
     CATEGORY_NOT_FOUND = "category_not_found"
+    CATEGORY_ALREADY_EXISTS = "category_already_exists"
+    INVALID_CATEGORY_NAME = "invalid_category_name"
 
     # STATIONS
     STATION_NOT_FOUND = "station_not_found"
     STATION_NAME_ALREADY_EXISTS = "station_name_already_exists"
+    INVALID_STATION_NAME = "invalid_station_name"
+
+    # LAYOUT
+    LAYOUT_BACKGROUND_INVALID_FORMAT = "layout_background_invalid_format"
+    LAYOUT_BACKGROUND_TOO_LARGE = "layout_background_too_large"
 
     # PERMISSIONS
     PERMISSION_DENIED = "permission_denied"
+
+    # EMAIL Y BACKUP
+    INVALID_BACKUP_CONFIGURATION = "invalid_backup_configuration"
+    EMAIL_NOT_CONFIGURED = "email_not_configured"
+    SMTP_NOT_CONFIGURED = "smtp_not_configured"
+    SMTP_HOST_NOT_CONFIGURED = "smtp_host_not_configured"
+    BACKUP_EMAIL_NOT_CONFIGURED = "backup_email_not_configured"
+    EMAIL_SEND_FAILURE = "email_send_failure"
+    BACKUP_NOT_FOUND = "backup_not_found"
+    BACKUP_INVALID_PATH = "backup_invalid_path"
+    BACKUP_DATABASE_NOT_FOUND = "backup_database_not_found"
+    BACKUP_ENGINE_NOT_SUPPORTED = "backup_engine_not_supported"
+    BACKUP_FAILED = "backup_failed"
+
+    # REPORTS
+    REPORT_INVALID_DATE_RANGE = "report_invalid_date_range"
+
+    #SETTINGS
+    BACKUP_DESTINATION_REQUIRED = "backup_destination_required"
+    BACKUP_WEEKDAY_REQUIRED = "backup_weekday_required"
+    BACKUP_MONTHDAY_REQUIRED = "backup_monthday_required"
+
+    # AUTH
+    INVALID_TOKEN = "invalid_token"
+    INVALID_TOKEN_PAYLOAD = "invalid_token_payload"
+    USER_INACTIVE = "user_inactive"
+    ROLE_MISMATCH = "role_mismatch"

@@ -6,7 +6,8 @@ from sqlalchemy import (
     ForeignKey,
     String,
     UniqueConstraint,
-    Index
+    Index, 
+    Identity
 )
 from sqlalchemy.orm import relationship
 from app.db.base_class import Base
@@ -15,7 +16,7 @@ from app.db.base_class import Base
 class Table(Base):
     __tablename__ = "tables"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, Identity(), primary_key=True, index=True)
 
     restaurant_id = Column(
         Integer,

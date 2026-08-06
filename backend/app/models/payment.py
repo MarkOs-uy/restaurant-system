@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Column, Integer, Enum, Numeric, ForeignKey
+from sqlalchemy import Column, Integer, Enum, Numeric, ForeignKey, Identity
 from sqlalchemy.orm import relationship
 from app.db.base_class import Base
 
@@ -13,7 +13,7 @@ class PaymentMethod(str, enum.Enum):
 class Payment(Base):
     __tablename__ = "payments"
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, Identity(), primary_key=True)
     restaurant_id = Column(
         Integer,
         ForeignKey("restaurants.id"),

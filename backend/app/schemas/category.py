@@ -1,23 +1,24 @@
-from typing import List
-from .base import BaseSchema
-from .product import ProductMenu
 from decimal import Decimal
+from pydantic import Field
+from .base import BaseSchema
 
-class CategoryBase(BaseSchema):
+class ProductRef(BaseSchema):
+    id: int
     name: str
+    price: Decimal
 
-
-class CategoryCreate(CategoryBase):
-    pass
-
+class CategoryCreate(BaseSchema):
+    name: str
 
 class CategoryUpdate(BaseSchema):
     name: str
 
-
-class CategoryResponse(CategoryBase):
+class CategoryRef(BaseSchema):
     id: int
+    name: str
 
+class CategoryResponse(CategoryRef):
+    active: bool
 
 class CategoryWithProducts(CategoryResponse):
-    products: List[ProductMenu] = []
+    products: list[ProductRef] = Field(default_factory=list)

@@ -1,29 +1,30 @@
-from fastapi import APIRouter, Depends
+"""
+Endpoints para la gestión de la cocina.
+Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
+"""
 
-from app.models.user import User
+from fastapi import APIRouter, Depends, status
 
 from app.dependencies.roles import kitchen_or_admin
-
-from app.schemas.order.order_item import (
-    OrderItemStatusUpdate,
-    OrderItemOut
-)
-from app.schemas.order.kitchen import KitchenItemOut
 
 from app.domain.kitchen.dependencies import get_kitchen_service
 from app.domain.kitchen.kitchen_service import KitchenService
 
+from app.models.user import User
 
-router = APIRouter(
-    prefix="/kitchen",
-    tags=["kitchen"]
-)
+from app.schemas.order.kitchen import KitchenItemOut
 
-# -----------------------------------------------------
+router = APIRouter(prefix="/kitchen", tags=["kitchen"])
 
+# ----------------------------------------------------------------------------------------------------
+# Obtener items por estación
+# ----------------------------------------------------------------------------------------------------
 @router.get(
     "/stations/{station_id}/items",
-    response_model=list[KitchenItemOut]
+    response_model=list[KitchenItemOut],
+    status_code=status.HTTP_200_OK,
+    summary="Devolver items por estación",
+    description="Devuelve la lista de items por estación del restaurante autenticado."
 )
 def get_station_items(
     station_id: int,
@@ -33,30 +34,4 @@ def get_station_items(
     return service.get_station_items(
         station_id=station_id,
         user=user
-    )
-
-# -----------------------------------------------------
-
-@router.patch(
-    "/{item_id}/status",
-    response_model=OrderItemOut
-)
-def update_item_status(
-    item_id: int,
-    data: OrderItemStatusUpdate,
-    user: User = Depends(kitchen_or_admin),
-    service: KitchenService = Depends(get_kitchen_service)
-):
-    item = service.update_item_status(
-        item_id=item_id,
-        status=data.status,
-        user=user
-    )
-    return OrderItemOut(
-        id=item.id,
-        product_name=item.product.name,
-        quantity=item.quantity,
-        unit_price=item.unit_price,
-        subtotal=item.quantity * item.unit_price,
-        status=item.status
     )

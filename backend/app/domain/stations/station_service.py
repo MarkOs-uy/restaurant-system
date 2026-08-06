@@ -1,80 +1,56 @@
-from sqlalchemy.orm import Session, joinedload
-from app.models.production_station import ProductionStation
-
-from app.models.order_item import OrderItem, OrderItemStatus
-from app.models.product import Product
-from app.models.order import Order
+from sqlalchemy.orm import Session
 
 from app.domain.errors.base import DomainError
 from app.domain.errors.error_codes import ErrorCode
 
+from app.models.production_station import ProductionStation
+
+from app.schemas.station import (
+    StationCreate,
+    StationUpdate
+)
 
 class StationService:
 
-    def __init__(self, db: Session):
+    """
+    Servicio encargado de la lógica de negocio relacionada con las estaciones.
+
+    Responsabilidades:
+    - Gestionar el CRUD de estaciones.
+    - Validar las reglas de negocio.
+    - Acceder a la base de datos mediante SQLAlchemy.
+    - Lanzar DomainError cuando una operación no pueda completarse.
+    """
+
+    def __init__(self, db: Session) -> None:
         self.db = db
 
-    # -------------------------
-    # Crear estación
-    # ------------------------- 
-
-    def create_station(self, restaurant_id: int, name: str):
-        existing = (
+    # -------------------------------------------------------
+    # Comprobar si el nombre de la estación ya existe
+    # -------------------------------------------------------
+    def _station_name_exists(
+        self,
+        restaurant_id: int,
+        name: str,
+        exclude_id: int | None = None
+    ) -> bool:
+        query = (
             self.db.query(ProductionStation)
             .filter(
                 ProductionStation.restaurant_id == restaurant_id,
                 ProductionStation.name == name
             )
-            .first()
         )
-        if existing:
-            raise DomainError(
-                "Station name already exists",
-                code=ErrorCode.STATION_NAME_ALREADY_EXISTS,
-                context={"name": name}
+        if exclude_id is not None:
+            query = query.filter(
+                ProductionStation.id != exclude_id
             )
-        station = ProductionStation(
-            name=name,
-            restaurant_id=restaurant_id,
-            active=True
-        )
-        self.db.add(station)
-        self.db.commit()
-        self.db.refresh(station)
-        return station
-    
-    # -------------------------
-    # Listar estaciones
-    # -------------------------
-
-    def list_stations(self, restaurant_id: int):
-        return (
-            self.db.query(ProductionStation)
-            .filter(ProductionStation.restaurant_id == restaurant_id)
-            .order_by(ProductionStation.name)
-            .all()
-        )
-
-    # -------------------------
-    # Listar estaciones activas
-    # -------------------------
-
-    def list_active_stations(self, restaurant_id: int):
-        return (
-            self.db.query(ProductionStation)
-            .filter(
-                ProductionStation.restaurant_id == restaurant_id,
-                ProductionStation.active.is_(True)
-            )
-            .order_by(ProductionStation.name)
-            .all()
-        )
+        return query.first() is not None
 
     # -------------------------
     # Obtener estación
     # -------------------------
-
-    def get_station(self, restaurant_id: int, station_id: int):
+    def _get_station(self, restaurant_id: int, station_id: int) -> ProductionStation:
         station = (
             self.db.query(ProductionStation)
             .filter(
@@ -91,74 +67,89 @@ class StationService:
         return station
 
     # -------------------------
-    # Actualizar estación
-    # -------------------------
+    # Crear estación
+    # ------------------------- 
+    def create_station(self, restaurant_id: int, data: StationCreate) -> ProductionStation:
+        name=data.name.strip()
+        if not name:
+            raise DomainError(
+                "Station name cannot be empty",
+                ErrorCode.INVALID_STATION_NAME
+            )
 
-    def update_station(self, restaurant_id: int, station_id: int, name: str):
-        station = self.get_station(restaurant_id, station_id)
-        existing = (
+        if self._station_name_exists(restaurant_id, name):
+            raise DomainError(
+                "Station name already exists",
+                ErrorCode.STATION_NAME_ALREADY_EXISTS,
+                context={"name": name}
+            )
+        station = ProductionStation(
+            name=name,
+            restaurant_id=restaurant_id,
+            active=True
+        )
+        self.db.add(station)
+        self.db.commit()
+        self.db.refresh(station)
+        return station
+    
+    # -------------------------
+    # Listar estaciones
+    # -------------------------
+    def list_stations(self, restaurant_id: int) -> list[ProductionStation]:
+        return (
+            self.db.query(ProductionStation)
+            .filter(ProductionStation.restaurant_id == restaurant_id)
+            .order_by(ProductionStation.name)
+            .all()
+        )
+
+    # ----------------------------
+    # Listar estaciones activas
+    # ----------------------------
+    def list_active_stations(self, restaurant_id: int) -> list[ProductionStation]:
+        return (
             self.db.query(ProductionStation)
             .filter(
                 ProductionStation.restaurant_id == restaurant_id,
-                ProductionStation.name == name,
-                ProductionStation.id != station_id
+                ProductionStation.active.is_(True)
             )
-            .first()
+            .order_by(ProductionStation.name)
+            .all()
         )
-        if existing:
+
+    # -------------------------
+    # Actualizar estación
+    # -------------------------
+    def update_station(self, restaurant_id: int, station_id: int, data: StationUpdate) -> ProductionStation:
+        station = self._get_station(restaurant_id, station_id)
+        name = data.name.strip()
+        if not name:
+            raise DomainError(
+                "Station name cannot be empty",
+                ErrorCode.INVALID_STATION_NAME
+            )
+        if self._station_name_exists(
+            restaurant_id,
+            name,
+            exclude_id=station_id
+        ):
             raise DomainError(
                 "Station name already exists",
-                code=ErrorCode.STATION_NAME_ALREADY_EXISTS
+                ErrorCode.STATION_NAME_ALREADY_EXISTS,
+                context={"name": name}
             )
         station.name = name
         self.db.commit()
         self.db.refresh(station)
         return station
 
-    # -------------------------
+    # -----------------------------
     # Activar/desactivar estación
-    # -------------------------
-
-    def toggle_station(self, restaurant_id: int, station_id: int):
-        station = self.get_station(restaurant_id, station_id)
+    # -----------------------------
+    def toggle_station(self, restaurant_id: int, station_id: int) -> ProductionStation:
+        station = self._get_station(restaurant_id, station_id)
         station.active = not station.active
         self.db.commit()
         self.db.refresh(station)
         return station
-
-    # -------------------------
-    # Para cambiar a otro service a la brevedad
-    # -------------------------
-
-    def get_station_items(self, restaurant_id: int, station_id: int):
-        items = (
-            self.db.query(OrderItem)
-            .join(OrderItem.product)
-            .join(Product.station)
-            .join(OrderItem.order)
-            .join(Order.table)
-            .filter(
-                Product.station_id == station_id,
-                OrderItem.restaurant_id == restaurant_id,
-                OrderItem.status.in_([
-                    OrderItemStatus.SENT,
-                    OrderItemStatus.IN_PROGRESS
-                ])
-            )
-            .order_by(Order.created_at)
-            .all()
-        )
-
-        result = []
-
-        for item in items:
-            result.append({
-                "item_id": item.id,
-                "product_name": item.product.name,
-                "quantity": item.quantity,
-                "status": item.status,
-                "table_number": item.order.table.number,
-                "order_id": item.order.id
-            })
-
-        return result

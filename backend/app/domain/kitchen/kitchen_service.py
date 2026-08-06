@@ -7,19 +7,21 @@ from app.models.order import Order
 
 from app.schemas.order.kitchen import KitchenItemOut
 
-from app.domain.order_item.order_item_service import OrderItemService
-
-
 class KitchenService:
+    """
+    Servicio encargado de la lógica de negocio relacionada con la cocina.
 
-    def __init__(self, db: Session):
+    Responsabilidades:
+    - Devolver items a pedido
+    - Acceder a la base de datos mediante SQLAlchemy.
+    """
+
+    def __init__(self, db: Session) -> None:
         self.db = db
-        self.item_service = OrderItemService(db)
 
-    # -------------------------
+    # -------------------------------------------------------------------------
     # Obtener los items de una estación, filtrando por estado y restaurante
-    # -------------------------
-
+    # -------------------------------------------------------------------------
     def get_station_items(
         self,
         station_id: int,
@@ -28,7 +30,6 @@ class KitchenService:
         items = (
             self.db.query(OrderItem)
             .join(OrderItem.product)
-            .join(Product.station)
             .join(OrderItem.order)
             .join(Order.table)
             .filter(
@@ -39,37 +40,17 @@ class KitchenService:
                     OrderItemStatus.IN_PROGRESS
                 ])
             )
+            .order_by(Order.created_at, OrderItem.id)
             .all()
         )
-
-        result = []
-
-        for item in items:
-            result.append(
-                KitchenItemOut(
-                    item_id=item.id,
-                    product_name=item.product.name,
-                    quantity=item.quantity,
-                    status=item.status,
-                    table_number=item.order.table.number,
-                    order_id=item.order.id
-                )
+        return [
+            KitchenItemOut(
+                item_id=item.id,
+                product_name=item.product.name,
+                quantity=item.quantity,
+                status=item.status,
+                table_number=item.order.table.number,
+                order_id=item.order.id
             )
-
-        return result
-
-    # -------------------------
-    # Actualizar el estado de un item, validando que el usuario tenga permisos para hacerlo
-    # -------------------------
-
-    def update_item_status(
-        self,
-        item_id: int,
-        status: OrderItemStatus,
-        user: User
-    ):
-        return OrderItemService.update_status(
-            item_id=item_id,
-            new_status=status,
-            user=user
-        )
+            for item in items
+        ]

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, DateTime, Numeric, ForeignKey, Boolean, JSON
+from sqlalchemy import Column, Integer, DateTime, Numeric, ForeignKey, Boolean, JSON, Identity
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -9,7 +9,7 @@ class CashRegister(Base):
 
     __tablename__ = "cash_registers"
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, Identity(), primary_key=True)
 
     restaurant_id = Column(
         Integer,

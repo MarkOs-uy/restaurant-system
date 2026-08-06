@@ -365,6 +365,20 @@ hr {
   transform: translateY(-1px) !important;
 }
 
+.btn-payment-other {
+  background: linear-gradient(135deg, #c67213 0%, #c96c00 100%) !important;
+  color: #fff !important;
+  border: none !important;
+  font-weight: 600 !important;
+  box-shadow: 0 4px 14px rgba(139, 92, 246, 0.25) !important;
+}
+
+.btn-payment-other:hover {
+  background: linear-gradient(135deg, #c4843b 0%, #7c3aed 100%) !important;
+  box-shadow: 0 6px 18px rgba(139, 92, 246, 0.45) !important;
+  transform: translateY(-1px) !important;
+}
+
 /* ---------- SECTION SPACING AND WRAPPERS ---------- */
 .detail-section {
   margin-bottom: 36px; /* High breathing room for main components */
@@ -738,6 +752,8 @@ hr {
   font-size: 16px;
 }
 
+/* ---------- BACKUPS PAGE ---------- */
+
 .backups-page {
   width: 100%;
   padding: 40px 8px;
@@ -779,15 +795,19 @@ hr {
   margin-bottom: 0;
 }
 
+.backup-schedule-form,
 .backup-email-form {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  flex-wrap: wrap;
+    width: 100%;
 }
 
+.backup-schedule-form .backup-status-grid,
+.backup-email-form .backup-status-grid{
+    width:100%;
+}
+
+.backup-schedule-form label,
 .backup-email-form label {
-  display: flex;
+  display:flex;
   flex-direction: column;
   gap: 6px;
   color: var(--color-text-secondary);
@@ -797,12 +817,121 @@ hr {
   min-width: 260px;
 }
 
+.checkbox-label{
+    display:flex !important;
+    flex-direction:row !important;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    width:100%;
+    height:100%;
+
+    min-height:64px;
+}
+
+.checkbox-label span{
+    font-weight:700;
+}
+
+.checkbox-label input{
+    margin:0;
+}
+
 .backup-email-note {
   margin: 14px 0 0;
   color: var(--color-text-secondary);
   font-size: 14px;
   font-weight: 600;
 }
+
+.backup-field-group{
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:16px;
+
+    height:100%;
+
+    padding-right:24px;
+
+    border-right:1px solid var(--color-border);
+
+}
+
+.backup-send-layout{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    gap:40px;
+
+}
+
+.backup-send-info{
+
+    display:flex;
+
+    gap:36px;
+
+    flex-wrap:wrap;
+
+}
+
+.backup-send-info div{
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:6px;
+
+}
+
+.backup-send-info span{
+
+    font-size:12px;
+
+    color:var(--color-text-secondary);
+
+    text-transform:uppercase;
+
+}
+
+.backup-send-info strong{
+
+    font-size:15px;
+
+}
+
+.backup-files {
+    width: 100%;
+    margin-top: 20px;
+}
+
+.backup-files td:last-child,
+.backup-files th:last-child {
+    width: 150px;
+    text-align: center;
+}
+
+.backup-warning {
+    margin-bottom: 18px;
+    padding: 14px 18px;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 170, 0, 0.12);
+    border: 1px solid rgba(255, 170, 0, 0.25);
+    color: #ffd166;
+    font-weight: 600;
+}
+
+/* ---------- PRODUCT RANKS & EVOLUTION ---------- */
 
 .today-product {
   margin-bottom: 18px;
