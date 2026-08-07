@@ -1,70 +1,70 @@
+"""
+Funciones de seguridad del sistema.
+
+Responsabilidades:
+- Generar hashes BCrypt.
+- Verificar contraseñas.
+- Crear tokens JWT.
+- Validar y decodificar tokens JWT.
+"""
+
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-from app.core.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
-
-
-pwd_context = CryptContext(
-    schemes=["bcrypt"],
-    deprecated="auto"
+from app.core.config import (
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    ALGORITHM,
+    SECRET_KEY,
 )
 
+# --------------------------------------------------------------------------------------
+# Contexto utilizado para el hash y verificación de contraseñas
+# --------------------------------------------------------------------------------------
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# 🔐 Hash password
-def get_password_hash(password: str):
+# --------------------------------------------------------------------------------------
+# Genera el hash BCrypt de una contraseña
+# --------------------------------------------------------------------------------------
+def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
-
-# 🔎 Verify password
-def verify_password(plain_password: str, hashed_password: str):
+# --------------------------------------------------------------------------------------
+# Verifica una contraseña contra su hash BCrypt
+# --------------------------------------------------------------------------------------
+def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
-
-# 🎟 Create JWT
-def create_access_token(data: dict):
-
-    to_encode = data.copy()
-
+# --------------------------------------------------------------------------------------
+# Crea un JWT firmado con la información suministrada
+# --------------------------------------------------------------------------------------
+def create_access_token(data: dict[str, object]) -> str:
     now = datetime.now(timezone.utc)
-
-    expire = now + timedelta(
-        minutes=ACCESS_TOKEN_EXPIRE_MINUTES
-    )
-
-    to_encode.update({
-        "exp": expire,
+    payload = {
+        **data,
         "iat": now,
-        "jti": str(uuid4())
-    })
-
+        "exp": now + timedelta(
+            minutes=ACCESS_TOKEN_EXPIRE_MINUTES
+        ),
+        "jti": str(uuid4()) # Identificador único del token
+    }
     return jwt.encode(
-        to_encode,
+        payload,
         SECRET_KEY,
         algorithm=ALGORITHM
     )
 
-
-# 🔓 Decode JWT
-def decode_access_token(token: str):
-
+# --------------------------------------------------------------------------------------
+# Decodifica un JWT y devuelve su payload si es válido
+# --------------------------------------------------------------------------------------
+def decode_access_token(token: str) -> dict[str, object] | None:
     try:
-
-        payload = jwt.decode(
+        return jwt.decode(
             token,
             SECRET_KEY,
             algorithms=[ALGORITHM]
         )
-
-        exp = payload.get("exp")
-
-        if exp:
-            if datetime.fromtimestamp(exp, tz=timezone.utc) < datetime.now(timezone.utc):
-                return None
-
-        return payload
-
     except JWTError:
         return None

@@ -1,9 +1,11 @@
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from contextlib import asynccontextmanager
 import asyncio
 import logging
 from pathlib import Path
@@ -24,17 +26,18 @@ from app.domain.errors.base import DomainError
 from app.websocket import ws
 from app.core.config import CORS_ORIGINS
 
-
-logger = logging.getLogger("app.main")
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
+logger = logging.getLogger("app.main")
 
+# --------------------------------------------------------------------------------------
+# Configuración del ciclo de vida de la aplicación.
+# --------------------------------------------------------------------------------------
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Backend arrancando...")
 
     # Event worker
@@ -57,42 +60,44 @@ async def lifespan(app: FastAPI):
     scheduler.start()
     logger.info("Scheduler iniciado")
 
-    yield
-
-    logger.info("Backend apagándose...")
-
-    # Detener scheduler
-    scheduler.shutdown(wait=False)
-    logger.info("Scheduler detenido")
-
-    # Cancelar redis
-    redis_task.cancel()
     try:
-        await redis_task
-    except asyncio.CancelledError:
+        yield
+    finally:
+        logger.info("Backend apagándose...")
+
+        # Detener scheduler
+        scheduler.shutdown(wait=False)
+        logger.info("Scheduler detenido")
+
+        redis_task.cancel()
+        worker_task.cancel()
+        cleanup_task.cancel()
+
+        await asyncio.gather(
+            redis_task,
+            worker_task,
+            cleanup_task,
+            return_exceptions=True,
+        )
         logger.info("Redis listener detenido")
-
-    # Cancelar worker
-    worker_task.cancel()
-    try:
-        await worker_task
-    except asyncio.CancelledError:
         logger.info("Event worker detenido")
-
-    # Cancelar cleanup
-    cleanup_task.cancel()
-    try:
-        await cleanup_task
-    except asyncio.CancelledError:
         logger.info("Event cleanup detenido")
 
-
+# --------------------------------------------------------------------------------------
+# Aplicación FastAPI.
+# --------------------------------------------------------------------------------------
 app = FastAPI(lifespan=lifespan, redirect_slashes=False)
+
+# --------------------------------------------------------------------------------------
+# Configuración de archivos estáticos.
+# --------------------------------------------------------------------------------------
 uploads_dir = Path(__file__).resolve().parent.parent / "uploads"
 uploads_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
-# CORS
+# --------------------------------------------------------------------------------------
+# Configuración CORS.
+# --------------------------------------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
@@ -101,7 +106,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# routers
+# --------------------------------------------------------------------------------------
+# Registro de routers.
+# --------------------------------------------------------------------------------------
 app.include_router(auth.router, prefix="/api")
 app.include_router(backups.router, prefix="/api")
 app.include_router(cash_register.router, prefix="/api")
@@ -118,25 +125,29 @@ app.include_router(ws.router)
 app.include_router(layout.router, prefix="/api")
 app.include_router(system_settings.router, prefix="/api")
 
-
+# --------------------------------------------------------------------------------------
+# Endpoints del sistema.
+# --------------------------------------------------------------------------------------
 @app.get("/")
-def root():
+def root() -> dict[str, str]:
     return {"status": "running"}
 
 
 @app.get("/health")
 @app.get("/api/health")
-def health():
+def health() -> dict[str, str]:
     return {
         "status": "ok",
         "service": "restaurant-pos",
         "version": "1.0.0"
     }
 
-
+# --------------------------------------------------------------------------------------
+# Manejadores globales de excepciones.
+# --------------------------------------------------------------------------------------
 @app.exception_handler(DomainError)
-async def domain_error_handler(request: Request, exc: DomainError):
-    logger.warning(f"{exc.code}: {exc.message}")
+async def domain_error_handler(request: Request, exc: DomainError) -> JSONResponse:
+    logger.warning("%s: %s", exc.code, exc.message,)
     return JSONResponse(
         status_code=400,
         content={
@@ -147,7 +158,7 @@ async def domain_error_handler(request: Request, exc: DomainError):
     )
 
 @app.exception_handler(Exception)
-async def unexpected_error_handler(request: Request, exc: Exception):
+async def unexpected_error_handler(request: Request, exc: Exception) -> JSONResponse:
     logger.exception("Unexpected server error")
     return JSONResponse(
         status_code=500,

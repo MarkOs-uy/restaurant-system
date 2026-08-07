@@ -1,0 +1,32 @@
+{
+    "name": "Restaurant System",
+
+    "dockerComposeFile": "../docker-compose.yml",
+
+    "service": "backend",
+
+    "workspaceFolder": "/app",
+
+    "shutdownAction": "none",
+
+    "overrideCommand": false,
+
+    "remoteUser": "root",
+
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "python.defaultInterpreterPath": "/usr/local/bin/python",
+                "python.analysis.typeCheckingMode": "basic",
+                "editor.formatOnSave": true
+            },
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "ms-azuretools.vscode-docker",
+                "charliermarsh.ruff",
+                "eamodio.gitlens"
+            ]
+        }
+    }
+}

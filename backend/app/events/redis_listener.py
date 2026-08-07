@@ -2,6 +2,8 @@ import asyncio
 import json
 import logging
 
+from typing import Any
+
 from app.core.redis import redis_client
 from app.websocket.manager import manager
 from app.services.event_worker import INSTANCE_ID
@@ -11,8 +13,10 @@ logger = logging.getLogger("app.redis_listener")
 
 CHANNEL = "restaurant_events"
 
-
-async def _process_event(data: dict):
+# --------------------------------------------------------------------------------------
+# Procesa un evento recibido desde Redis y lo distribuye mediante WebSocket.
+# --------------------------------------------------------------------------------------
+async def _process_event(data: dict[str, Any]) -> None:
     try:
 
         # ignorar eventos propios
@@ -31,20 +35,16 @@ async def _process_event(data: dict):
             except Exception:
                 logger.warning("Invalid JSON payload: %s", payload)
                 return
-
         if not restaurant_id or not event_type:
             logger.warning("Invalid event received: %s", data)
             return
-
         if not isinstance(payload, dict):
             logger.warning("Invalid payload type: %s", type(payload))
             return
-
         message = {
             "type": event_type,
             "payload": payload
         }
-
         logger.debug(
             "Dispatch WS event: r=%s target=%s type=%s payload=%s",
             restaurant_id,
@@ -52,29 +52,22 @@ async def _process_event(data: dict):
             event_type,
             payload
         )
-
         if target == "broadcast":
-
             await manager.broadcast(
                 restaurant_id,
                 message
             )
-
         elif target == "role":
-
             await manager.send_to_role(
                 restaurant_id,
                 UserRole(target_id),
                 message
             )
-
         elif target == "station":
-
             station_payload = {
                 **payload,
                 "station_id": int(target_id)
             }
-
             await manager.send_to_role(
                 restaurant_id,
                 UserRole.KITCHEN,
@@ -83,56 +76,42 @@ async def _process_event(data: dict):
                     "payload": station_payload
                 }
             )
-
         else:
-
             logger.warning(
                 "Unknown event target: %s",
                 target
             )
-
     except Exception:
-        logger.exception("Error processing redis event")
+        logger.exception("Error processing redis event: %s", data)
 
-
-async def redis_event_listener():
+# --------------------------------------------------------------------------------------
+# Escucha permanentemente el canal Redis y despacha los eventos recibidos.
+# Reconecta automáticamente ante cualquier fallo.
+# --------------------------------------------------------------------------------------
+async def redis_event_listener() -> None:
 
     while True:
-
         pubsub = None
-
         try:
-
             logger.info("Starting Redis listener")
-
             pubsub = redis_client.pubsub()
-
             await pubsub.subscribe(CHANNEL)
-
             logger.info("Subscribed to %s", CHANNEL)
-
             async for message in pubsub.listen():
-
                 try:
-
                     if message["type"] != "message":
                         continue
-
                     raw = message["data"]
-
                     if not raw:
                         continue
-
-                    # Redis puede enviar bytes
+                    # Redis puede devolver bytes dependiendo de la configuración del cliente.
                     if isinstance(raw, bytes):
                         raw = raw.decode()
 
                     data = json.loads(raw)
 
                     # procesar evento sin bloquear listener
-                    asyncio.create_task(
-                        _process_event(data)
-                    )
+                    asyncio.create_task(_process_event(data))
 
                 except Exception:
                     logger.exception("Error reading redis message")
@@ -143,21 +122,13 @@ async def redis_event_listener():
             break
 
         except Exception:
-
-            logger.exception(
-                "Redis listener crashed. Reconnecting in 3 seconds..."
-            )
-
+            logger.exception("Redis listener crashed. Reconnecting in 3 seconds...")
             await asyncio.sleep(3)
-
         finally:
-
             if pubsub:
-
                 try:
                     await pubsub.unsubscribe(CHANNEL)
                     await pubsub.close()
                 except Exception:
-                    pass
-
+                    logger.exception("Error closing Redis pubsub")
             logger.info("Redis listener stopped")
