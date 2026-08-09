@@ -1,105 +1,164 @@
-import { parseWSEvent, type WSEventParsed } from "../ws"
+import {
+    parseWSEvent,
+    type WSEventParsed
+} from "../ws"
 
-const defaultWsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:"
-const WS_URL =
-  import.meta.env.VITE_WS_URL || `${defaultWsProtocol}//${window.location.host}`
+import { WS_URL } from "../api"
 
+// ---------------------------------------------------------------------------------------------
+// Listener utilizado por los componentes que desean recibir eventos WebSocket.
+// ---------------------------------------------------------------------------------------------
 type Listener = (event: WSEventParsed) => void
 
 class WSService {
 
-  private ws: WebSocket | null = null
-  private listeners: Listener[] = []
-  private reconnectTimer: any = null
-  private manuallyDisconnected = false
+    private ws: WebSocket | null = null
 
-  connect() {
+    private listeners: Listener[] = []
 
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer)
-      this.reconnectTimer = null
+    private reconnectTimer: ReturnType<typeof setTimeout> | null = null
+
+    private manuallyDisconnected = false
+
+    // -----------------------------------------------------------------------------------------
+    // Establece la conexión WebSocket si no existe una conexión activa.
+    // -----------------------------------------------------------------------------------------
+    connect(): void {
+
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer)
+            this.reconnectTimer = null
+        }
+
+        if (
+            this.ws &&
+            (
+                this.ws.readyState === WebSocket.OPEN ||
+                this.ws.readyState === WebSocket.CONNECTING
+            )
+        ) {
+            return
+        }
+
+        this.manuallyDisconnected = false
+
+        const token = localStorage.getItem("token")
+
+        if (!token) {
+            return
+        }
+
+        const url =
+            `${WS_URL}/ws?token=${encodeURIComponent(token)}`
+
+        console.log("WS connecting")
+
+        this.ws = new WebSocket(url)
+
+        // -------------------------------------------------------------------------------------
+        // Conexión establecida.
+        // -------------------------------------------------------------------------------------
+        this.ws.onopen = () => {
+            console.log("WS connected")
+        }
+
+        // -------------------------------------------------------------------------------------
+        // Mensaje recibido.
+        // -------------------------------------------------------------------------------------
+        this.ws.onmessage = (event: MessageEvent) => {
+
+            try {
+
+                const parsed = parseWSEvent(event)
+
+                this.listeners.forEach(listener => {
+                    listener(parsed)
+                })
+
+            } catch (error) {
+
+                console.error(
+                    "WS message error:",
+                    error
+                )
+            }
+        }
+
+        // -------------------------------------------------------------------------------------
+        // Conexión cerrada.
+        //
+        // Si el cierre no fue solicitado explícitamente por la aplicación,
+        // se programa automáticamente una reconexión.
+        // -------------------------------------------------------------------------------------
+        this.ws.onclose = () => {
+
+            console.log("WS closed")
+
+            this.ws = null
+
+            if (this.manuallyDisconnected) {
+                return
+            }
+
+            this.reconnectTimer = setTimeout(() => {
+                this.connect()
+            }, 2000)
+        }
+
+        // -------------------------------------------------------------------------------------
+        // Ante un error, cerramos la conexión para que onclose gestione
+        // el proceso de reconexión.
+        // -------------------------------------------------------------------------------------
+        this.ws.onerror = () => {
+            this.ws?.close()
+        }
     }
 
-    if (
-      this.ws &&
-      (
-        this.ws.readyState === WebSocket.OPEN ||
-        this.ws.readyState === WebSocket.CONNECTING
-      )
-    ) {
-      return
+    // -----------------------------------------------------------------------------------------
+    // Cierra la conexión WebSocket y evita la reconexión automática.
+    // -----------------------------------------------------------------------------------------
+    disconnect(): void {
+
+        this.manuallyDisconnected = true
+
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer)
+            this.reconnectTimer = null
+        }
+
+        if (this.ws) {
+
+            this.ws.onclose = null
+
+            this.ws.close()
+
+            this.ws = null
+        }
     }
 
-    this.manuallyDisconnected = false
+    // -----------------------------------------------------------------------------------------
+    // Registra un listener para recibir eventos WebSocket.
+    //
+    // Devuelve una función que permite eliminarlo.
+    // -----------------------------------------------------------------------------------------
+    subscribe(listener: Listener): () => void {
 
-    const token = localStorage.getItem("token")
-    if (!token) return
+        this.listeners.push(listener)
 
-    const url = `${WS_URL}/ws?token=${encodeURIComponent(token)}`
-
-    console.log("WS connecting")
-
-    this.ws = new WebSocket(url)
-
-    this.ws.onopen = () => {
-      console.log("WS connected")
+        return () => {
+            this.unsubscribe(listener)
+        }
     }
 
-    this.ws.onmessage = (event) => {
+    // -----------------------------------------------------------------------------------------
+    // Elimina un listener previamente registrado.
+    // -----------------------------------------------------------------------------------------
+    unsubscribe(listener: Listener): void {
 
-      const parsed = parseWSEvent(event)
-
-      this.listeners.forEach(listener =>
-        listener(parsed)
-      )
-
+        this.listeners = this.listeners.filter(
+            current => current !== listener
+        )
     }
-
-    this.ws.onclose = () => {
-
-      console.log("WS closed")
-
-      this.ws = null
-
-      if (this.manuallyDisconnected) return
-
-      this.reconnectTimer = setTimeout(() => {
-        this.connect()
-      }, 2000)
-
-    }
-
-    this.ws.onerror = () => {
-      this.ws?.close()
-    }
-
-  }
-
-  disconnect() {
-
-    this.manuallyDisconnected = true
-
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer)
-      this.reconnectTimer = null
-    }
-
-    if (this.ws) {
-      this.ws.onclose = null
-      this.ws.close()
-      this.ws = null
-    }
-
-  }
-
-  subscribe(listener: Listener) {
-    this.listeners.push(listener)
-  }
-
-  unsubscribe(listener: Listener) {
-    this.listeners = this.listeners.filter(l => l !== listener)
-  }
-
 }
 
 export const wsService = new WSService()

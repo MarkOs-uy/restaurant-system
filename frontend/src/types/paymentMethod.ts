@@ -1,3 +1,6 @@
+/**
+ * Métodos de pago soportados por el sistema.
+ */
 export const PaymentMethod = {
   CASH: "CASH",
   CARD: "CARD",

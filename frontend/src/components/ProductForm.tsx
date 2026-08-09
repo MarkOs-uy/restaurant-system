@@ -1,23 +1,12 @@
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 
-interface Category {
-  id: number
-  name: string
-}
+import type { Category } from "../types/category.ts"
+import type { Product } from "../types/product.ts"
+import type { Station } from "../types/station.ts"
 
-interface Station {
-  id: number
-  name: string
-}
-
-interface Product {
-  id?: number
-  name: string
-  price: number
-  category_id: number
-  station_id: number
-}
-
+// ---------------------------------------------------------------------------------------------
+// Props del formulario de productos.
+// ---------------------------------------------------------------------------------------------
 interface Props {
   product: Product | null
   categories: Category[]
@@ -26,6 +15,9 @@ interface Props {
   onCancel: () => void
 }
 
+// ---------------------------------------------------------------------------------------------
+// Formulario reutilizable para crear o editar productos.
+// ---------------------------------------------------------------------------------------------
 export default function ProductForm({
   product,
   categories,
@@ -39,6 +31,10 @@ export default function ProductForm({
   const [categoryId, setCategoryId] = useState<number | "">("")
   const [stationId, setStationId] = useState<number | "">("")
 
+  // -------------------------------------------------------------------------------------------
+  // Inicializa el formulario al editar un producto.
+  // Si no hay producto, limpia el formulario para crear uno nuevo.
+  // -------------------------------------------------------------------------------------------
   useEffect(() => {
 
     if (product) {
@@ -46,11 +42,20 @@ export default function ProductForm({
       setPrice(String(product.price))
       setCategoryId(product.category_id)
       setStationId(product.station_id)
+      return
     }
+
+    setName("")
+    setPrice("")
+    setCategoryId("")
+    setStationId("")
 
   }, [product])
 
-  const handleSubmit = () => {
+  // -------------------------------------------------------------------------------------------
+  // Valida y envía los datos del formulario al componente padre.
+  // -------------------------------------------------------------------------------------------
+  const handleSubmit = (): void => {
 
     if (!name || !price || !categoryId || !stationId) {
       alert("Complete todos los campos")
@@ -82,7 +87,6 @@ export default function ProductForm({
       </h3>
 
       {/* NOMBRE */}
-
       <div style={{ marginBottom: 10 }}>
         <input
           placeholder="Nombre"
@@ -93,7 +97,6 @@ export default function ProductForm({
       </div>
 
       {/* PRECIO */}
-
       <div style={{ marginBottom: 10 }}>
         <input
           type="number"
@@ -104,44 +107,47 @@ export default function ProductForm({
         />
       </div>
 
-      {/* CATEGORIA */}
-
+      {/* CATEGORÍA */}
       <div style={{ marginBottom: 10 }}>
         <select
           value={categoryId}
-          onChange={(e) => setCategoryId(Number(e.target.value))}
+          onChange={(e) => {
+            const value = e.target.value
+            setCategoryId(value ? Number(value) : "")
+          }}
           style={{ padding: 5 }}
         >
           <option value="">Seleccionar categoría</option>
 
-          {categories.map(c => (
-            <option key={c.id} value={c.id}>
-              {c.name}
+          {categories.map(category => (
+            <option key={category.id} value={category.id}>
+              {category.name}
             </option>
           ))}
         </select>
       </div>
 
-      {/* ESTACION */}
-
+      {/* ESTACIÓN */}
       <div style={{ marginBottom: 10 }}>
         <select
           value={stationId}
-          onChange={(e) => setStationId(Number(e.target.value))}
+          onChange={(e) => {
+            const value = e.target.value
+            setStationId(value ? Number(value) : "")
+          }}
           style={{ padding: 5 }}
         >
           <option value="">Seleccionar estación</option>
 
-          {stations.map(s => (
-            <option key={s.id} value={s.id}>
-              {s.name}
+          {stations.map(station => (
+            <option key={station.id} value={station.id}>
+              {station.name}
             </option>
           ))}
         </select>
       </div>
 
       {/* BOTONES */}
-
       <button
         onClick={handleSubmit}
         style={{

@@ -1,50 +1,76 @@
-import { useState } from "react"
+import { useState, type FormEvent } from "react"
 import { useNavigate } from "react-router-dom"
-import { apiFetch } from "../api"
 import { jwtDecode } from "jwt-decode"
-import toast from "react-hot-toast"
+
+import { apiFetch } from "../api"
+import { showToast } from "../utils/showToast"
+import type { ApiError } from "../types/apiError"
+
+// ---------------------------------------------------------------------------------------------
+// Respuesta devuelta por el endpoint de autenticación.
+// ---------------------------------------------------------------------------------------------
+interface LoginResponse {
+  access_token: string
+  token_type: string
+}
+
+// ---------------------------------------------------------------------------------------------
+// Claims del JWT utilizados por el frontend.
+// El backend puede incluir otros claims.
+// ---------------------------------------------------------------------------------------------
+interface AuthPayload {
+  role: string
+  restaurant_id: number
+}
 
 export default function LoginPage() {
-
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
+
   const navigate = useNavigate()
 
-  const login = async (e?: React.FormEvent) => {
-
-    if (e) e.preventDefault()
+  // -------------------------------------------------------------------------------------------
+  // Autentica al usuario y establece la sesión local.
+  // -------------------------------------------------------------------------------------------
+  async function login(e: FormEvent<HTMLFormElement>): Promise<void> {
+    e.preventDefault()
 
     try {
-
       const formData = new URLSearchParams()
+
       formData.append("username", username)
       formData.append("password", password)
       formData.append("grant_type", "password")
 
-      const data: any = await apiFetch("/auth/login", {
+      const data = await apiFetch("/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded"
         },
         body: formData.toString(),
         suppressErrorToast: true
-      })
+      }) as LoginResponse
 
       const token = data.access_token
+
+      if (!token) {
+        throw new Error("El servidor no devolvió un token de autenticación")
+      }
+
+      const decoded = jwtDecode<AuthPayload>(token)
+
       localStorage.setItem("token", token)
+      localStorage.setItem("role", decoded.role)
+      localStorage.setItem(
+        "restaurant_id",
+        String(decoded.restaurant_id)
+      )
 
-      const decoded: any = jwtDecode(token)
+      window.dispatchEvent(
+        new Event("authChanged")
+      )
 
-      const role = decoded.role
-      const restaurantId = decoded.restaurant_id
-
-      localStorage.setItem("role", role)
-      localStorage.setItem("restaurant_id", String(restaurantId))
-      
-      window.dispatchEvent(new Event("authChanged"))
-
-      switch (role) {
-
+      switch (decoded.role) {
         case "ADMIN":
           navigate("/admin")
           break
@@ -64,35 +90,22 @@ export default function LoginPage() {
 
         default:
           navigate("/")
-
       }
 
-    } catch (error: any) {
-
+    } catch (error: unknown) {
       console.error("Login error:", error)
 
-      const message =
-        error?.status === 401
-          ? "Usuario o contraseña incorrectos"
-          : error?.message || "No pudimos iniciar sesión"
+      const apiError = error as ApiError
 
-      toast.error(message, {
-        duration: 4500,
-        style: {
-          border: "1px solid rgba(239, 68, 68, 0.25)",
-          background: "#161c24",
-          color: "#fca5a5",
-          fontWeight: 600,
-          borderRadius: "10px"
-        },
-        iconTheme: {
-          primary: "#ef4444",
-          secondary: "#161c24"
-        }
-      })
+      if (apiError.status === 401) {
+        showToast("Usuario o contraseña incorrectos")
+        return
+      }
 
+      showToast(
+        apiError.message ?? "No pudimos iniciar sesión"
+      )
     }
-
   }
 
   return (
@@ -103,7 +116,8 @@ export default function LoginPage() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "radial-gradient(circle at top, #1a233a 0%, #0c0f17 100%)",
+        background:
+          "radial-gradient(circle at top, #1a233a 0%, #0c0f17 100%)",
         position: "fixed",
         top: 0,
         left: 0,
@@ -126,13 +140,25 @@ export default function LoginPage() {
           gap: "20px"
         }}
       >
-
-        <h2 style={{ textAlign: "center", marginBottom: "10px", fontSize: "28px", fontWeight: "700", letterSpacing: "-0.5px" }}>
-          🍳 <span style={{ color: "var(--color-primary)" }}>Marcha</span>
+        <h2
+          style={{
+            textAlign: "center",
+            marginBottom: "10px",
+            fontSize: "28px",
+            fontWeight: "700",
+            letterSpacing: "-0.5px"
+          }}
+        >
+          🍳{" "}
+          <span style={{ color: "var(--color-primary)" }}>
+            Marcha
+          </span>
         </h2>
 
         <input
+          type="text"
           placeholder="Usuario"
+          autoComplete="username"
           value={username}
           onChange={e => setUsername(e.target.value)}
         />
@@ -140,6 +166,7 @@ export default function LoginPage() {
         <input
           type="password"
           placeholder="Contraseña"
+          autoComplete="current-password"
           value={password}
           onChange={e => setPassword(e.target.value)}
         />
@@ -155,7 +182,6 @@ export default function LoginPage() {
         >
           Ingresar
         </button>
-
       </form>
     </div>
   )

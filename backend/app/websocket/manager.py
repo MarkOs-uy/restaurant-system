@@ -4,9 +4,7 @@ from fastapi import WebSocket
 from collections import defaultdict
 from typing import Any
 
-from app.dependencies.auth import AuthUser
-
-from app.models.user import UserRole
+from app.models.user import User, UserRole
 
 
 logger = logging.getLogger("app.websocket.manager")
@@ -39,7 +37,7 @@ class ConnectionManager:
 # --------------------------------------------------------------------------------------
 # Acepta una nueva conexión WebSocket autenticada.
 # --------------------------------------------------------------------------------------
-    async def connect(self, websocket: WebSocket, user: AuthUser,) -> bool:
+    async def connect(self, websocket: WebSocket, user: User,) -> bool:
 
         if self._user_connections[user.id] >= MAX_CONNECTIONS_PER_USER:
             logger.warning(

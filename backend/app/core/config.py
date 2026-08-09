@@ -46,6 +46,8 @@ SECRET_KEY = _get_required_env("SECRET_KEY")
 
 ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 
+DATABASE_URL = _get_required_env("DATABASE_URL")
+
 ACCESS_TOKEN_EXPIRE_MINUTES = _get_int_env("ACCESS_TOKEN_EXPIRE_MINUTES",60)
 
 CORS_ORIGINS = _get_csv_env("CORS_ORIGINS","")

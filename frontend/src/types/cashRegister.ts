@@ -1,6 +1,12 @@
+/**
+ * Interfaces de caja
+ */
 import { PaymentMethod } from "./paymentMethod"
 import { CashMovementType } from "./cashMovementType"
 
+/**
+ * Movimiento de caja individual.
+ */
 export interface CashMovement {
   id: number
   type: CashMovementType
@@ -9,6 +15,9 @@ export interface CashMovement {
   created_at: string
 }
 
+/**
+ * Información mostrada en el dashboard de caja.
+ */
 export interface CashRegisterDashboard {
   cash_register_id: number
   opened_at: string
@@ -21,6 +30,9 @@ export interface CashRegisterDashboard {
   cash_movements: CashMovement[]
 }
 
+/**
+ * Información al cierre de caja.
+ */
 export interface CashRegisterCloseSummary {
     message: string
     total_sales: number

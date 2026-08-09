@@ -1,36 +1,40 @@
-import { getAuthHeaders } from "../api"
+import { API_URL, getAuthHeaders } from "../api"
 
-const API_URL =
-  import.meta.env.VITE_API_URL ??
-  "http://localhost:8000"
+// ---------------------------------------------------------------------------------------------
+// Descarga un archivo de backup desde el backend autenticado.
+// Recibe el nombre del archivo y fuerza la descarga en el navegador.
+// ---------------------------------------------------------------------------------------------
+export async function downloadBackup(
+    filename: string
+): Promise<void> {
 
-export async function downloadBackup(filename: string) {
+    const response = await fetch(
+        `${API_URL}/backups/download/${encodeURIComponent(filename)}`,
+        {
+            headers: getAuthHeaders()
+        }
+    )
 
-  const response = await fetch(
-    `${API_URL}/backups/download/${encodeURIComponent(filename)}`,
-    {
-      headers: getAuthHeaders()
+    if (!response.ok) {
+        throw new Error(
+            "No fue posible descargar el backup"
+        )
     }
-  )
 
-  if (!response.ok) {
-    throw new Error("No fue posible descargar el backup")
-  }
+    const blob = await response.blob()
 
-  const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
 
-  const url = window.URL.createObjectURL(blob)
+    const link = document.createElement("a")
 
-  const link = document.createElement("a")
+    link.href = url
+    link.download = filename.split("/").pop() ?? filename
 
-  link.href = url
-  link.download = filename.split("/").pop() ?? filename
+    document.body.appendChild(link)
 
-  document.body.appendChild(link)
+    link.click()
 
-  link.click()
+    link.remove()
 
-  link.remove()
-
-  window.URL.revokeObjectURL(url)
+    window.URL.revokeObjectURL(url)
 }

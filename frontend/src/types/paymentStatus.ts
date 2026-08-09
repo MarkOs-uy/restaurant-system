@@ -1,3 +1,6 @@
+/**
+ * Estados de pago soportados por el sistema.
+ */
 export const PaymentStatus = {
   PENDING: "PENDING",
   PAID: "PAID",

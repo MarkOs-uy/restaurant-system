@@ -1,21 +1,16 @@
 import { useEffect, useReducer } from "react"
 import { apiFetch } from "../api"
 import { wsService } from "../services/wsService"
+import { OrderItemStatus } from "../types/orderItemStatus"
 import type { WSEventParsed } from "../ws"
+import type { Order, OrderItem } from "../types/order"
+
 
 interface Item {
   id: number
   product_name: string
   quantity: number
-  status: string
-}
-
-interface Order {
-  id: number
-  table_number: number
-  status: string
-  created_at: string
-  items: Item[]
+  status: OrderItemStatus
 }
 
 type Event =
@@ -32,21 +27,29 @@ const playSound = () => {
   bell.play().catch(() => {})
 }
 
-const statusColor = (status: string) => {
-  switch (status) {
-    case "PENDING":
-      return "#999"
-    case "SENT":
-      return "orange"
-    case "READY":
-      return "dodgerblue"
-    case "DELIVERED":
-      return "green"
-    case "IN_PROGRESS":
-      return "purple"
-    default:
-      return "black"
-  }
+const statusColor = (status: OrderItemStatus) => {
+    switch (status) {
+        case OrderItemStatus.PENDING:
+            return "#999"
+
+        case OrderItemStatus.SENT:
+            return "orange"
+
+        case OrderItemStatus.READY:
+            return "dodgerblue"
+
+        case OrderItemStatus.DELIVERED:
+            return "green"
+
+        case OrderItemStatus.IN_PROGRESS:
+            return "purple"
+
+        case OrderItemStatus.CANCELLED:
+            return "red"
+
+        default:
+            return "black"
+    }
 }
 
 function orderWaitingMinutes(created_at?: string) {
@@ -65,15 +68,14 @@ const waitingColor = (minutes: number) => {
 }
 
 const hasReadyItems = (order: Order) =>
-  order.items.some(item => item.status === "READY")
+    order.items.some(item => item.status === OrderItemStatus.READY)
 
 const hasActiveItems = (order: Order) =>
-  order.items.some(item => item.status !== "DELIVERED")
+    order.items.some(item => item.status !== OrderItemStatus.DELIVERED)
 
 /* =========================
    REDUCER
 ========================= */
-
 function ordersReducer(state: Order[], event: Event): Order[] {
   switch (event.type) {
     case "SET_ORDERS":
@@ -115,7 +117,6 @@ function ordersReducer(state: Order[], event: Event): Order[] {
 /* =========================
    COMPONENT
 ========================= */
-
 export default function Waiter() {
 
   const [orders, dispatch] = useReducer(ordersReducer, [])
@@ -123,19 +124,14 @@ export default function Waiter() {
   /* =========================
      FETCH
   ========================= */
-
   const fetchOrders = async () => {
-    const data = await apiFetch("/orders/active")
-    dispatch({
-      type: "SET_ORDERS",
-      orders: data
-    })
+    const data = await apiFetch<Order[]>("/orders/active")
+    dispatch({type: "SET_ORDERS", orders: data})
   }
 
   /* =========================
      WEBSOCKET
   ========================= */
-
   useEffect(() => {
     fetchOrders()
     const handler = ({ type, data }: WSEventParsed) => {
@@ -155,9 +151,8 @@ export default function Waiter() {
   }, [])
 
   /* =========================
-     ACTIONS
+     Marcar un item como entregado
   ========================= */
-
   const markAsDelivered = async (itemId: number) => {
     await apiFetch(`/order-items/${itemId}/status`, {
       method: "PATCH",
@@ -165,6 +160,9 @@ export default function Waiter() {
     })
   }
 
+  /* =========================
+     Marcar todos los items READY como entregados
+  ========================= */
   const deliverAllReady = async (order: Order) => {
     const readyItems = order.items.filter(i => i.status === "READY")
     if (readyItems.length === 0) return
@@ -181,7 +179,6 @@ export default function Waiter() {
   /* =========================
      FILTROS
   ========================= */
-
   const visibleOrders = orders
     .map(order => ({
       ...order,

@@ -1,10 +1,21 @@
+// ---------------------------------------------------------------------------------------------
+// Props de la tarjeta visual de una mesa.
+// ---------------------------------------------------------------------------------------------
 interface Props {
   number: number
   color: string
   onClick: () => void
 }
 
-export default function TableCard({ number, color, onClick }: Props) {
+// ---------------------------------------------------------------------------------------------
+// Representación visual de una mesa.
+// ---------------------------------------------------------------------------------------------
+export default function TableCard({
+  number,
+  color,
+  onClick
+}: Props) {
+
   return (
     <div
       onClick={onClick}

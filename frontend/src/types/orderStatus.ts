@@ -1,3 +1,6 @@
+/**
+ * Estado de las ordenes soportadas
+ */
 export const OrderStatus = {
   DRAFT: "DRAFT",
   OPEN: "OPEN",

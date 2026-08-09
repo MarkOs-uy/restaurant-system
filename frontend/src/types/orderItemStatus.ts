@@ -1,3 +1,6 @@
+/**
+ * Estado de las items
+ */
 export const OrderItemStatus = {
   PENDING: "PENDING",
   SENT: "SENT",

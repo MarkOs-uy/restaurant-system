@@ -1,12 +1,16 @@
+import type { ReactNode } from "react"
+
+// ---------------------------------------------------------------------------------------------
+// Contenedor base para las páginas de la aplicación.
+// ---------------------------------------------------------------------------------------------
 interface Props {
   title: string
-  children: React.ReactNode
+  children: ReactNode
 }
 
 export default function Page({ title, children }: Props) {
   return (
     <div style={{ padding: 40 }}>
-
       <h1
         style={{
           marginBottom: 30,
@@ -17,7 +21,6 @@ export default function Page({ title, children }: Props) {
       </h1>
 
       {children}
-
     </div>
   )
 }

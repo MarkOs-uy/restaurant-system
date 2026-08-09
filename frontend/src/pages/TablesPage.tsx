@@ -5,27 +5,9 @@ import { showToast } from "../utils/showToast"
 import toast from "react-hot-toast"
 import { wsService } from "../services/wsService"
 import type { WSEventParsed } from "../ws"
-
-interface Table {
-  id: number
-  number: number
-  x: number
-  y: number
-  capacity: number
-  shape: string
-  status: string
-  active: boolean
-  order_id?: number | null
-  order_status?: string | null
-}
-
-interface InactiveTable {
-  id: number
-  number: number
-  capacity: number
-  shape: string
-  active: boolean
-}
+import type { Table, InactiveTable, TouchTableResponse } from "../types/table"
+import type { Layout } from "../types/layout"
+import { WSEvent } from "../types/websocketEvents"
 
 interface DragState {
   id: number
@@ -67,27 +49,25 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
   const backgroundInputRef = useRef<HTMLInputElement | null>(null)
   const draggingRef = useRef<DragState | null>(null)
 
-  const [layout, setLayout] = useState({
+  const [layout, setLayout] = useState<Layout>({
     width: 900,
     height: 500,
     grid_size: 40,
     snap_to_grid: true,
-    background_image: null as string | null
+    background_image: null
   })
 
   // -------------------------
   // Cargar layout y mesas
   // -------------------------
-
-  const loadLayout = async () => {
-    const data = await apiFetch(`/layout/`)
-    setLayout(data)
+  const loadLayout = async (): Promise<void> => {
+      const data = await apiFetch<Layout>("/layout/")
+      setLayout(data)
   }
 
   // -------------------------
   // Salvar layout (tamaño, grid, snap)
   // -------------------------
-
   const saveLayout = async () => {
     await apiFetch("/layout/", {
       method: "PATCH",
@@ -96,33 +76,37 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
     showToast("Layout guardado")
   }
 
+  // -------------------------
+  // Actualizar layout
+  // -------------------------
   const uploadBackground = async (file: File) => {
     if (!file.type.startsWith("image/")) {
-      showToast("Seleccioná un archivo de imagen")
+      showToast("Selecciona un archivo de imagen")
       return
     }
 
     const formData = new FormData()
     formData.append("file", file)
 
-    const updatedLayout = await apiFetch("/layout/background", {
-      method: "POST",
-      body: formData
-    })
+    const updatedLayout = await apiFetch<Layout>(
+        "/layout/background",
+        {
+            method: "POST",
+            body: formData
+        }
+    )
     setLayout(updatedLayout)
-    showToast("Fondo del plano actualizado")
   }
 
   // -------------------------
   // Cargar mesas y sus estados
   // -------------------------
-
   const loadTables = async () => {
     if (draggingRef.current) return
     try {
       const [activeData, inactiveData] = await Promise.all([
-        apiFetch("/tables/status"),
-        apiFetch("/tables/?active=false")
+          apiFetch<Table[]>("/tables/status"),
+          apiFetch<InactiveTable[]>("/tables/?active=false")
       ])
       setTables(activeData)
       setInactiveTables(inactiveData)
@@ -134,18 +118,23 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
   // -------------------------
   // Tocar mesa: si tiene orden abierta, ir a la orden. Si no, crear nueva orden para esa mesa
   // -------------------------
-
   const touchTable = async (tableId: number) => {
-    const data = await apiFetch(`/tables/${tableId}/touch`, {
-      method: "POST"
-    })
+    const data = await apiFetch<TouchTableResponse>(
+        `/tables/${tableId}/touch`,
+        {
+            method: "POST"
+        }
+    )
     if (data.order_id) {
-      navigate(`/orders/${data.order_id}`)
+        navigate(`/orders/${data.order_id}`)
     } else {
-      navigate(`/orders/table/${tableId}`)
+        navigate(`/orders/table/${tableId}`)
     }
   }
 
+  // -------------------------
+  // Devolver el color de una mesa de acuerdo al status de la orden
+  // -------------------------
   const getTableColor = (table: Table) => {
     if (!table.order_status) return "#1e293b"   // Slate oscuro (libre)
     if (table.order_status === "OPEN") return "#f59e0b"   // Naranja/Amarillo cálido
@@ -158,7 +147,6 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
   // -------------------------
   // Mover mesa (modo edición): actualizar posición en backend al soltar
   // -------------------------
-
   const moveTable = (id: number, x: number, y: number) => {
     setTables(prev =>
       prev.map(t =>
@@ -170,20 +158,30 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
   // -------------------------
   // Salvar nueva posición de la mesa al soltar
   // -------------------------
-
   const savePosition = (tableId: number, x: number, y: number) => {
     if (positionTimers.current[tableId]) {
       clearTimeout(positionTimers.current[tableId])
     }
     positionTimers.current[tableId] = setTimeout(async () => {
-      const updatedPosition = await apiFetch(`/tables/${tableId}/position`, {
-        method: "PATCH",
-        body: { x, y }
-      })
-      moveTable(updatedPosition.id, updatedPosition.x, updatedPosition.y)
+      const updatedPosition = await apiFetch<Table>(
+          `/tables/${tableId}/position`,
+          {
+              method: "PATCH",
+              body: { x, y }
+          }
+      )
+
+      moveTable(
+          updatedPosition.id,
+          updatedPosition.x,
+          updatedPosition.y
+      )
     }, 300)
   }
 
+  // -------------------------
+  // Obtener el próximo número disponible de una mesa
+  // -------------------------
   const getNextAvailableTableNumber = () => {
     const usedNumbers = new Set([
       ...tables.map(t => t.number),
@@ -196,6 +194,9 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
     return number
   }
 
+  // -------------------------
+  // Obtener las dimiensiones de una mesa de acuerdo a su capacidad
+  // -------------------------
   const getTableDimensions = (table: Pick<Table, "capacity" | "shape">) => {
     const shape = normalizeShape(table.shape)
     const size = 60 + (table.capacity || 4) * 10
@@ -219,7 +220,6 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
   // -------------------------
   // Crear nueva mesa con forma y capacidad seleccionada en el formulario
   // -------------------------
-
   const createTable = async () => {
     const number = Number(newTableForm.number)
     const usedNumbers = new Set([
@@ -237,18 +237,23 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
       return
     }
 
-    const table = await apiFetch("/tables/", {
-      method: "POST",
-      body: {
-        number,
-        x: 50,
-        y: 50,
-        shape: newTableForm.shape === "rectangle"
-          ? rectangleShape(newTableForm.orientation)
-          : newTableForm.shape,
-        capacity: newTableForm.capacity
-      }
-    })
+    const table = await apiFetch<Table>(
+        "/tables/",
+        {
+            method: "POST",
+            body: {
+                number,
+                x: 50,
+                y: 50,
+                shape:
+                    newTableForm.shape === "rectangle"
+                        ? rectangleShape(newTableForm.orientation)
+                        : newTableForm.shape,
+                capacity: newTableForm.capacity
+            }
+        }
+    )
+
     setTables(prev => [...prev, table])
     setNewTableForm({
       number: "",
@@ -259,6 +264,9 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
     setShowForm(false)
   }
 
+  // -------------------------
+  // Rotar una mesa rectangular
+  // -------------------------
   const rotateTable = async (table: Table) => {
     if (normalizeShape(table.shape) !== "rectangle") return
 
@@ -267,26 +275,28 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
         ? "horizontal"
         : "vertical"
 
-    const updated = await apiFetch(`/tables/${table.id}`, {
-      method: "PATCH",
-      body: {
-        shape: rectangleShape(nextOrientation)
-      }
-    })
+    const updated = await apiFetch<Table>(
+        `/tables/${table.id}`,
+        {
+            method: "PATCH",
+            body: {
+                shape: rectangleShape(nextOrientation)
+            }
+        }
+    )
 
     setTables(prev =>
-      prev.map(t =>
-        t.id === table.id
-          ? { ...t, shape: updated.shape }
-          : t
-      )
+        prev.map(t =>
+            t.id === table.id
+                ? { ...t, shape: updated.shape }
+                : t
+        )
     )
   }
 
   // -------------------------
   // Eliminar mesa (modo edición, click derecho)
   // -------------------------
-
   const deleteTable = async (id: number) => {
     await apiFetch(`/tables/${id}`, {
       method: "DELETE"
@@ -294,6 +304,7 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
     setTables(prev => prev.filter(t => t.id !== id))
     await loadTables()
   }
+
 
   const requestDeleteTable = (table: Table) => {
     toast.custom((t) => (
@@ -322,11 +333,12 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
           <button
             onClick={async () => {
               toast.dismiss(t.id)
+
               try {
                 await deleteTable(table.id)
                 toast.success(`Mesa ${table.number} eliminada`)
-              } catch (err: any) {
-                alert(err.message)
+              } catch {
+                // El error ya fue gestionado por apiFetch.
               }
             }}
             style={{
@@ -347,7 +359,6 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
   // -------------------------
   // Reactivar mesa inactiva desde la tabla de mesas inactivas
   // -------------------------
-
   const activateTable = async (id: number) => {
     await apiFetch(`/tables/${id}/activate`, {
       method: "PATCH"
@@ -362,19 +373,19 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
   }, [])
 
   useEffect(() => {
-    const relevantEvents = new Set([
-      "ORDER_UPDATED",
-      "ORDER_STATUS_CHANGED",
-      "ORDER_CLOSED",
-      "ITEM_STATUS_CHANGED",
-      "PAYMENT_ADDED",
-      "PAYMENT_DELETED",
-      "TABLE_CREATED",
-      "TABLE_UPDATED",
-      "TABLE_POSITION_UPDATED",
-      "TABLE_ACTIVATED",
-      "TABLE_DEACTIVATED",
-      "LAYOUT_UPDATED"
+    const relevantEvents = new Set<WSEvent>([
+      WSEvent.ORDER_UPDATED,
+      WSEvent.ORDER_STATUS_CHANGED,
+      WSEvent.ORDER_CLOSED,
+      WSEvent.ITEM_STATUS_CHANGED,
+      WSEvent.PAYMENT_ADDED,
+      WSEvent.PAYMENT_DELETED,
+      WSEvent.TABLE_CREATED,
+      WSEvent.TABLE_UPDATED,
+      WSEvent.TABLE_POSITION_UPDATED,
+      WSEvent.TABLE_ACTIVATED,
+      WSEvent.TABLE_DEACTIVATED,
+      WSEvent.LAYOUT_UPDATED
     ])
 
     const handler = ({ type }: WSEventParsed) => {
