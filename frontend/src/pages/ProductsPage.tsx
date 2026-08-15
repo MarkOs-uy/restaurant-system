@@ -1,59 +1,104 @@
-import { useEffect, useState } from "react"
-import { API_URL, getAuthHeaders } from "../api"
+import {
+  Fragment,
+  useEffect,
+  useState
+} from "react"
+
 import { apiFetch } from "../api"
+
+import type {
+  Product,
+  ProductCreate,
+  ProductUpdate
+} from "../types/product"
+
+import type { Category } from "../types/category"
+import type { Station } from "../types/station"
 
 import Page from "../components/Page"
 import Card from "../components/Card"
 import DataTable from "../components/DataTable"
-
 import ProductForm from "../components/ProductForm"
 
-interface Product {
-  id: number
-  name: string
-  price: number
-  active: boolean
-  category_id: number
-  station_id: number
-  category?: { name: string }
-  station?: { name: string }
-}
 
-interface Category {
-  id: number
-  name: string
-}
+type GroupedProducts =
+  Record<string, Product[]>
 
-interface Station {
-  id: number
-  name: string
-}
 
 export default function ProductsPage() {
+  const [products, setProducts] =
+    useState<Product[]>([])
 
-  const [products, setProducts] = useState<Product[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
-  const [stations, setStations] = useState<Station[]>([])
+  const [categories, setCategories] =
+    useState<Category[]>([])
 
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
-  const [showForm, setShowForm] = useState(false)
+  const [stations, setStations] =
+    useState<Station[]>([])
 
-  const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({})
+  const [
+    editingProduct,
+    setEditingProduct
+  ] = useState<Product | null>(null)
 
+  const [showForm, setShowForm] =
+    useState(false)
+
+  const [
+    openCategories,
+    setOpenCategories
+  ] = useState<Record<string, boolean>>({})
+
+
+  /**
+   * Carga todos los productos.
+   */
   const fetchProducts = async () => {
-    const data = await apiFetch(`/products/`)
-    setProducts(data)
+    const [
+      activeProducts,
+      inactiveProducts
+    ] = await Promise.all([
+      apiFetch<Product[]>(
+        "/products/?active=true"
+      ),
+      apiFetch<Product[]>(
+        "/products/?active=false"
+      )
+    ])
+
+    setProducts([
+      ...activeProducts,
+      ...inactiveProducts
+    ])
   }
 
+
+  /**
+   * Carga las categorías activas disponibles
+   * para asignar a productos.
+   */
   const fetchCategories = async () => {
-    const data = await apiFetch(`/categories/`)
+    const data =
+      await apiFetch<Category[]>(
+        "/categories/?active=true"
+      )
+
     setCategories(data)
   }
 
+
+  /**
+   * Carga las estaciones activas disponibles
+   * para asignar a productos.
+   */
   const fetchStations = async () => {
-    const data = await apiFetch(`/stations/`)
+    const data =
+      await apiFetch<Station[]>(
+        "/stations/?active=true"
+      )
+
     setStations(data)
   }
+
 
   useEffect(() => {
     fetchProducts()
@@ -61,65 +106,102 @@ export default function ProductsPage() {
     fetchStations()
   }, [])
 
-  const saveProduct = async (product: any) => {
 
-    const method = product.id ? "PATCH" : "POST"
+  /**
+   * Crea un producto nuevo o actualiza
+   * el producto actualmente en edición.
+   */
+  const saveProduct = async (
+    product: ProductCreate
+  ) => {
+    if (editingProduct) {
+      const payload: ProductUpdate = {
+        name: product.name,
+        price: product.price,
+        category_id: product.category_id,
+        station_id: product.station_id
+      }
 
-    const url = product.id
-      ? `${API_URL}/products/${product.id}`
-      : `${API_URL}/products/`
-
-    await fetch(url, {
-      method,
-      headers: {
-        ...getAuthHeaders(),
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(product)
-    })
+      await apiFetch(
+        `/products/${editingProduct.id}`,
+        {
+          method: "PATCH",
+          body: payload
+        }
+      )
+    } else {
+      await apiFetch(
+        "/products/",
+        {
+          method: "POST",
+          body: product
+        }
+      )
+    }
 
     setShowForm(false)
     setEditingProduct(null)
 
-    fetchProducts()
+    await fetchProducts()
   }
 
-  const toggleActive = async (id: number) => {
 
-    await fetch(
-      `${API_URL}/products/${id}/toggle`,
+  /**
+   * Activa o desactiva un producto.
+   */
+  const toggleActive = async (
+    id: number
+  ) => {
+    await apiFetch(
+      `/products/${id}/toggle`,
       {
-        method: "PATCH",
-        headers: getAuthHeaders()
+        method: "PATCH"
       }
     )
 
-    fetchProducts()
+    await fetchProducts()
   }
 
-  const groupedProducts = products.reduce((acc: any, p) => {
-    const cat = p.category?.name || "Sin categoría"
 
-    if (!acc[cat]) acc[cat] = []
+  /**
+   * Agrupa los productos por categoría
+   * para mostrarlos en la tabla.
+   */
+  const groupedProducts =
+    products.reduce<GroupedProducts>(
+      (groups, product) => {
+        const categoryName =
+          product.category?.name ??
+          "Sin categoría"
 
-    acc[cat].push(p)
+        if (!groups[categoryName]) {
+          groups[categoryName] = []
+        }
 
-    return acc
-  }, {})
+        groups[categoryName].push(product)
 
-  const toggleCategory = (cat: string) => {
-    setOpenCategories(prev => ({
-      ...prev,
-      [cat]: !prev[cat]
+        return groups
+      },
+      {}
+    )
+
+
+  const toggleCategory = (
+    categoryName: string
+  ) => {
+    setOpenCategories(previous => ({
+      ...previous,
+      [categoryName]:
+        !previous[categoryName]
     }))
   }
 
+
   return (
     <Page title="Productos">
-
       <Card>
-
-        <button className="btn btn-primary"
+        <button
+          className="btn btn-primary"
           onClick={() => {
             setEditingProduct(null)
             setShowForm(true)
@@ -128,6 +210,7 @@ export default function ProductsPage() {
         >
           + Nuevo producto
         </button>
+
 
         {showForm && (
           <ProductForm
@@ -142,8 +225,8 @@ export default function ProductsPage() {
           />
         )}
 
-        <DataTable>
 
+        <DataTable>
           <thead>
             <tr>
               <th>Nombre</th>
@@ -151,83 +234,131 @@ export default function ProductsPage() {
               <th>Categoría</th>
               <th>Estación</th>
               <th>Activo</th>
-              <th style={{ width: 300 }}>Acciones</th>
+              <th style={{ width: 300 }}>
+                Acciones
+              </th>
             </tr>
           </thead>
 
           <tbody>
+            {Object.entries(groupedProducts)
+              .sort(([a], [b]) =>
+                a.localeCompare(b)
+              )
+              .map(
+                ([categoryName, items]) => (
+                  <Fragment
+                    key={categoryName}
+                  >
+                    <tr
+                      style={{
+                        background:
+                          "rgba(255, 255, 255, 0.04)",
+                        cursor: "pointer"
+                      }}
+                      onClick={() =>
+                        toggleCategory(
+                          categoryName
+                        )
+                      }
+                    >
+                      <td
+                        colSpan={6}
+                        style={{
+                          fontWeight: "bold",
+                          color:
+                            "var(--color-primary)"
+                        }}
+                      >
+                        {openCategories[
+                          categoryName
+                        ]
+                          ? "▼"
+                          : "▶"}{" "}
+                        {categoryName}
+                      </td>
+                    </tr>
 
-          {Object.entries(groupedProducts)
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([categoryName, items]: any) => (
 
-              <>
-                {/* HEADER CATEGORÍA */}
-
-                <tr
-                  style={{
-                    background: "rgba(255, 255, 255, 0.04)",
-                    cursor: "pointer"
-                  }}
-                  onClick={() => toggleCategory(categoryName)}
-                >
-                  <td colSpan={6} style={{ fontWeight: "bold", color: "var(--color-primary)" }}>
-                    {openCategories[categoryName] ? "▼" : "▶"} {categoryName}
-                  </td>
-                </tr>
-
-                {/* PRODUCTOS */}
-
-                {openCategories[categoryName] &&
-                  items
-                    .sort((a: any, b: any) => a.name.localeCompare(b.name))
-                    .map((p: any) => (
-
-                      <tr key={p.id}>
-
-                        <td>{p.name}</td>
-
-                        <td>${p.price}</td>
-
-                        <td>{p.category?.name || "-"}</td>
-
-                        <td>{p.station?.name || "-"}</td>
-
-                        <td>{p.active ? "✔" : "❌"}</td>
-
-                        <td>
-
-                          <button className="btn btn-primary"
-                            onClick={() => {
-                              setEditingProduct(p)
-                              setShowForm(true)
-                            }}
+                    {openCategories[
+                      categoryName
+                    ] &&
+                      [...items]
+                        .sort((a, b) =>
+                          a.name.localeCompare(
+                            b.name
+                          )
+                        )
+                        .map(product => (
+                          <tr
+                            key={product.id}
                           >
-                            Editar
-                          </button>
+                            <td>
+                              {product.name}
+                            </td>
 
-                          <button className="btn btn-primary"
-                            onClick={() => toggleActive(p.id)}
-                            style={{ marginLeft: 10 }}
-                          >
-                            Activar / Desactivar
-                          </button>
+                            <td>
+                              $
+                              {product.price.toFixed(
+                                2
+                              )}
+                            </td>
 
-                        </td>
+                            <td>
+                              {product.category
+                                ?.name ?? "-"}
+                            </td>
 
-                      </tr>
+                            <td>
+                              {product.station
+                                ?.name ?? "-"}
+                            </td>
 
-                    ))}
+                            <td>
+                              {product.active
+                                ? "✔"
+                                : "❌"}
+                            </td>
 
-              </>
-            ))}
+                            <td>
+                              <button
+                                className="btn btn-primary"
+                                onClick={() => {
+                                  setEditingProduct(
+                                    product
+                                  )
+                                  setShowForm(
+                                    true
+                                  )
+                                }}
+                              >
+                                Editar
+                              </button>
 
+                              <button
+                                className="btn btn-primary"
+                                onClick={() =>
+                                  toggleActive(
+                                    product.id
+                                  )
+                                }
+                                style={{
+                                  marginLeft: 10
+                                }}
+                              >
+                                {product.active
+                                  ? "Desactivar"
+                                  : "Activar"}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                  </Fragment>
+                )
+              )}
           </tbody>
-
         </DataTable>
-
       </Card>
-
     </Page>
   )
 }

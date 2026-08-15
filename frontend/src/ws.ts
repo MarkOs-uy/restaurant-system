@@ -1,4 +1,4 @@
-import type { WSEvent } from "./types/websocketEvents.ts"
+import type { WSEvent } from "./types/webSocketEvents.ts"
 
 // ---------------------------------------------------------------------------------------------
 // Representa un evento recibido desde el WebSocket una vez parseado.

@@ -5,50 +5,44 @@ import { CashMovementType,
   PaymentMethod,
   WSEvent,  
    } from "../types"
-import type { CashRegisterDashboard, CashMovement, CashRegisterCloseSummary } from "../types"
+import type { 
+  CashRegisterDashboard, 
+  CashMovement, 
+  CashRegisterCloseSummary, 
+  RawCashRegisterDashboard, 
+  RawCashRegisterCloseSummary 
+} from "../types/cashRegister"
+
+import type { 
+  OrderPayment, 
+  CashierOrder, 
+  RawOrderPayment, 
+  RawCashierOrder 
+} from "../types/order"
+
 import type { WSEventParsed } from "../ws"
 import { wsService } from "../services/wsService"
 import { moneyToNumber } from "../utils/money"
 
-interface Order {
-  id: number
-  table_number: number
-  status: string
-  subtotal: number
-  total: number
-  total_paid: number
-  remaining: number
-  discount: number
-  payments: Payment[]
-}
 
 interface State {
   dashboard: CashRegisterDashboard | null
-  orders: Order[]
-  selectedOrder: Order | null
+  orders: CashierOrder[]
+  selectedOrder: CashierOrder | null
   loading: boolean
   movementModalOpen: boolean
   movementType: "cash_in" | "cash_out" | null
 }
 
-interface Payment {
-  id: number
-  amount: number
-  method: string
-  created_at: string
-}
-
 type Action =
   | { type: "SET_DASHBOARD"; payload: CashRegisterDashboard | null }
-  | { type: "SET_ORDERS"; payload: Order[] }
-  | { type: "SELECT_ORDER"; payload: Order | null }
+  | { type: "SET_ORDERS"; payload: CashierOrder[] }
+  | { type: "SELECT_ORDER"; payload: CashierOrder | null }
   | { type: "SET_LOADING"; payload: boolean }
-  | { type: "OPEN_MOVEMENT_MODAL"; payload: "cash_in" | "cash_out" }
+  | { type: "OPEN_MOVEMENT_MODAL"; payload: CashMovementType }
   | { type: "CLOSE_MOVEMENT_MODAL" }
-  | { type: "UPDATE_ORDER_STATUS"; payload: { order_id: number; status: string } }
+  | { type: "UPDATE_ORDER_STATUS"; payload: { order_id: number; status: OrderStatus } }
   | { type: "REMOVE_ORDER"; payload: number }
-  | { type: "PAYMENT_ADDED"; payload:{order_id:number, amount:number} }
-  | { type: "PAYMENT_DELETED"; payload:{order_id:number, amount:number, method: string} }
   | { type: "ADD_MOVEMENT"; payload:CashMovement }
   | { type: "DELETE_MOVEMENT"; payload:{ movement_id: number; amount: number; movement_type: CashMovementType } }
 
@@ -69,11 +63,22 @@ const reducer = (state: State, action: Action): State => {
     case "UPDATE_ORDER_STATUS":
       return {
         ...state,
-        orders: state.orders.map(o =>
-          o.id === action.payload.order_id
-            ? { ...o, status: action.payload.status }
-            : o
-        )
+        orders: state.orders.map(order =>
+          order.id === action.payload.order_id
+            ? {
+                ...order,
+                status: action.payload.status
+              }
+            : order
+        ),
+        selectedOrder:
+          state.selectedOrder?.id ===
+          action.payload.order_id
+            ? {
+                ...state.selectedOrder,
+                status: action.payload.status
+              }
+            : state.selectedOrder
       }
     case "REMOVE_ORDER":
       return {
@@ -124,8 +129,54 @@ const reducer = (state: State, action: Action): State => {
 }
 
 
-function normalizeDashboard(data: any): CashRegisterDashboard {
+function isObject(
+  value: unknown
+): value is Record<string, unknown> {
+  return (
+    typeof value === "object" &&
+    value !== null
+  )
+}
 
+function hasOrderId(
+  value: unknown
+): value is { order_id: number } {
+  return (
+    isObject(value) &&
+    typeof value.order_id === "number"
+  )
+}
+
+function isOrderStatus(
+  value: unknown
+): value is OrderStatus {
+  return (
+    typeof value === "string" &&
+    Object.values(OrderStatus).some(
+      status => status === value
+    )
+  )
+}
+
+function isOrderStatusChangedPayload(
+  value: unknown
+): value is {
+  order_id: number
+  status: OrderStatus
+} {
+  return (
+    isObject(value) &&
+    typeof value.order_id === "number" &&
+    isOrderStatus(value.status)
+  )
+}
+
+
+/**
+ * Normaliza los valores monetarios del dashboard de caja
+ * recibidos desde la API.
+ */
+export function normalizeDashboard( data: RawCashRegisterDashboard): CashRegisterDashboard {
   return {
     ...data,
     opening_amount: moneyToNumber(data.opening_amount),
@@ -133,37 +184,58 @@ function normalizeDashboard(data: any): CashRegisterDashboard {
     average_ticket: moneyToNumber(data.average_ticket),
     expected_cash: moneyToNumber(data.expected_cash),
     by_method: Object.fromEntries(
-      Object.entries(data.by_method ?? {}).map(
-        ([method, amount]) => [method, moneyToNumber(amount)]
+      Object.entries(
+        data.by_method ?? {}
+      ).map(
+        ([method, amount]) => [
+          method,
+          moneyToNumber(amount)
+        ]
       )
-    ),
-    cash_movements: (data.cash_movements ?? []).map((m: any) => ({
-      ...m,
-      amount: moneyToNumber(m.amount)
-    }))
+    ) as Record<PaymentMethod, number>,
+    cash_movements:
+      (data.cash_movements ?? []).map(
+        movement => ({
+          ...movement,
+          amount:
+            moneyToNumber(
+              movement.amount
+            )
+        })
+      )
   }
 }
 
-function normalizePayment(data: any): Payment {
+
+function normalizePayment( data: RawOrderPayment): OrderPayment {
+  return {...data, amount: moneyToNumber(data.amount)}
+}
+
+
+function normalizeOrder( data: RawCashierOrder): CashierOrder {
   return {
     ...data,
-    amount: moneyToNumber(data.amount)
+    subtotal:
+      moneyToNumber(data.subtotal),
+    total:
+      moneyToNumber(data.total),
+    total_paid:
+      moneyToNumber(data.total_paid),
+    remaining:
+      moneyToNumber(data.remaining),
+    discount:
+      moneyToNumber(data.discount),
+    payments:
+      (data.payments ?? [])
+        .map(normalizePayment)
   }
 }
 
-function normalizeOrder(data: any): Order {
-  return {
-    ...data,
-    subtotal: moneyToNumber(data.subtotal),
-    total: moneyToNumber(data.total),
-    total_paid: moneyToNumber(data.total_paid),
-    remaining: moneyToNumber(data.remaining),
-    discount: moneyToNumber(data.discount),
-    payments: (data.payments ?? []).map(normalizePayment)
-  }
-}
-
-function normalizeCloseSummary(data: any): CashRegisterCloseSummary {
+/**
+ * Normaliza los valores monetarios del resumen
+ * devuelto al cerrar una caja.
+ */
+function normalizeCloseSummary(data: RawCashRegisterCloseSummary): CashRegisterCloseSummary {
   return {
     ...data,
     total_sales: moneyToNumber(data.total_sales),
@@ -197,7 +269,7 @@ export default function CashierPage() {
   const paymentInputRef = useRef<HTMLInputElement>(null)
   const [openingAmount, setOpeningAmount] = useState("")
   const [paymentAmount, setPaymentAmount] = useState("")
-  const selectedOrderRef = useRef<Order | null>(null)
+  const selectedOrderRef = useRef<CashierOrder | null>(null)
   const [movementAmount, setMovementAmount] = useState("")
   const [movementReason, setMovementReason] = useState("")
   const [discount, setDiscount] = useState("")
@@ -227,60 +299,51 @@ export default function CashierPage() {
     selectedOrderRef.current = selectedOrder
   }, [selectedOrder])
 
-  const methodLabels: Record<string, string> = {
-    CASH: "💵 Efectivo",
-    CARD: "💳 Tarjeta",
-    TRANSFER: "📲 Transferencia",
-    OTHER: "🤝 Otro"
-  }
+  const methodLabels:
+    Record<PaymentMethod, string> = {
+      [PaymentMethod.CASH]: "💵 Efectivo",
+      [PaymentMethod.CARD]: "💳 Tarjeta",
+      [PaymentMethod.TRANSFER]: "📲 Transferencia",
+      [PaymentMethod.OTHER]: "🤝 Otro"
+    }
 
-  const methodColors: Record<string, string> = {
-    CASH: "#2e7d32",
-    CARD: "#1565c0",
-    TRANSFER: "#6a1b9a",
-    OTHER: "#c67213"
-  }
+  const methodColors:
+    Record<PaymentMethod, string> = {
+      [PaymentMethod.CASH]: "#2e7d32",
+      [PaymentMethod.CARD]: "#1565c0",
+      [PaymentMethod.TRANSFER]: "#6a1b9a",
+      [PaymentMethod.OTHER]: "#c67213"
+    }
 
-  const paymentStatusIcon = (order: Order) => {
+  const paymentStatusIcon = (order: CashierOrder) => {
     if (order.remaining === 0) return "🟢"
     if (order.total_paid > 0) return "🟡"
     return "🔴"
   }
 
-
   const fetchDashboard = async () => {
-    try {
-      const data = await apiFetch("/cash-register/dashboard")
-      const normalized = normalizeDashboard(data)
-      dispatch({
-        type: "SET_DASHBOARD",
-        payload: normalized
-      })
-    } catch (err: any) {
-      if (err.code === "cash_register_not_open") {
-        dispatch({
-          type: "SET_DASHBOARD",
-          payload: null
-        })
-      } else {
-        console.error("No se pudo actualizar el dashboard de caja", err)
-      }
-    }
+    const data =
+      await apiFetch<RawCashRegisterDashboard>(
+        "/cash-register/dashboard"
+      )
+
+    dispatch({
+      type: "SET_DASHBOARD",
+      payload: normalizeDashboard(data)
+    })
   }
 
   const fetchActiveOrders = async () => {
     try {
-      const data = await apiFetch("/orders/active")
+      const data = await apiFetch<RawCashierOrder[]>( "/orders/active")
       dispatch({ type: "SET_ORDERS", payload: data.map(normalizeOrder) })
     } catch {
       dispatch({ type: "SET_ORDERS", payload: [] })
     }
   }
 
-
-  const dashboardTimer = useRef<any>(null)
-  const ordersTimer = useRef<any>(null)
-
+  const dashboardTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const ordersTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const scheduleDashboardRefresh = () => {
     if (dashboardTimer.current) clearTimeout(dashboardTimer.current)
@@ -301,7 +364,7 @@ export default function CashierPage() {
   const selectOrder = async (orderId:number)=>{
     setPaymentAmount("")
     try {
-      const data = await apiFetch(`/orders/${orderId}`)
+      const data = await apiFetch<RawCashierOrder>( `/orders/${orderId}`)
       dispatch({
         type:"SELECT_ORDER",
         payload: normalizeOrder(data)
@@ -316,24 +379,51 @@ export default function CashierPage() {
     }
   }
 
-  const registerPayment = async (method: string) => {
+  const registerPayment = async (
+    method: PaymentMethod,
+    amountOverride?: number
+  ) => {
     if (!selectedOrder) return
-    if (processingPayment) return    
-    setProcessingPayment(true)  
-    let amount = Number(paymentAmount)
-    if (Number.isNaN(amount) || amount <= 0) {
+    if (processingPayment) return
+
+    setProcessingPayment(true)
+
+    let amount =
+      amountOverride ??
+      Number(paymentAmount)
+
+    if (
+      Number.isNaN(amount) ||
+      amount <= 0
+    ) {
       amount = selectedOrder.remaining
     }
-    if (amount <= 0) return
-    amount = Math.min(amount, selectedOrder.remaining)
+
+    if (amount <= 0) {
+      setProcessingPayment(false)
+      return
+    }
+
+    amount = Math.min(
+      amount,
+      selectedOrder.remaining
+    )
+
     try {
-      await apiFetch(`/orders/${selectedOrder.id}/payments`, {
-        method:"POST",
-        body:{ amount, method }
-      })
+      await apiFetch(
+        `/orders/${selectedOrder.id}/payments`,
+        {
+          method: "POST",
+          body: {
+            amount,
+            method
+          }
+        }
+      )
+
       setPaymentAmount("")
       await selectOrder(selectedOrder.id)
-    } catch (err:any) {
+    } catch (err: any) {
       alert(err.message)
     } finally {
       setProcessingPayment(false)
@@ -374,7 +464,7 @@ export default function CashierPage() {
   }
 
 
-  const openMovementModal = (type: "cash_in" | "cash_out") => {
+  const openMovementModal = ( type: CashMovementType ) => {
     setMovementAmount("")
     setMovementReason("")
     dispatch({ type: "OPEN_MOVEMENT_MODAL", payload: type })
@@ -421,20 +511,21 @@ export default function CashierPage() {
       return
     }
     try {
-      const summary = await apiFetch("/cash-register/close", {
-        method: "POST",
-        body: {
-          counted_cash: Number(realCash),
-          difference_reason: differenceReason
-        }
-      })
-      setCloseModalOpen(false)
-      setCloseSummary(normalizeCloseSummary(summary))
-      setShowCloseSummary(true)
-      dispatch({
-        type: "SET_DASHBOARD",
-        payload: null
-      })
+      const summary =
+        await apiFetch<RawCashRegisterCloseSummary>(
+          "/cash-register/close",
+          {
+            method: "POST",
+            body: {
+              counted_cash: Number(realCash),
+              difference_reason: differenceReason
+            }
+          }
+        )
+
+      setCloseSummary(
+        normalizeCloseSummary(summary)
+      )
     } catch (err: any) {
       switch (err.code) {
         case "order_has_remaining_balance":
@@ -460,11 +551,14 @@ export default function CashierPage() {
         return
       }
       fetching = true
-      await fetchActiveOrders()
-      fetching = false
+      try {
+        await fetchActiveOrders()
+      } finally {
+        fetching = false
+      }
       if (pending) {
         pending = false
-        safeFetchOrders()
+        await safeFetchOrders()
       }
     }
 
@@ -484,56 +578,81 @@ export default function CashierPage() {
       switch (type) {
 
         case WSEvent.CASH_MOVEMENT_ADDED:
-          dispatch({
-            type: "ADD_MOVEMENT",
-            payload: {
-              ...data.movement,
-              amount: moneyToNumber(data.movement.amount)
-            }
-          })
-        break
-
         case WSEvent.CASH_MOVEMENT_DELETED:
-          dispatch({
-            type: "DELETE_MOVEMENT",
-            payload:{
-              movement_id: data.movement_id,
-              amount: moneyToNumber(data.amount),
-              movement_type: data.movement_type
-            }
-          })
-        break
+          scheduleDashboardRefresh()
+          break
 
         case WSEvent.PAYMENT_ADDED:
         case WSEvent.PAYMENT_DELETED:
+          if (!hasOrderId(data)) {
+            console.warn(
+              `Payload inválido para ${type}`,
+              data
+            )
+            return
+          }
           scheduleOrdersRefresh()
           scheduleDashboardRefresh()
-          if (selectedOrderRef.current?.id === data.order_id) {
+          if (
+            selectedOrderRef.current?.id ===
+            data.order_id
+          ) {
             await selectOrder(data.order_id)
           }
         break
 
         case WSEvent.ORDER_UPDATED:
+          if (!hasOrderId(data)) {
+            console.warn(
+              "Payload inválido para ORDER_UPDATED",
+              data
+            )
+            return
+          }
           scheduleOrdersRefresh()
-          if (selectedOrderRef.current?.id === data.order_id) {
+          if ( selectedOrderRef.current?.id === data.order_id) {
             await selectOrder(data.order_id)
           }
         break
 
-        case "ORDER_STATUS_CHANGED":
+        case WSEvent.ORDER_UPDATED:
+          if (!hasOrderId(data)) {
+            console.warn(
+              "Payload inválido para ORDER_UPDATED",
+              data
+            )
+            return
+          }
+          scheduleOrdersRefresh()
+          if (
+            selectedOrderRef.current?.id ===
+            data.order_id
+          ) {
+            await selectOrder(data.order_id)
+          }
+          break
+
+        case WSEvent.ORDER_STATUS_CHANGED:
+          if (!isOrderStatusChangedPayload(data)) {
+            console.warn("Payload inválido para ORDER_STATUS_CHANGED", data)
+            return
+          }
           dispatch({
-            type:"UPDATE_ORDER_STATUS",
-            payload:{
-              order_id:data.order_id,
-              status:data.status
+            type: "UPDATE_ORDER_STATUS",
+            payload: {
+              order_id: data.order_id,
+              status: data.status
             }
           })
         break
 
-        case "ORDER_CLOSED":
+        case WSEvent.ORDER_CLOSED:
+          if (!hasOrderId(data)) {
+            return
+          }
           dispatch({
-            type:"REMOVE_ORDER",
-            payload:data.order_id
+            type: "REMOVE_ORDER",
+            payload: data.order_id
           })
           scheduleOrdersRefresh()
           scheduleDashboardRefresh()
@@ -732,10 +851,15 @@ export default function CashierPage() {
 
         <hr />
         <h3>Ventas por método</h3>
-        {Object.entries(by_method)
+        {(
+          Object.entries(by_method) as [PaymentMethod, number][]
+        )
           .sort((a, b) => b[1] - a[1])
           .map(([method, amount]) => (
-            <p key={method} style={{ color: methodColors[method] }}>
+            <p
+              key={method}
+              style={{ color: methodColors[method] }}
+            >
               {methodLabels[method]}: ${amount.toFixed(2)}
             </p>
           ))}
@@ -753,7 +877,7 @@ export default function CashierPage() {
             }}
           >
             <span>
-              {m.type === "cash_in" ? "➕" : "➖"} {m.reason}
+              {m.type === CashMovementType.CASH_IN ? "➕" : "➖"} {m.reason}
             </span>
 
             <div style={{display:"flex", gap:8}}>
@@ -787,13 +911,13 @@ export default function CashierPage() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
           <button
             style={{ padding: 10, background: "#2e7d32", color: "white", borderRadius: 6 }}
-            onClick={() => openMovementModal("cash_in")}
+            onClick={() => openMovementModal(CashMovementType.CASH_IN)}
           >
             Ingreso
           </button>
           <button
             style={{ padding: 10, background: "#c62828", color: "white", borderRadius: 6 }}
-            onClick={() => openMovementModal("cash_out")}
+            onClick={() => openMovementModal(CashMovementType.CASH_OUT)}
           >
             Retiro
           </button>
@@ -819,7 +943,7 @@ export default function CashierPage() {
               }}
             >
               <h2>
-                {state.movementType === "cash_in"
+                {state.movementType === CashMovementType.CASH_IN
                   ? "➕ Ingreso de caja"
                   : "➖ Retiro de caja"}
               </h2>
@@ -945,9 +1069,13 @@ export default function CashierPage() {
 
             <h3>Ventas por método</h3>
 
-            {Object.entries(by_method).map(([method,amount])=>(
-              <p key={method} style={{color:methodColors[method]}}>
-                {methodLabels[method]}: ${amount.toFixed(2)}
+            {Object.values(PaymentMethod).map(method => (
+              <p
+                key={method}
+                style={{ color: methodColors[method] }}
+              >
+                {methodLabels[method]}: $
+                {by_method[method].toFixed(2)}
               </p>
             ))}
 
@@ -1221,22 +1349,22 @@ export default function CashierPage() {
             />
 
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 20 }}>
-              {Object.entries(methodLabels).map(([value, label]) => (
+              {Object.values(PaymentMethod).map(method => (
                 <button
-                  key={value}
+                  key={method}
                   disabled={processingPayment || selectedOrder.remaining <= 0}
-                  onClick={() => registerPayment(value)}
+                  onClick={() => registerPayment(method)}
                   style={{
                     padding: 16,
                     fontSize: 18,
                     borderRadius: 6,
-                    background: methodColors[value],
+                    background: methodColors[method],
                     color: "white",
                     opacity: selectedOrder.remaining <= 0 ? 0.4 : 1,
                     cursor: selectedOrder.remaining <= 0 ? "not-allowed" : "pointer"
                   }}
                 >
-                  {label}
+                  {methodLabels[method]}
                 </button>
               ))}
             </div>
@@ -1244,7 +1372,7 @@ export default function CashierPage() {
             <div style={{ marginTop: 20 }}>
               <button
                 disabled={processingPayment || selectedOrder.remaining <= 0}
-                onClick={() => registerPayment(PaymentMethod.CASH)}
+                onClick={() => registerPayment( PaymentMethod.CASH, selectedOrder.remaining)}
                 style={{
                   width: "100%",
                   padding: 16,

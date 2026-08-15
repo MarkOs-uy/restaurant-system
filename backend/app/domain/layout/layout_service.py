@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.domain.errors.base import DomainError
 from app.domain.errors.error_codes import ErrorCode
+from app.domain.events.websocket import WSEvent
 
 from app.services.event_service import EventService
 
@@ -127,13 +128,13 @@ class LayoutService:
         layout.snap_to_grid = data.snap_to_grid
         if data.background_image is not None:
             layout.background_image = data.background_image
-        self.db.commit()
         self.db.refresh(layout)
         self.events.emit(
                 restaurant_id=restaurant_id,
-                event_type="LAYOUT_UPDATED",
+                event_type=WSEvent.LAYOUT_UPDATED,
                 payload={"restaurant_id": restaurant_id}
             )
+        self.db.commit()
         return layout
 
     # --------------------------------------------------------------------------------------
@@ -156,13 +157,13 @@ class LayoutService:
         )
         layout = self.get_layout(restaurant_id)
         layout.background_image = background_image
-        self.db.commit()
-        self.db.refresh(layout)
         self.events.emit(
             restaurant_id=restaurant_id,
-            event_type="LAYOUT_UPDATED",
+            event_type=WSEvent.LAYOUT_UPDATED,
             payload={
                 "restaurant_id": restaurant_id
             }
         )
+        self.db.commit()
+        self.db.refresh(layout)
         return layout

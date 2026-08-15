@@ -1,4 +1,13 @@
-from sqlalchemy import Column, Integer, ForeignKey, Numeric, String, Enum, Identity
+from sqlalchemy import (
+    Column,
+    Integer,
+    ForeignKey,
+    Numeric,
+    String,
+    Enum,
+    Identity,
+    Index
+)
 from sqlalchemy.orm import relationship
 import enum
 
@@ -16,7 +25,11 @@ class OrderItemStatus(str, enum.Enum):
 class OrderItem(Base):
     __tablename__ = "order_items"
 
-    id = Column(Integer, Identity(), primary_key=True)
+    id = Column(
+        Integer,
+        Identity(),
+        primary_key=True
+    )
 
     restaurant_id = Column(
         Integer,
@@ -37,9 +50,15 @@ class OrderItem(Base):
         nullable=False
     )
 
-    quantity = Column(Integer, nullable=False)
+    quantity = Column(
+        Integer,
+        nullable=False
+    )
 
-    unit_price = Column(Numeric(10, 2), nullable=False)
+    unit_price = Column(
+        Numeric(10, 2),
+        nullable=False
+    )
 
     status = Column(
         Enum(OrderItemStatus),
@@ -47,9 +66,27 @@ class OrderItem(Base):
         nullable=False
     )
 
-    notes = Column(String, nullable=True)
+    notes = Column(
+        String,
+        nullable=True
+    )
 
-    # Relaciones
-    order = relationship("Order", back_populates="items")
+    __table_args__ = (
+        Index(
+            "ix_order_items_order_status",
+            "order_id",
+            "status"
+        ),
+    )
+
+    order = relationship(
+        "Order",
+        back_populates="items"
+    )
+
     product = relationship("Product")
-    restaurant = relationship("Restaurant", back_populates="order_items")
+
+    restaurant = relationship(
+        "Restaurant",
+        back_populates="order_items"
+    )

@@ -29,20 +29,54 @@ class SystemSettings(Base):
     )
 
     # SMTP
-    smtp_host = Column(String)
-    smtp_port = Column(Integer, nullable=False, default=587)
-    smtp_user = Column(String)
-    smtp_password = Column(String)
-    smtp_from = Column(String)
-    smtp_use_tls = Column(Boolean, nullable=False, default=True)
+    smtp_host = Column(
+        String,
+        nullable=True
+    )
+
+    smtp_port = Column(
+        Integer,
+        nullable=False,
+        default=587
+    )
+
+    smtp_user = Column(
+        String,
+        nullable=True
+    )
+
+    smtp_password = Column(
+        String,
+        nullable=True
+    )
+
+    smtp_from = Column(
+        String,
+        nullable=True
+    )
+
+    smtp_use_tls = Column(
+        Boolean,
+        nullable=False,
+        default=True
+    )
+
 
     # Backups
-    backup_email = Column(String)
+    backup_email = Column(
+        String,
+        nullable=True
+    )
 
     backup_frequency = Column(
         SqlEnum(
             BackupFrequency,
-            values_callable=lambda enum: [e.value for e in enum]
+            values_callable=lambda enum: [
+                item.value
+                for item in enum
+            ],
+            native_enum=False,
+            length=20
         ),
         nullable=False,
         default=BackupFrequency.MANUAL
@@ -57,13 +91,13 @@ class SystemSettings(Base):
     backup_retention_weekly = Column(
         Integer,
         nullable=False,
-        default=12
+        default=84
     )
 
     backup_retention_monthly = Column(
         Integer,
         nullable=False,
-        default=24
+        default=365
     )
 
     backup_time = Column(

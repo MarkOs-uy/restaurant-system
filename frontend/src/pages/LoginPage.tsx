@@ -1,66 +1,121 @@
-import { useState, type FormEvent } from "react"
+import {
+  useState,
+  type FormEvent
+} from "react"
+
 import { useNavigate } from "react-router-dom"
 import { jwtDecode } from "jwt-decode"
 
 import { apiFetch } from "../api"
+
+import { UserRole } from "../types/userRole"
+
+import type {
+  AuthPayload,
+  LoginResponse
+} from "../types/auth"
+
+import {
+  isApiError
+} from "../types/apiError"
+
 import { showToast } from "../utils/showToast"
-import type { ApiError } from "../types/apiError"
 
-// ---------------------------------------------------------------------------------------------
-// Respuesta devuelta por el endpoint de autenticación.
-// ---------------------------------------------------------------------------------------------
-interface LoginResponse {
-  access_token: string
-  token_type: string
-}
-
-// ---------------------------------------------------------------------------------------------
-// Claims del JWT utilizados por el frontend.
-// El backend puede incluir otros claims.
-// ---------------------------------------------------------------------------------------------
-interface AuthPayload {
-  role: string
-  restaurant_id: number
-}
 
 export default function LoginPage() {
-  const [username, setUsername] = useState("")
-  const [password, setPassword] = useState("")
+  const [username, setUsername] =
+    useState("")
+
+  const [password, setPassword] =
+    useState("")
+
+  const [loggingIn, setLoggingIn] =
+    useState(false)
 
   const navigate = useNavigate()
+
 
   // -------------------------------------------------------------------------------------------
   // Autentica al usuario y establece la sesión local.
   // -------------------------------------------------------------------------------------------
-  async function login(e: FormEvent<HTMLFormElement>): Promise<void> {
-    e.preventDefault()
+  async function login(
+    event: FormEvent<HTMLFormElement>
+  ): Promise<void> {
+    event.preventDefault()
+
+    if (loggingIn) return
+
+    const trimmedUsername =
+      username.trim()
+
+    if (!trimmedUsername || !password) {
+      showToast(
+        "Ingrese usuario y contraseña"
+      )
+      return
+    }
+
+    setLoggingIn(true)
 
     try {
-      const formData = new URLSearchParams()
+      const formData =
+        new URLSearchParams()
 
-      formData.append("username", username)
-      formData.append("password", password)
-      formData.append("grant_type", "password")
+      formData.append(
+        "username",
+        trimmedUsername
+      )
 
-      const data = await apiFetch("/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded"
-        },
-        body: formData.toString(),
-        suppressErrorToast: true
-      }) as LoginResponse
+      formData.append(
+        "password",
+        password
+      )
 
-      const token = data.access_token
+      formData.append(
+        "grant_type",
+        "password"
+      )
+
+      const data =
+        await apiFetch<LoginResponse>(
+          "/auth/login",
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/x-www-form-urlencoded"
+            },
+
+            body:
+              formData.toString(),
+
+            suppressErrorToast: true
+          }
+        )
+
+      const token =
+        data.access_token
 
       if (!token) {
-        throw new Error("El servidor no devolvió un token de autenticación")
+        throw new Error(
+          "El servidor no devolvió un token de autenticación"
+        )
       }
 
-      const decoded = jwtDecode<AuthPayload>(token)
+      const decoded =
+        jwtDecode<AuthPayload>(token)
 
-      localStorage.setItem("token", token)
-      localStorage.setItem("role", decoded.role)
+      localStorage.setItem(
+        "token",
+        token
+      )
+
+      localStorage.setItem(
+        "role",
+        decoded.role
+      )
+
       localStorage.setItem(
         "restaurant_id",
         String(decoded.restaurant_id)
@@ -71,42 +126,56 @@ export default function LoginPage() {
       )
 
       switch (decoded.role) {
-        case "ADMIN":
+        case UserRole.ADMIN:
           navigate("/admin")
           break
 
-        case "WAITER":
+        case UserRole.WAITER:
           navigate("/waiter")
           break
 
-        case "KITCHEN":
-          localStorage.removeItem("kitchen_station_id")
+        case UserRole.KITCHEN:
+          localStorage.removeItem(
+            "kitchen_station_id"
+          )
           navigate("/kitchen")
           break
 
-        case "CASHIER":
+        case UserRole.CASHIER:
           navigate("/cashier")
           break
-
-        default:
-          navigate("/")
       }
 
     } catch (error: unknown) {
-      console.error("Login error:", error)
+      console.error(
+        "Login error:",
+        error
+      )
 
-      const apiError = error as ApiError
+      if (
+        isApiError(error) &&
+        error.status === 401
+      ) {
+        showToast(
+          "Usuario o contraseña incorrectos"
+        )
+        return
+      }
 
-      if (apiError.status === 401) {
-        showToast("Usuario o contraseña incorrectos")
+      if (error instanceof Error) {
+        showToast(error.message)
         return
       }
 
       showToast(
-        apiError.message ?? "No pudimos iniciar sesión"
+        "No pudimos iniciar sesión"
       )
+
+    } finally {
+      setLoggingIn(false)
     }
   }
+
 
   return (
     <div
@@ -127,13 +196,19 @@ export default function LoginPage() {
       <form
         onSubmit={login}
         style={{
-          background: "rgba(22, 28, 45, 0.45)",
-          backdropFilter: "blur(12px) saturate(180%)",
-          WebkitBackdropFilter: "blur(12px) saturate(180%)",
-          border: "1px solid var(--color-border)",
+          background:
+            "rgba(22, 28, 45, 0.45)",
+          backdropFilter:
+            "blur(12px) saturate(180%)",
+          WebkitBackdropFilter:
+            "blur(12px) saturate(180%)",
+          border:
+            "1px solid var(--color-border)",
           padding: "40px",
-          borderRadius: "var(--radius-lg)",
-          boxShadow: "var(--shadow-lg), var(--shadow-glass)",
+          borderRadius:
+            "var(--radius-lg)",
+          boxShadow:
+            "var(--shadow-lg), var(--shadow-glass)",
           width: "360px",
           display: "flex",
           flexDirection: "column",
@@ -150,7 +225,12 @@ export default function LoginPage() {
           }}
         >
           🍳{" "}
-          <span style={{ color: "var(--color-primary)" }}>
+          <span
+            style={{
+              color:
+                "var(--color-primary)"
+            }}
+          >
             Marcha
           </span>
         </h2>
@@ -160,7 +240,11 @@ export default function LoginPage() {
           placeholder="Usuario"
           autoComplete="username"
           value={username}
-          onChange={e => setUsername(e.target.value)}
+          onChange={event =>
+            setUsername(
+              event.target.value
+            )
+          }
         />
 
         <input
@@ -168,19 +252,26 @@ export default function LoginPage() {
           placeholder="Contraseña"
           autoComplete="current-password"
           value={password}
-          onChange={e => setPassword(e.target.value)}
+          onChange={event =>
+            setPassword(
+              event.target.value
+            )
+          }
         />
 
         <button
           type="submit"
           className="btn-primary"
+          disabled={loggingIn}
           style={{
             padding: "12px",
             fontSize: "16px",
             marginTop: "10px"
           }}
         >
-          Ingresar
+          {loggingIn
+            ? "Ingresando..."
+            : "Ingresar"}
         </button>
       </form>
     </div>

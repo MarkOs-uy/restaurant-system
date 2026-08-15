@@ -1,6 +1,15 @@
-from sqlalchemy import Column, Integer, Boolean, ForeignKey, String, UniqueConstraint, Identity
-from app.db.base_class import Base
+from sqlalchemy import (
+    Column,
+    Integer,
+    Boolean, 
+    ForeignKey, 
+    String, 
+    UniqueConstraint, 
+    Identity
+)
 from sqlalchemy.orm import relationship
+
+from app.db.base_class import Base
 
 class Category(Base):
     __tablename__ = "categories"
@@ -38,4 +47,3 @@ class Category(Base):
         "Product",
         back_populates="category"
     )
-

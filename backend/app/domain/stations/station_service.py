@@ -47,9 +47,9 @@ class StationService:
             )
         return query.first() is not None
 
-    # -------------------------
-    # Obtener estación
-    # -------------------------
+    # ---------------------------------------
+    # Obtener estación - método privado
+    # ---------------------------------------
     def _get_station(self, restaurant_id: int, station_id: int) -> ProductionStation:
         station = (
             self.db.query(ProductionStation)
@@ -65,6 +65,19 @@ class StationService:
                 code=ErrorCode.STATION_NOT_FOUND
             )
         return station
+
+    # -------------------------
+    # Obtener estación
+    # -------------------------
+    def get_station(
+        self,
+        restaurant_id: int,
+        station_id: int
+    ):
+        return self._get_station(
+            restaurant_id,
+            station_id
+        )
 
     # -------------------------
     # Crear estación
@@ -96,24 +109,26 @@ class StationService:
     # -------------------------
     # Listar estaciones
     # -------------------------
-    def list_stations(self, restaurant_id: int) -> list[ProductionStation]:
-        return (
-            self.db.query(ProductionStation)
-            .filter(ProductionStation.restaurant_id == restaurant_id)
-            .order_by(ProductionStation.name)
-            .all()
-        )
+    def list_stations(
+        self,
+        restaurant_id: int,
+        active: bool | None = True
+    ) -> list[ProductionStation]:
 
-    # ----------------------------
-    # Listar estaciones activas
-    # ----------------------------
-    def list_active_stations(self, restaurant_id: int) -> list[ProductionStation]:
-        return (
+        query = (
             self.db.query(ProductionStation)
             .filter(
-                ProductionStation.restaurant_id == restaurant_id,
-                ProductionStation.active.is_(True)
+                ProductionStation.restaurant_id == restaurant_id
             )
+        )
+
+        if active is not None:
+            query = query.filter(
+                ProductionStation.active == active
+            )
+
+        return (
+            query
             .order_by(ProductionStation.name)
             .all()
         )

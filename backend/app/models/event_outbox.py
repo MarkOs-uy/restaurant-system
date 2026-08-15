@@ -6,29 +6,32 @@ from sqlalchemy import (
     JSON,
     ForeignKey,
     Identity,
+    Index,
     func
 )
-
 from sqlalchemy.orm import relationship
+
 from app.db.base_class import Base
 
-class EventOutbox(Base):
 
+class EventOutbox(Base):
     __tablename__ = "event_outbox"
 
-    id = Column(Integer, Identity(), primary_key=True)
+    id = Column(
+        Integer,
+        Identity(),
+        primary_key=True
+    )
 
     restaurant_id = Column(
         Integer,
         ForeignKey("restaurants.id"),
-        nullable=False,
-        index=True
+        nullable=False
     )
 
     event_type = Column(
         String,
-        nullable=False,
-        index=True
+        nullable=False
     )
 
     payload = Column(
@@ -49,8 +52,7 @@ class EventOutbox(Base):
     status = Column(
         String,
         nullable=False,
-        default="pending",
-        index=True
+        default="pending"
     )
 
     retries = Column(
@@ -62,8 +64,7 @@ class EventOutbox(Base):
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
-        nullable=False,
-        index=True
+        nullable=False
     )
 
     processed_at = Column(
@@ -74,6 +75,36 @@ class EventOutbox(Base):
     last_error = Column(
         String,
         nullable=True
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_event_outbox_restaurant",
+            "restaurant_id"
+        ),
+        Index(
+            "ix_event_outbox_event_type",
+            "event_type"
+        ),
+        Index(
+            "ix_event_outbox_status",
+            "status"
+        ),
+        Index(
+            "ix_event_outbox_created",
+            "created_at"
+        ),
+        Index(
+            "idx_event_outbox_cleanup",
+            "status",
+            "processed_at"
+        ),
+        Index(
+            "idx_event_outbox_failed_cleanup",
+            "status",
+            "retries",
+            "created_at"
+        ),
     )
 
     restaurant = relationship(

@@ -15,9 +15,23 @@ class Product(Base):
     )
     name = Column(String, nullable=False)
     price = Column(Numeric(10, 2), nullable=False)
-    active = Column(Boolean, default=True)
-    station_id = Column(ForeignKey("production_stations.id"))
-    category_id = Column(Integer, ForeignKey("categories.id"))
+    active = Column(
+        Boolean,
+        nullable=False,
+        default=True
+    )
+
+    station_id = Column(
+        Integer,
+        ForeignKey("production_stations.id"),
+        nullable=False
+    )
+
+    category_id = Column(
+        Integer,
+        ForeignKey("categories.id"),
+        nullable=False
+    )
     
     __table_args__ = (
         UniqueConstraint("restaurant_id", "name", name="uq_product_name_per_restaurant"),

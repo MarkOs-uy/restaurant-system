@@ -4,6 +4,7 @@ from sqlalchemy import func
 from app.domain.order.constants import ACTIVE_ORDER_STATUSES
 from app.domain.errors.base import DomainError
 from app.domain.errors.error_codes import ErrorCode
+from app.domain.events.websocket import WSEvent
 
 from app.services.event_service import EventService
 
@@ -177,13 +178,13 @@ class TableService:
         )
         self.db.add(table)
         self.db.flush()
-        self.db.commit()
-        self.db.refresh(table)
         self.events.emit(
             restaurant_id=restaurant_id,
-            event_type="TABLE_CREATED",
+            event_type=WSEvent.TABLE_CREATED,
             payload={"table_id": table.id}
         )
+        self.db.commit()
+        self.db.refresh(table)
         return table
 
     # -------------------------
@@ -213,13 +214,13 @@ class TableService:
 
         for field, value in update_data.items():
             setattr(table, field, value)
-        self.db.commit()
-        self.db.refresh(table)
         self.events.emit(
             restaurant_id=restaurant_id,
-            event_type="TABLE_UPDATED",
+            event_type=WSEvent.TABLE_UPDATED,
             payload={"table_id": table.id}
         )
+        self.db.commit()
+        self.db.refresh(table)
         return table
 
     # --------------------------------
@@ -234,17 +235,17 @@ class TableService:
         table = self._get_table(restaurant_id, table_id, active_only=True)
         table.x = data.x
         table.y = data.y
-        self.db.commit()
-        self.db.refresh(table)
         self.events.emit(
             restaurant_id=restaurant_id,
-            event_type="TABLE_POSITION_UPDATED",
+            event_type=WSEvent.TABLE_POSITION_UPDATED,
             payload={
                 "table_id": table.id,
                 "x": table.x,
                 "y": table.y
             }
         )
+        self.db.commit()
+        self.db.refresh(table)
         return table
 
     # -------------------------
@@ -254,12 +255,12 @@ class TableService:
         table = self._get_table(restaurant_id, table_id, active_only=True)
         logger.info("Mesa desactivada r=%s table_id=%s", restaurant_id, table_id)
         table.active = False
-        self.db.commit()
         self.events.emit(
             restaurant_id=restaurant_id,
-            event_type="TABLE_DEACTIVATED",
+            event_type=WSEvent.TABLE_DEACTIVATED,
             payload={"table_id": table.id}
         )
+        self.db.commit()
 
     # -------------------------
     # Activar mesa
@@ -268,12 +269,12 @@ class TableService:
         table = self._get_table(restaurant_id, table_id)
         logger.info("Mesa activada r=%s table_id=%s", restaurant_id, table_id)
         table.active = True
-        self.db.commit()  
         self.events.emit(
             restaurant_id=restaurant_id,
-            event_type="TABLE_ACTIVATED",
+            event_type=WSEvent.TABLE_ACTIVATED,
             payload={"table_id": table.id}
         )
+        self.db.commit()  
 
     # -------------------------
     # Tocar mesa

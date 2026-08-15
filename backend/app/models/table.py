@@ -1,4 +1,5 @@
 import uuid
+
 from sqlalchemy import (
     Column,
     Integer,
@@ -6,17 +7,24 @@ from sqlalchemy import (
     ForeignKey,
     String,
     UniqueConstraint,
-    Index, 
+    Index,
     Identity
 )
 from sqlalchemy.orm import relationship
+
 from app.db.base_class import Base
+
+from app.models.enums import TableShape
 
 
 class Table(Base):
     __tablename__ = "tables"
 
-    id = Column(Integer, Identity(), primary_key=True, index=True)
+    id = Column(
+        Integer,
+        Identity(),
+        primary_key=True
+    )
 
     restaurant_id = Column(
         Integer,
@@ -25,24 +33,47 @@ class Table(Base):
         index=True
     )
 
-    number = Column(Integer, nullable=False)
-
-    active = Column(Boolean, default=True, nullable=False)
-
-    x = Column(Integer, nullable=False, default=0)
-    y = Column(Integer, nullable=False, default=0)
-
-    capacity = Column(Integer, default=4, nullable=False)
-
-    shape = Column(String, default="Circular")
-
-    external_id = Column(
-        String,
-        default=lambda: str(uuid.uuid4()),
+    number = Column(
+        Integer,
         nullable=False
     )
 
-    # 🔐 Multi-tenant constraints correctas
+    active = Column(
+        Boolean,
+        nullable=False,
+        default=True
+    )
+
+    x = Column(
+        Integer,
+        nullable=False,
+        default=0
+    )
+
+    y = Column(
+        Integer,
+        nullable=False,
+        default=0
+    )
+
+    capacity = Column(
+        Integer,
+        nullable=False,
+        default=4
+    )
+
+    shape = Column(
+        String,
+        nullable=False,
+        default=TableShape.CIRCLE.value
+    )
+
+    external_id = Column(
+        String,
+        nullable=False,
+        default=lambda: str(uuid.uuid4())
+    )
+
     __table_args__ = (
         UniqueConstraint(
             "restaurant_id",
@@ -61,7 +92,6 @@ class Table(Base):
         ),
     )
 
-    # Relaciones
     orders = relationship(
         "Order",
         back_populates="table"

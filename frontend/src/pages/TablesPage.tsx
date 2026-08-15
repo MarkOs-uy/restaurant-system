@@ -7,7 +7,7 @@ import { wsService } from "../services/wsService"
 import type { WSEventParsed } from "../ws"
 import type { Table, InactiveTable, TouchTableResponse } from "../types/table"
 import type { Layout } from "../types/layout"
-import { WSEvent } from "../types/websocketEvents"
+import { WSEvent } from "../types/webSocketEvents"
 
 interface DragState {
   id: number
@@ -57,28 +57,34 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
     background_image: null
   })
 
-  // -------------------------
-  // Cargar layout y mesas
-  // -------------------------
+  /**
+   * Carga la configuración visual del plano desde el backend.
+   *
+   * La respuesta contiene las dimensiones del plano, configuración
+   * de la grilla, ajuste a grilla y eventual imagen de fondo.
+   */
   const loadLayout = async (): Promise<void> => {
-      const data = await apiFetch<Layout>("/layout/")
-      setLayout(data)
+    const data = await apiFetch<Layout>("/layout/")
+    setLayout(data)
   }
 
-  // -------------------------
-  // Salvar layout (tamaño, grid, snap)
-  // -------------------------
+  /**
+   * Guarda en el backend la configuración actual del plano.
+   *
+   * Incluye dimensiones, tamaño de grilla y configuración de snap.
+   */
   const saveLayout = async () => {
     await apiFetch("/layout/", {
       method: "PATCH",
       body: layout
     })
+
     showToast("Layout guardado")
   }
 
-  // -------------------------
-  // Actualizar layout
-  // -------------------------
+  /**
+   * Actualiza en el backend la imagen de fondo actual del plano.
+   */
   const uploadBackground = async (file: File) => {
     if (!file.type.startsWith("image/")) {
       showToast("Selecciona un archivo de imagen")
@@ -98,16 +104,22 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
     setLayout(updatedLayout)
   }
 
-  // -------------------------
-  // Cargar mesas y sus estados
-  // -------------------------
+  /**
+   * Carga las mesas activas e inactivas desde el backend.
+   *
+   * La operación se evita mientras se está arrastrando una mesa para
+   * impedir que una actualización remota sobrescriba temporalmente
+   * la posición que se está modificando localmente.
+   */
   const loadTables = async () => {
     if (draggingRef.current) return
+
     try {
       const [activeData, inactiveData] = await Promise.all([
-          apiFetch<Table[]>("/tables/status"),
-          apiFetch<InactiveTable[]>("/tables/?active=false")
+        apiFetch<Table[]>("/tables/status"),
+        apiFetch<InactiveTable[]>("/tables/?active=false")
       ])
+
       setTables(activeData)
       setInactiveTables(inactiveData)
     } finally {
@@ -115,9 +127,13 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
     }
   }
 
-  // -------------------------
-  // Tocar mesa: si tiene orden abierta, ir a la orden. Si no, crear nueva orden para esa mesa
-  // -------------------------
+  /**
+   * Atiende la selección de una mesa.
+   *
+   * Si existe una orden activa para la mesa, navega directamente
+   * hacia esa orden. Si no existe, navega hacia la pantalla desde
+   * donde se puede iniciar una nueva orden.
+   */
   const touchTable = async (tableId: number) => {
     const data = await apiFetch<TouchTableResponse>(
         `/tables/${tableId}/touch`,
@@ -132,9 +148,10 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
     }
   }
 
-  // -------------------------
-  // Devolver el color de una mesa de acuerdo al status de la orden
-  // -------------------------
+  /**
+   * Devolver el color de una mesa de acuerdo al status de la orden
+   *
+   */  
   const getTableColor = (table: Table) => {
     if (!table.order_status) return "#1e293b"   // Slate oscuro (libre)
     if (table.order_status === "OPEN") return "#f59e0b"   // Naranja/Amarillo cálido
@@ -144,9 +161,10 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
     return "#637381"
   }
 
-  // -------------------------
-  // Mover mesa (modo edición): actualizar posición en backend al soltar
-  // -------------------------
+  /**
+   * Mover mesa (modo edición): actualizar posición en backend al soltar
+   *
+   */  
   const moveTable = (id: number, x: number, y: number) => {
     setTables(prev =>
       prev.map(t =>
@@ -155,9 +173,12 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
     )
   }
 
-  // -------------------------
-  // Salvar nueva posición de la mesa al soltar
-  // -------------------------
+  /**
+   * Guarda la posición de una mesa en el backend.
+   *
+   * Se utiliza un pequeño debounce para evitar múltiples peticiones
+   * cuando la posición cambia rápidamente durante una interacción.
+   */
   const savePosition = (tableId: number, x: number, y: number) => {
     if (positionTimers.current[tableId]) {
       clearTimeout(positionTimers.current[tableId])
@@ -179,9 +200,9 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
     }, 300)
   }
 
-  // -------------------------
-  // Obtener el próximo número disponible de una mesa
-  // -------------------------
+  /**
+   * Obtiene el siguiente número disponible para una mesa
+   */
   const getNextAvailableTableNumber = () => {
     const usedNumbers = new Set([
       ...tables.map(t => t.number),
@@ -194,9 +215,9 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
     return number
   }
 
-  // -------------------------
-  // Obtener las dimiensiones de una mesa de acuerdo a su capacidad
-  // -------------------------
+  /**
+   * Obtener las dimiensiones de una mesa de acuerdo a su capacidad
+   */
   const getTableDimensions = (table: Pick<Table, "capacity" | "shape">) => {
     const shape = normalizeShape(table.shape)
     const size = 60 + (table.capacity || 4) * 10
@@ -217,9 +238,9 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
     }
   }
 
-  // -------------------------
-  // Crear nueva mesa con forma y capacidad seleccionada en el formulario
-  // -------------------------
+  /**
+   * Crear nueva mesa con forma y capacidad seleccionada en el formulario
+   */
   const createTable = async () => {
     const number = Number(newTableForm.number)
     const usedNumbers = new Set([
@@ -264,9 +285,9 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
     setShowForm(false)
   }
 
-  // -------------------------
-  // Rotar una mesa rectangular
-  // -------------------------
+  /**
+   * Rota una mesa rectangular
+   */
   const rotateTable = async (table: Table) => {
     if (normalizeShape(table.shape) !== "rectangle") return
 
@@ -294,9 +315,9 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
     )
   }
 
-  // -------------------------
-  // Eliminar mesa (modo edición, click derecho)
-  // -------------------------
+  /**
+   * Elimina una mesa (modo edición, click derecho)
+   */
   const deleteTable = async (id: number) => {
     await apiFetch(`/tables/${id}`, {
       method: "DELETE"
@@ -305,7 +326,9 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
     await loadTables()
   }
 
-
+  /**
+   * Cuadro de diálogo de eliminación de una mesa (modo edición, click derecho)
+   */
   const requestDeleteTable = (table: Table) => {
     toast.custom((t) => (
       <div
@@ -356,9 +379,9 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
     ))
   }
 
-  // -------------------------
-  // Reactivar mesa inactiva desde la tabla de mesas inactivas
-  // -------------------------
+  /**
+   * Reactiva una mesa inactiva desde la tabla de mesas inactivas
+   */
   const activateTable = async (id: number) => {
     await apiFetch(`/tables/${id}/activate`, {
       method: "PATCH"
@@ -391,8 +414,9 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
     const handler = ({ type }: WSEventParsed) => {
       if (!relevantEvents.has(type)) return
 
-      if (type === "LAYOUT_UPDATED") {
+      if (type === WSEvent.LAYOUT_UPDATED) {
         loadLayout()
+        return
       }
 
       loadTables()

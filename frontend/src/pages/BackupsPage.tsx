@@ -3,52 +3,16 @@ import { waitForServer } from "../services/health"
 import toast from "react-hot-toast"
 import { apiFetch } from "../api"
 import { downloadBackup } from "../services/downloadBackup"
+import { BackupType } from "../types/backup"
+import { BackupFrequency } from "../types/systemSettings"
 
-interface BackupStatus {
-  last_backup_at: string | null
-  last_backup_file: string |null
-  last_backup_size: number | null
-  last_backup_source: string | null
+import type { 
+  BackupStatus,
+  BackupFile,
+  BackupRestoreResponse
+} from "../types/backup"
+import type { SystemSettings } from "../types/systemSettings"
 
-  email_enabled: boolean
-  email_from: string | null
-
-  last_automatic_backup_at: string | null
-  next_automatic_backup_at: string | null
-  last_backup_result: string | null
-}
-
-interface SystemSettings {
-  smtp_host: string
-  smtp_port: number
-  smtp_user: string
-  smtp_password: string
-  smtp_from: string
-  smtp_use_tls: boolean
-
-  backup_email: string
-
-  backup_enabled: boolean
-  backup_frequency: string
-  backup_retention_daily: number
-  backup_retention_weekly: number
-  backup_retention_monthly: number
-  backup_time: string
-  backup_weekday: number | null
-  backup_monthday: number | null
-
-  backup_keep_local: boolean
-  backup_send_email: boolean
-
-  backup_timezone: string
-}
-
-interface BackupFile {
-    filename: string
-    created_at: string
-    size: number
-    type: string
-}
 
 const emptyStatus: BackupStatus = {
 last_backup_at: null,
@@ -88,25 +52,36 @@ const emptySettings: SystemSettings = {
   backup_timezone: "America/Montevideo"
 }
 
-function formatDateTime(value: string | null) {
-  if (!value) return "Sin backups registrados"
-
-  return new Date(value).toLocaleString("es-UY", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit"
-  })
+function formatDateTime(value: string | null): string {
+  if (!value) {
+    return "Sin backups registrados"
   }
+  return new Date(value).toLocaleString(
+    "es-UY",
+    {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    }
+  )
+}
 
-function formatBytes(value: number | null) {
-  if (!value) return "Sin datos"
-
-  if (value < 1024) return `${value} B`
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
-  return `${(value / (1024 * 1024)).toFixed(1)} MB`
+function formatBytes(value: number | null): string {
+  if (value === null) {
+    return "Sin datos"
   }
+  if (value < 1024) {
+    return `${value} B`
+  }
+  if (value < 1024 * 1024) {
+    return `${(value / 1024).toFixed(1)} KB`
+  }
+  return `${
+    (value / (1024 * 1024)).toFixed(1)
+  } MB`
+}
 
 export default function BackupsPage() {
 
@@ -120,32 +95,42 @@ export default function BackupsPage() {
   const [files,setFiles]=useState<BackupFile[]>([])
 
   const loadStatus = async () => {
-    const data = await apiFetch("/backups/status")
+    const data = await apiFetch<BackupStatus>("/backups/status")
     setStatus(data)
   }
 
   const loadSettings = async () => {
-    const data = await apiFetch("/settings")
+    const data = await apiFetch<SystemSettings>("/settings")
     setSettings(data)
   }
 
   const loadFiles = async()=>{
-      const data=await apiFetch("/backups/files")
+      const data=await apiFetch<BackupFile[]>("/backups/files")
       setFiles(data)
   }
 
 
   useEffect(() => {
-    loadStatus()
-    loadSettings()
-    loadFiles()
+    const init = async () => {
+      await Promise.all([
+        loadStatus(),
+        loadSettings(),
+        loadFiles()
+      ])
+    }
 
-    const statusTimer = window.setInterval(() => {
-      loadStatus()
-    }, 30000)
+    init()
+
+    const statusTimer =
+      window.setInterval(
+        loadStatus,
+        30000
+      )
 
     return () => {
-      window.clearInterval(statusTimer)
+      window.clearInterval(
+        statusTimer
+      )
     }
   }, [])
 
@@ -218,8 +203,8 @@ export default function BackupsPage() {
     }
     setLoading(true)
     try {
-      const result = await apiFetch(
-          `/backups/restore/${filename}`,
+      const result = await apiFetch<BackupRestoreResponse>(
+          `/backups/restore/${encodeURIComponent(filename)}`,
           {
               method: "POST"
           }
@@ -271,43 +256,40 @@ export default function BackupsPage() {
   }
 
 
-  function frequencyLabel(freq: string) {
-
-    switch (freq) {
-      case "daily":
+  function frequencyLabel(frequency: BackupFrequency): string {
+    switch (frequency) {
+      case BackupFrequency.DAILY:
         return "Diario"
 
-      case "weekly":
+      case BackupFrequency.WEEKLY:
         return "Semanal"
 
-      case "monthly":
+      case BackupFrequency.MONTHLY:
         return "Mensual"
 
-      default:
+      case BackupFrequency.MANUAL:
         return "Manual"
     }
-
   }
 
-  function backupTypeLabel(type: string) {
+  function backupTypeLabel(
+    type: BackupType
+  ): string {
     switch (type) {
-      case "manual":
+      case BackupType.MANUAL:
         return "Manual"
 
-      case "daily":
+      case BackupType.DAILY:
         return "Diario"
 
-      case "weekly":
+      case BackupType.WEEKLY:
         return "Semanal"
 
-      case "monthly":
+      case BackupType.MONTHLY:
         return "Mensual"
 
-      case "before_restore":
+      case BackupType.BEFORE_RESTORE:
         return "Antes de restaurar"
-
-      default:
-        return type
     }
   }
 
@@ -472,14 +454,14 @@ export default function BackupsPage() {
                   onChange={e =>
                     setSettings({
                       ...settings,
-                      backup_frequency: e.target.value
+                      backup_frequency: e.target.value as BackupFrequency
                     })
                   }
                 >
-                  <option value="manual">Manual</option>
-                  <option value="daily">Diario</option>
-                  <option value="weekly">Semanal</option>
-                  <option value="monthly">Mensual</option>
+                  <option value={BackupFrequency.MANUAL}>Manual</option>
+                  <option value={BackupFrequency.DAILY}>Diario</option>
+                  <option value={BackupFrequency.WEEKLY}>Semanal</option>
+                  <option value={BackupFrequency.MONTHLY}>Mensual</option>
                 </select>
               </label>
             </div>
@@ -503,7 +485,7 @@ export default function BackupsPage() {
             </div>
 
             {
-            settings.backup_frequency === "weekly" && (
+            settings.backup_frequency === BackupFrequency.WEEKLY && (
 
             <div>
               <label>
@@ -534,7 +516,7 @@ export default function BackupsPage() {
 
 
             {
-            settings.backup_frequency === "monthly" && (
+            settings.backup_frequency === BackupFrequency.MONTHLY && (
 
             <div>
               <label>

@@ -3,7 +3,12 @@ Endpoints para la gestión de productos.
 Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
 """
 
-from fastapi import APIRouter, Depends, status
+from fastapi import(
+    APIRouter, 
+    Depends, 
+    status,
+    Query
+)
 
 from app.dependencies.roles import admin_only, waiter_or_admin
 
@@ -48,10 +53,14 @@ def create_product(
     description="Devuelve la lista de productos del restaurante autenticado."
 )
 def list_products(
+    active: bool | None = Query(default=True),
     user: User = Depends(waiter_or_admin),
     service: ProductService = Depends(get_product_service)
 ):
-    return service.list_products(user.restaurant_id)
+    return service.list_products(
+        user.restaurant_id,
+        active
+    )
 
 # ----------------------------------------------------------------------------------------------------
 # Actualizar producto

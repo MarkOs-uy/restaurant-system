@@ -146,18 +146,6 @@ class CategoryService:
         self.db.refresh(category)
         return category
 
-    # -------------------------
-    # Eliminar categoría
-    # -------------------------
-    def delete_category(
-        self,
-        restaurant_id: int,
-        category_id: int
-    ) -> None:
-        category = self._get_category(restaurant_id, category_id)
-        self.db.delete(category)
-        self.db.commit()
-
     # --------------------------------------------
     # Activar o desactivar categoría
     # --------------------------------------------
@@ -197,6 +185,7 @@ class CategoryService:
             CategoryWithProducts(
                 id=c.id,
                 name=c.name,
+                active=c.active,
                 products=[
                     ProductRef(
                         id=p.id,

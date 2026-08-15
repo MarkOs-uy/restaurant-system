@@ -7,7 +7,7 @@ export interface Table {
   x: number
   y: number
   capacity: number
-  shape: string
+  shape: TableShape
   status: string
   active: boolean
   order_id?: number | null
@@ -18,7 +18,7 @@ export interface InactiveTable {
   id: number
   number: number
   capacity: number
-  shape: string
+  shape: TableShape
   active: boolean
 }
 
@@ -31,3 +31,20 @@ export interface TablePosition {
   x: number
   y: number
 }
+
+export interface TableUpdate {
+  number: number
+  capacity: number
+  shape: TableShape
+  active: boolean
+}
+
+export const TableShape = {
+  CIRCLE: "circle",
+  SQUARE: "square",
+  RECTANGLE_HORIZONTAL: "rectangle-horizontal",
+  RECTANGLE_VERTICAL: "rectangle-vertical"
+} as const
+
+export type TableShape =
+  typeof TableShape[keyof typeof TableShape]

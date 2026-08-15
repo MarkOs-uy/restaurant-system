@@ -1,148 +1,233 @@
 import { useEffect, useState } from "react"
+
 import { apiFetch } from "../api"
 
 import Page from "../components/Page"
 import Card from "../components/Card"
 import DataTable from "../components/DataTable"
 
-interface Category {
-  id: number
-  name: string
-}
+import type {
+  Category,
+  CategoryCreate,
+  CategoryUpdate
+} from "../types/category"
+
 
 export default function CategoriesPage() {
+  const [categories, setCategories] =
+    useState<Category[]>([])
 
-  const [categories, setCategories] = useState<Category[]>([])
-  const [name, setName] = useState("")
-  const [editingId, setEditingId] = useState<number | null>(null)
+  const [name, setName] =
+    useState("")
 
+  const [editingId, setEditingId] =
+    useState<number | null>(null)
+
+
+  /**
+   * Carga todas las categorías, activas e inactivas,
+   * para permitir su administración.
+   */
   const fetchCategories = async () => {
-    const data = await apiFetch(`/categories/`)
-    setCategories(data)
+    const [
+      activeCategories,
+      inactiveCategories
+    ] = await Promise.all([
+      apiFetch<Category[]>(
+        "/categories/?active=true"
+      ),
+      apiFetch<Category[]>(
+        "/categories/?active=false"
+      )
+    ])
+
+    setCategories([
+      ...activeCategories,
+      ...inactiveCategories
+    ])
   }
+
 
   useEffect(() => {
     fetchCategories()
   }, [])
 
+
+  /**
+   * Crea una nueva categoría o actualiza
+   * la que se encuentra en edición.
+   */
   const saveCategory = async () => {
+    const trimmedName = name.trim()
 
-    if (!name) return
-
-    try {
-
-      const method = editingId ? "PATCH" : "POST"
-
-      const url = editingId
-        ? `/categories/${editingId}`
-        : `/categories/`
-
-      await apiFetch(url, {
-        method,
-        body: { name }
-      })
-
-      setName("")
-      setEditingId(null)
-
-      fetchCategories()
-
-    } catch (err:any) {
-      alert(err.message)
+    if (!trimmedName) {
+      return
     }
+
+    if (editingId) {
+      const payload: CategoryUpdate = {
+        name: trimmedName
+      }
+
+      await apiFetch(
+        `/categories/${editingId}`,
+        {
+          method: "PATCH",
+          body: payload
+        }
+      )
+    } else {
+      const payload: CategoryCreate = {
+        name: trimmedName
+      }
+
+      await apiFetch(
+        "/categories/",
+        {
+          method: "POST",
+          body: payload
+        }
+      )
+    }
+
+    setName("")
+    setEditingId(null)
+
+    await fetchCategories()
   }
 
-  const deleteCategory = async (id: number) => {
-    if (!confirm("Eliminar categoría?")) return
+
+  /**
+   * Activa o desactiva una categoría.
+   *
+   * Las categorías no se eliminan físicamente
+   * para preservar la integridad histórica.
+   */
+  const toggleCategory = async (
+    id: number
+  ) => {
     await apiFetch(
-      `/categories/${id}`,
+      `/categories/${id}/toggle`,
       {
-        method: "DELETE",
+        method: "PATCH"
       }
     )
-    fetchCategories()
+
+    await fetchCategories()
   }
 
-  const editCategory = (c: Category) => {
-    setEditingId(c.id)
-    setName(c.name)
+
+  /**
+   * Carga una categoría en el formulario de edición.
+   */
+  const editCategory = (
+    category: Category
+  ) => {
+    setEditingId(category.id)
+    setName(category.name)
   }
+
+
+  /**
+   * Cancela la edición actual y limpia el formulario.
+   */
+  const cancelEdit = () => {
+    setEditingId(null)
+    setName("")
+  }
+
 
   return (
     <Page title="Categorías">
-
       <Card>
-
         <div style={{ marginBottom: 20 }}>
-
           <input
             placeholder="Nombre categoría"
             value={name}
-            onChange={e => setName(e.target.value)}
+            onChange={event =>
+              setName(event.target.value)
+            }
           />
 
-          <button className="btn btn-primary"
+          <button
+            className="btn btn-primary"
             onClick={saveCategory}
             style={{ marginLeft: 10 }}
           >
-            {editingId ? "Actualizar" : "Crear"}
+            {editingId
+              ? "Actualizar"
+              : "Crear"}
           </button>
 
+          {editingId !== null && (
+            <button
+              className="btn btn-primary"
+              onClick={cancelEdit}
+              style={{ marginLeft: 10 }}
+            >
+              Cancelar
+            </button>
+          )}
         </div>
 
-        <DataTable>
 
+        <DataTable>
           <thead>
             <tr>
               <th>Nombre</th>
-              <th style={{ width: 300 }}>Acciones</th>
+              <th>Estado</th>
+              <th style={{ width: 300 }}>
+                Acciones
+              </th>
             </tr>
           </thead>
 
           <tbody>
+            {categories.length === 0 && (
+              <tr>
+                <td colSpan={3}>
+                  No hay categorías
+                </td>
+              </tr>
+            )}
 
-            {categories.map(c => (
-              <tr key={c.id}>
-
-                <td>{c.name}</td>
+            {categories.map(category => (
+              <tr key={category.id}>
+                <td>{category.name}</td>
 
                 <td>
+                  {category.active
+                    ? "Activa"
+                    : "Inactiva"}
+                </td>
 
-                  <button className="btn btn-primary"
-                    onClick={() => editCategory(c)}>
+                <td>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() =>
+                      editCategory(category)
+                    }
+                  >
                     Editar
                   </button>
 
-                  <button className="btn btn-primary"
-                    onClick={() => deleteCategory(c.id)}
+                  <button
+                    className="btn btn-primary"
+                    onClick={() =>
+                      toggleCategory(category.id)
+                    }
                     style={{ marginLeft: 10 }}
                   >
-                    Eliminar
+                    {category.active
+                      ? "Desactivar"
+                      : "Activar"}
                   </button>
-
-                  {editingId && (
-                    <button className="btn btn-primary"
-                      onClick={() => {
-                        setEditingId(null)
-                        setName("")
-                      }}
-                      style={{ marginLeft: 10 }}
-                    >
-                      Cancelar
-                    </button>
-                  )}
-
                 </td>
-
               </tr>
             ))}
-
           </tbody>
-
         </DataTable>
-
       </Card>
-
     </Page>
   )
 }

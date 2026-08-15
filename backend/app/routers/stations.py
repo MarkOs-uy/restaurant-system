@@ -3,7 +3,12 @@ Endpoints para la gestión de estaciones.
 Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
 """
 
-from fastapi import APIRouter, Depends, status
+from fastapi import (
+    APIRouter,
+    status, 
+    Depends, 
+    Query
+)
 
 from app.dependencies.roles import admin_only, kitchen_or_admin
 
@@ -48,10 +53,11 @@ def create_station(
     description="Devuelve la lista de estaciones del restaurante autenticado."
 )
 def list_stations(
-    user: User = Depends(admin_only),
+    active: bool | None = Query(default=True),
+    user: User = Depends(kitchen_or_admin),
     service: StationService = Depends(get_station_service)
 ):
-    return service.list_stations(user.restaurant_id)
+    return service.list_stations(user.restaurant_id, active)
 
 # ----------------------------------------------------------------------------------------------------
 # Listar estaciones activas
@@ -67,7 +73,24 @@ def list_active_stations(
     user: User = Depends(kitchen_or_admin),
     service: StationService = Depends(get_station_service)
 ):
-    return service.list_active_stations(user.restaurant_id)
+    return service.list_stations(user.restaurant_id)
+
+# ----------------------------------------------------------------------------------------------------
+# Obtener estación
+# ----------------------------------------------------------------------------------------------------
+@router.get(
+    "/{station_id}",
+    response_model=StationResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Obtener estación",
+    description="Devuelve una estación específica del restaurante autenticado."
+)
+def get_station(
+    station_id: int,
+    user: User = Depends(kitchen_or_admin),
+    service: StationService = Depends(get_station_service)
+):
+    return service.get_station(user.restaurant_id, station_id)
 
 # ----------------------------------------------------------------------------------------------------
 # Actualizar estación

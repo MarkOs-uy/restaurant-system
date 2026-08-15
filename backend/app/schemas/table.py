@@ -1,12 +1,6 @@
 from app.models.order import OrderStatus
 from .base import BaseSchema
-from enum import Enum
-
-class TableShape(str, Enum):
-    CIRCLE = "circle"
-    SQUARE = "square"
-    RECTANGLE_HORIZONTAL = "rectangle-horizontal"
-    RECTANGLE_VERTICAL = "rectangle-vertical"
+from app.models.enums import TableShape
 
 class TableCreate(BaseSchema):
     number: int | None = None

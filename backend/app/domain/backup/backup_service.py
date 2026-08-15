@@ -33,8 +33,7 @@ from app.schemas.backup import (
     BackupFileOut,
     BackupEmailOut,
     BackupDeleteOut,
-    BackupRestoreOut,
-    BackupEmailRequest
+    BackupRestoreOut
 )
 
 BEFORE_RESTORE_MAX = 10

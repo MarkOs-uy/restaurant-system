@@ -1,61 +1,76 @@
-import { useParams, useNavigate } from "react-router-dom"
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
+import { useNavigate, useParams } from "react-router-dom"
+
 import { apiFetch } from "../api"
 import { wsService } from "../services/wsService"
 import type { WSEventParsed } from "../ws"
+
 import { moneyToNumber } from "../utils/money"
 
-interface Item {
-  id: number
-  product_name: string
-  quantity: number
-  unit_price: number
-  status: string
+import type {
+  AddProductToTableResponse,
+  OrderDetail,
+  RawOrderDetail
+} from "../types/order"
+
+import type { CategoryWithProducts } from "../types/category"
+
+import { OrderStatus } from "../types/orderStatus"
+import { OrderItemStatus } from "../types/orderItemStatus"
+import { PaymentMethod } from "../types/paymentMethod"
+import { WSEvent } from "../types/webSocketEvents"
+
+
+/**
+ * Eventos WebSocket que pueden modificar la información
+ * mostrada en el detalle de una orden.
+ */
+const ORDER_DETAIL_EVENTS = new Set<string>([
+  WSEvent.ORDER_UPDATED,
+  WSEvent.ORDER_STATUS_CHANGED,
+  WSEvent.ORDER_CLOSED,
+  WSEvent.ITEM_STATUS_CHANGED,
+  WSEvent.PAYMENT_ADDED,
+  WSEvent.PAYMENT_DELETED
+])
+
+
+/**
+ * Comprueba que el payload recibido por WebSocket
+ * contiene un identificador de orden válido.
+ */
+function hasOrderId(
+  value: unknown
+): value is { order_id: number } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "order_id" in value &&
+    typeof value.order_id === "number"
+  )
 }
 
-interface Payment {
-  id: number
-  amount: number
-  method: string
-}
 
-interface Order {
-  id: number
-  table_id: number
-  table_number: number
-  status: string
-  items: Item[]
-  subtotal: number
-  payments: Payment[]
-  total: number
-  total_paid: number
-  remaining: number
-  discount: number
-}
-
-interface Category {
-  id: number
-  name: string
-  products: Product[]
-}
-
-interface Product {
-  id: number
-  name: string
-  price: number
-}
-
-function normalizeOrder(data: any): Order {
+/**
+ * Convierte los valores monetarios recibidos desde la API
+ * a number para poder utilizarlos de forma segura en la UI.
+ */
+function normalizeOrder(
+  data: RawOrderDetail
+): OrderDetail {
   return {
     ...data,
-    items: (data.items ?? []).map((item: any) => ({
+
+    items: (data.items ?? []).map(item => ({
       ...item,
       unit_price: moneyToNumber(item.unit_price)
     })),
-    payments: (data.payments ?? []).map((payment: any) => ({
+
+    payments: (data.payments ?? []).map(payment => ({
       ...payment,
       amount: moneyToNumber(payment.amount)
     })),
+
     subtotal: moneyToNumber(data.subtotal),
     total: moneyToNumber(data.total),
     total_paid: moneyToNumber(data.total_paid),
@@ -64,69 +79,57 @@ function normalizeOrder(data: any): Order {
   }
 }
 
-export default function OrderDetail() {
 
+export default function OrderDetail() {
   const { orderId, tableId } = useParams()
-  const id = orderId ? Number(orderId) : null
+
+  const id = orderId
+    ? Number(orderId)
+    : null
 
   const navigate = useNavigate()
 
-  const [order, setOrder] = useState<Order | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [order, setOrder] =
+    useState<OrderDetail | null>(null)
 
-  const [categories, setCategories] = useState<Category[]>([])
-  const [openCategory, setOpenCategory] = useState<number | null>(null)
+  const [loading, setLoading] =
+    useState(true)
 
-  const [paymentAmount, setPaymentAmount] = useState("")
-  const [quantities, setQuantities] = useState<{ [key: number]: number }>({})
-  const [discount, setDiscount] = useState("")
-  const [discountType, setDiscountType] = useState<"amount" | "percent">("amount")
+  const [categories, setCategories] =
+    useState<CategoryWithProducts[]>([])
+
+  const [openCategory, setOpenCategory] =
+    useState<number | null>(null)
+
+  const [paymentAmount, setPaymentAmount] =
+    useState("")
+
+  const [quantities, setQuantities] =
+    useState<Record<number, number>>({})
+
+  const [discount, setDiscount] =
+    useState("")
+
+  const [discountType, setDiscountType] =
+    useState<"amount" | "percent">("amount")
+
   const updating = useRef(false)
 
-  useEffect(() => {
-    fetchCategories()
-    if (id) {
-      console.log(`${id}`)
-      fetchOrder()
-    } else {
-      setLoading(false)
-    }
-  }, [orderId])
-
-
-  useEffect(() => {
-    if (!id) return
-    const handler = ({ type, data }: WSEventParsed) => {
-      const relevantEvents = [
-        "ORDER_UPDATED",
-        "ORDER_STATUS_CHANGED",
-        "ITEM_STATUS_CHANGED",
-        "PAYMENT_ADDED",
-        "PAYMENT_DELETED"
-      ]
-      if (
-        relevantEvents.includes(type) &&
-        data.order_id === id
-      ) {
-        fetchOrder()
-      }
-    }
-    wsService.subscribe(handler)
-    return () => {
-      wsService.unsubscribe(handler)
-    }
-  }, [id])
-  
-  useEffect(() => {
-    if (!order) return
-    setPaymentAmount(order.remaining.toFixed(2))
-  }, [order?.remaining])
-
-
+  /**
+   * Obtiene la orden actual desde el backend y normaliza
+   * sus valores monetarios.
+   *
+   * El backend permanece como fuente de verdad.
+   */
   const fetchOrder = async () => {
-    setLoading(true)
+    if (!id) return
+
     try {
-      const data = await apiFetch(`/orders/${id}`)
+      const data =
+        await apiFetch<RawOrderDetail>(
+          `/orders/${id}`
+        )
+
       setOrder(normalizeOrder(data))
     } finally {
       setLoading(false)
@@ -134,55 +137,112 @@ export default function OrderDetail() {
   }
 
 
+  /**
+   * Carga las categorías activas junto con sus productos
+   * disponibles para agregar a la orden.
+   */
   const fetchCategories = async () => {
-    const data = await apiFetch(`/categories/with-products`)
+    const data =
+      await apiFetch<CategoryWithProducts[]>(
+        "/categories/with-products"
+      )
+
     setCategories(data)
   }
 
 
-  const addProduct = async (productId: number) => {
-    const quantity = quantities[productId] || 1
-    if (order?.status === "CLOSED") return
+  /**
+   * Agrega un producto a la orden.
+   *
+   * Si todavía no existe una orden para la mesa,
+   * el backend la crea y devuelve su identificador.
+   */
+  const addProduct = async (
+    productId: number
+  ) => {
+    const quantity =
+      quantities[productId] || 1
+
+    if (
+      order?.status === OrderStatus.CLOSED
+    ) {
+      return
+    }
+
     if (!orderId) {
-      const data = await apiFetch(
-        `/tables/${tableId}/add-product`,
-        {
-          method: "POST",
-          body: {
-            product_id: productId,
-            quantity
+      if (!tableId) return
+
+      const data =
+        await apiFetch<AddProductToTableResponse>(
+          `/tables/${tableId}/add-product`,
+          {
+            method: "POST",
+            body: {
+              product_id: productId,
+              quantity
+            }
           }
-        }
-      )
+        )
+
       navigate(`/orders/${data.order_id}`)
       return
     }
-    await apiFetch(`/orders/${orderId}/items`, {
-      method: "POST",
-      body: {
-        product_id: productId,
-        quantity
+
+    await apiFetch(
+      `/orders/${orderId}/items`,
+      {
+        method: "POST",
+        body: {
+          product_id: productId,
+          quantity
+        }
       }
-    })
+    )
+
     await fetchOrder()
   }
 
 
-  const removeItem = async (orderId: number, itemId: number) => {
-    await apiFetch(`/orders/${orderId}/items/${itemId}`, {
-      method: "DELETE"
-    })
+  /**
+   * Elimina un ítem pendiente de la orden.
+   */
+  const removeItem = async (
+    orderId: number,
+    itemId: number
+  ) => {
+    await apiFetch(
+      `/orders/${orderId}/items/${itemId}`,
+      {
+        method: "DELETE"
+      }
+    )
+
     await fetchOrder()
   }
 
 
-  const updateQuantity = async (itemId: number, quantity: number) => {
+  /**
+   * Actualiza la cantidad de un ítem pendiente.
+   *
+   * El ref evita enviar modificaciones concurrentes
+   * mientras una actualización anterior sigue en curso.
+   */
+  const updateQuantity = async (
+    itemId: number,
+    quantity: number
+  ) => {
     if (updating.current) return
+
     updating.current = true
+
     try {
-      await apiFetch(`/orders/order-items/${itemId}?quantity=${quantity}`, {
-        method: "PATCH"
-      })
+      await apiFetch(
+        `/orders/order-items/${itemId}?quantity=${quantity}`,
+        {
+          method: "PATCH"
+        }
+      )
+
       await fetchOrder()
     } finally {
       updating.current = false
@@ -190,63 +250,181 @@ export default function OrderDetail() {
   }
 
 
-  const markDelivered = async (itemId: number) => {
+  /**
+   * Marca un ítem READY como entregado.
+   */
+  const markDelivered = async (
+    itemId: number
+  ) => {
     await apiFetch(
       `/order-items/${itemId}/status`,
       {
         method: "PATCH",
-        body: { status: "DELIVERED" }
+        body: {
+          status: OrderItemStatus.DELIVERED
+        }
       }
     )
+
     await fetchOrder()
   }
 
 
-  const registerPayment = async (method: string) => {
+  /**
+   * Registra un pago para la orden actual.
+   */
+  const registerPayment = async (
+    method: PaymentMethod
+  ) => {
     if (!id) return
+
     const amount = Number(paymentAmount)
-    if (!amount || amount <= 0) {
+
+    if (
+      !Number.isFinite(amount) ||
+      amount <= 0
+    ) {
       alert("El pago debe ser mayor a 0")
       return
     }
-    await apiFetch(`/orders/${id}/payments`, {
-      method: "POST",
-      body: {
-        amount,
-        method
+
+    await apiFetch(
+      `/orders/${id}/payments`,
+      {
+        method: "POST",
+        body: {
+          amount,
+          method
+        }
       }
-    })
+    )
+
     await fetchOrder()
   }
 
 
-  const cancelPayment = async (paymentId: number) => {
+  /**
+   * Elimina un pago registrado mientras la orden
+   * todavía permanece abierta.
+   */
+  const cancelPayment = async (
+    paymentId: number
+  ) => {
     await apiFetch(
       `/orders/payments/${paymentId}`,
       {
-        method: "DELETE",
+        method: "DELETE"
       }
     )
+
     await fetchOrder()
   }
 
 
+  /**
+   * Cierra una orden que cumple las reglas de negocio
+   * de pago completo e ítems entregados.
+   */
   const closeOrder = async () => {
     if (!id) return
-    await apiFetch(`/orders/${id}/close`, {
-      method: "POST",
-    })
-  }
 
+    await apiFetch(
+      `/orders/${id}/close`,
+      {
+        method: "POST"
+      }
+    )
 
-  const sendToKitchen = async () => {
-    if (!id) return
-    await apiFetch(`/orders/${id}/send-to-kitchen`, {
-      method: "POST",
-    })
     await fetchOrder()
   }
 
+
+  /**
+   * Envía todos los ítems pendientes de la orden
+   * hacia sus respectivas estaciones de producción.
+   */
+  const sendToKitchen = async () => {
+    if (!id) return
+
+    await apiFetch(
+      `/orders/${id}/send-to-kitchen`,
+      {
+        method: "POST"
+      }
+    )
+
+    await fetchOrder()
+  }
+
+  /**
+   * El catálogo no depende de la orden,
+   * por lo que se carga una sola vez.
+   */
+  useEffect(() => {
+    fetchCategories()
+  }, [])
+
+
+  /**
+   * Carga el detalle cuando existe una orden.
+   * Si todavía estamos creando una orden desde una mesa,
+   * simplemente habilita la pantalla.
+   */
+  useEffect(() => {
+    if (id) {
+      setLoading(true)
+      fetchOrder()
+    } else {
+      setOrder(null)
+      setLoading(false)
+    }
+  }, [id])
+
+
+  /**
+   * Mantiene sincronizado el detalle ante cambios
+   * realizados desde otras terminales.
+   */
+  useEffect(() => {
+    if (!id) return
+
+    const handler = ({
+      type,
+      data
+    }: WSEventParsed) => {
+      if (!ORDER_DETAIL_EVENTS.has(type)) {
+        return
+      }
+      console.log("WS EVENT:", type, data)
+      if (
+        !hasOrderId(data) ||
+        data.order_id !== id
+      ) {
+        return
+      }
+
+      fetchOrder()
+    }
+
+    wsService.subscribe(handler)
+
+    return () => {
+      wsService.unsubscribe(handler)
+    }
+  }, [id])
+
+
+  /**
+   * Propone por defecto pagar exactamente
+   * el saldo pendiente de la orden.
+   */
+  useEffect(() => {
+    if (!order) return
+
+    setPaymentAmount(
+      order.remaining.toFixed(2)
+    )
+  }, [order?.remaining])
 
   if (loading) return <p>Cargando...</p>
 
@@ -259,56 +437,99 @@ export default function OrderDetail() {
   const payments = order?.payments ?? []
   const allDelivered =
     items.length > 0 &&
-    items.every(i => i.status === "DELIVERED")
+    items.every(i => i.status === OrderItemStatus.DELIVERED)
   const canClose =
     remaining === 0 &&
     allDelivered &&
-    status !== "CLOSED"
+    status !== OrderStatus.CLOSED
   const hasPendingItems =
-    items.some(i => i.status === "PENDING")
+    items.some(i => i.status === OrderItemStatus.PENDING)
   const getStatusColor = () => {
     switch (status) {
-      case "OPEN": return "green"
-      case "SENT": return "orange"
-      case "IN_PROGRESS": return "blue"
-      case "READY": return "purple"
-      case "CLOSED": return "gray"
-      case "CANCELLED": return "red"
-      default: return "black"
+      case OrderStatus.OPEN:
+        return "green"
+
+      case OrderStatus.SENT:
+        return "orange"
+
+      case OrderStatus.IN_PROGRESS:
+        return "blue"
+
+      case OrderStatus.READY:
+        return "purple"
+
+      case OrderStatus.CLOSED:
+        return "gray"
+
+      case OrderStatus.CANCELLED:
+        return "red"
+
+      default:
+        return "black"
     }
   }
 
-  const setOrderDiscount = async (amount: number) => {
+  /**
+   * Persiste el descuento monetario aplicado a la orden.
+   */
+  const setOrderDiscount = async (
+    amount: number
+  ) => {
     if (!order) return
+
     await apiFetch(
       `/orders/${order.id}/discount?discount=${amount}`,
       {
-        method: "PUT",
+        method: "PUT"
       }
     )
+
     setDiscount("")
+
     await fetchOrder()
   }
 
 
+  /**
+   * Convierte, cuando corresponde, un porcentaje
+   * en un importe monetario y aplica el descuento.
+   */
   const applyDiscount = async () => {
-    if (!order || discount.trim() === "") return
-    let finalDiscount = Number(discount)
-    if (Number.isNaN(finalDiscount) || finalDiscount < 0) {
+    if (
+      !order ||
+      discount.trim() === ""
+    ) {
+      return
+    }
+
+    let finalDiscount =
+      Number(discount)
+
+    if (
+      !Number.isFinite(finalDiscount) ||
+      finalDiscount < 0
+    ) {
       alert("Descuento inválido")
       return
     }
-    if (discountType === "percent") {
-      finalDiscount = (order.subtotal * finalDiscount) / 100
+
+    if (
+      discountType === "percent"
+    ) {
+      finalDiscount =
+        (order.subtotal * finalDiscount) / 100
     }
+
     await setOrderDiscount(finalDiscount)
   }
 
 
+  /**
+   * Elimina cualquier descuento existente.
+   */
   const removeDiscount = async () => {
     await setOrderDiscount(0)
   }
-
 
   return (
 
@@ -325,14 +546,20 @@ export default function OrderDetail() {
 
         <p>Mesa: {order?.table_number || tableId}</p>
 
-        <p>
-          Estado:{" "}
-          <strong style={{ color: getStatusColor() }}>
-            {status}
-          </strong>
-        </p>
+        {order && (
+          <p>
+            Estado:{" "}
+            <strong
+              style={{
+                color: getStatusColor()
+              }}
+            >
+              {order.status}
+            </strong>
+          </p>
+        )}
 
-        {order?.status === "DRAFT" && (
+        {order?.status === OrderStatus.DRAFT && (
           <div style={{
             background: "#333",
             padding: 10,
@@ -362,10 +589,10 @@ export default function OrderDetail() {
                 {item.product_name}
               </span>
 
-              {item.status === "PENDING" && (
+              {item.status === OrderItemStatus.PENDING && (
                 <>
                   <button className="btn btn-icon"
-                    onClick={() => updateQuantity(item.id, Math.max(0, item.quantity - 1))}
+                    onClick={() => updateQuantity(item.id, Math.max(1, item.quantity - 1))}
                   >
                     −
                   </button>
@@ -389,24 +616,28 @@ export default function OrderDetail() {
                   textAlign: "center",
                   fontWeight: 600,
                   color:
-                    item.status === "PENDING"
+                    item.status === OrderItemStatus.PENDING
                       ? "#b58900"
-                      : item.status === "READY"
+                      : item.status === OrderItemStatus.READY
                       ? "#268bd2"
-                      : item.status === "DELIVERED"
+                      : item.status === OrderItemStatus.DELIVERED
                       ? "#2a9d8f"
                       : "#333",
                   textDecoration:
-                    item.status === "DELIVERED"
+                    item.status === OrderItemStatus.DELIVERED
                       ? "line-through"
                       : "none"
                 }}
               >
                 {item.status}
               </strong>
-              {item.status === "PENDING" && (
+              {item.status === OrderItemStatus.PENDING && (
                 <button
-                  onClick={() => removeItem(order!.id, item.id)}
+                  onClick={() => {
+                    if (order) {
+                      removeItem(order.id, item.id)
+                    }
+                  }}
                   style={{
                     border: "none",
                     background: "transparent",
@@ -417,7 +648,7 @@ export default function OrderDetail() {
                   ❌
                 </button>
               )}
-              {item.status === "READY" && (
+              {item.status === OrderItemStatus.READY && (
                 <button
                   className="btn btn-primary"
                   onClick={() => markDelivered(item.id)}
@@ -452,7 +683,7 @@ export default function OrderDetail() {
         </div>
 
         {/* ENVIAR A COCINA */}
-        {status !== "CLOSED" && hasPendingItems && (
+        {status !== OrderStatus.CLOSED && hasPendingItems && (
           <div style={{ marginTop: 20 }}>
             <button
               onClick={sendToKitchen}
@@ -472,7 +703,7 @@ export default function OrderDetail() {
 
         <hr />
 
-        {order?.status !== "DRAFT" && (
+        {order && order.status !== OrderStatus.DRAFT && (
           <>
             <h2>Descuento</h2>
 
@@ -514,93 +745,107 @@ export default function OrderDetail() {
         )}
 
         {/* PAGOS */}
-        <h2>Pagos</h2>
+        {order && (
+          <>
+            <h2>Pagos</h2>
 
-        {payments.length === 0 && <p>No hay pagos registrados</p>}
+            {payments.length === 0 && (
+              <p>No hay pagos registrados</p>
+            )}
 
-        <ul style={{ listStyle: "none", padding: 0 }}>
-          {payments.map(p => (
-            <li
-              key={p.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "6px 0",
-                borderBottom: "1px solid #eee"
-              }}
-            >
-              <span>
-                ${Number(p.amount).toFixed(2)} — {p.method}
-              </span>
-
-              {status !== "CLOSED" && (
-                <button
-                  onClick={() => cancelPayment(p.id)}
+            <ul style={{ listStyle: "none", padding: 0 }}>
+              {payments.map(p => (
+                <li
+                  key={p.id}
                   style={{
-                    border: "none",
-                    background: "transparent",
-                    cursor: "pointer",
-                    fontSize: 16
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "6px 0",
+                    borderBottom: "1px solid #eee"
                   }}
                 >
-                  ❌
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
+                  <span>
+                    ${p.amount.toFixed(2)} — {p.method}
+                  </span>
 
-        <p><strong>Total pagado:</strong> ${total_paid.toFixed(2)}</p>
-        <p><strong>Saldo pendiente:</strong> ${remaining.toFixed(2)}</p>
+                  {status !== OrderStatus.CLOSED && (
+                    <button
+                      onClick={() => cancelPayment(p.id)}
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        cursor: "pointer",
+                        fontSize: 16
+                      }}
+                    >
+                      ❌
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
 
+            <p>
+              <strong>Total pagado:</strong>{" "}
+              ${total_paid.toFixed(2)}
+            </p>
+
+            <p>
+              <strong>Saldo pendiente:</strong>{" "}
+              ${remaining.toFixed(2)}
+            </p>
+          </>
+        )}
 
         {/* FORMULARIO DE PAGO */}
-        {status !== "CLOSED" && (
-          <div style={{ marginTop: 20 }}>
-            <h3>Registrar Pago</h3>
+        {order &&
+          order.status !== OrderStatus.CLOSED && (
+            <div style={{ marginTop: 20 }}>
+              <h3>Registrar Pago</h3>
 
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder="Monto"
-              value={paymentAmount}
-              onChange={(e) => setPaymentAmount(e.target.value)}
-              style={{ marginRight: 10, padding: 5 }}
-            />
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="Monto"
+                value={paymentAmount}
+                onChange={(e) => setPaymentAmount(e.target.value)}
+                style={{ marginRight: 10, padding: 5 }}
+              />
 
-            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-              <button
-                className="btn btn-payment-cash"
-                onClick={() => registerPayment("CASH")}
-              >
-              💵 Efectivo
-              </button>
+              <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+                <button
+                  className="btn btn-payment-cash"
+                  onClick={() => registerPayment(PaymentMethod.CASH)}
+                >
+                💵 Efectivo
+                </button>
 
-              <button
-                className="btn btn-payment-card"
-                onClick={() => registerPayment("CARD")}
-              >
-              💳 Tarjeta
-              </button>
+                <button
+                  className="btn btn-payment-card"
+                  onClick={() => registerPayment(PaymentMethod.CARD)}
+                >
+                💳 Tarjeta
+                </button>
 
-              <button
-                className="btn btn-payment-transfer"
-                onClick={() => registerPayment("TRANSFER")}
-              >
-              🏦 Transferencia
-              </button>
+                <button
+                  className="btn btn-payment-transfer"
+                  onClick={() => registerPayment(PaymentMethod.TRANSFER)}
+                >
+                🏦 Transferencia
+                </button>
 
-              <button
-                className="btn btn-payment-other"
-                onClick={() => registerPayment("OTHER")}
-              >
-              🤝 Otro
-              </button>
+                <button
+                  className="btn btn-payment-other"
+                  onClick={() => registerPayment(PaymentMethod.OTHER)}
+                >
+                🤝 Otro
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )
+        }
 
         {/* CERRAR ORDEN SOLO SI CUMPLE REGLAS */}
         {canClose && (
@@ -669,10 +914,13 @@ export default function OrderDetail() {
 
                     <button className="btn btn-primary"
                       onClick={() =>
-                        setQuantities({
-                          ...quantities,
-                          [p.id]: Math.max((quantities[p.id] || 1) - 1, 1)
-                        })
+                        setQuantities(current => ({
+                          ...current,
+                          [p.id]: Math.max(
+                            (current[p.id] || 1) - 1,
+                            1
+                          )
+                        }))
                       }
                     >
                       −
@@ -682,10 +930,10 @@ export default function OrderDetail() {
 
                     <button className="btn btn-primary"
                       onClick={() =>
-                        setQuantities({
-                          ...quantities,
-                          [p.id]: (quantities[p.id] || 1) + 1
-                        })
+                        setQuantities(current => ({
+                          ...current,
+                          [p.id]: (current[p.id] || 1) + 1
+                        }))
                       }
                     >
                       +

@@ -1,3 +1,6 @@
+import { OrderStatus } from "./orderStatus"
+import { OrderItemStatus } from "./orderItemStatus"
+
 /**
  * Eventos Websocket
  */
@@ -6,14 +9,11 @@ export const WSEvent = {
   CASH_MOVEMENT_ADDED: "CASH_MOVEMENT_ADDED",
   CASH_MOVEMENT_DELETED: "CASH_MOVEMENT_DELETED",
 
-  //ORDER_CREATED: "ORDER_CREATED",
-  //ORDER_ITEM_ADDED: "ORDER_ITEM_ADDED",
-  //ORDER_ITEM_REMOVED: "ORDER_ITEM_REMOVED",
   ORDER_UPDATED: "ORDER_UPDATED",
-  ORDER_STATUS_CHANGED: "ORDER STATUS CHANGED",
-  ORDER_CLOSED: "ORDER CLOSED",
+  ORDER_STATUS_CHANGED: "ORDER_STATUS_CHANGED",
+  ORDER_CLOSED: "ORDER_CLOSED",
   
-  ITEM_STATUS_CHANGED: "ITEM STATUS CHANGED",
+  ITEM_STATUS_CHANGED: "ITEM_STATUS_CHANGED",
   NEW_ITEM: "NEW_ITEM",
   ITEM_READY: "ITEM_READY",
 
@@ -27,16 +27,25 @@ export const WSEvent = {
   TABLE_DEACTIVATED: "TABLE_DEACTIVATED",
   LAYOUT_UPDATED: "LAYOUT_UPDATED"
 
-
-
-
-
-
-
-
-
-
-
 } as const
 
 export type WSEvent = typeof WSEvent[keyof typeof WSEvent]
+
+export interface OrderStatusChangedPayload {
+  order_id: number
+  status: OrderStatus
+}
+
+export interface ItemStatusChangedPayload {
+  order_id: number
+  item_id: number
+  status: OrderItemStatus
+}
+
+export interface OrderUpdatedPayload {
+  order_id: number
+}
+
+export interface OrderClosedPayload {
+  order_id: number
+}

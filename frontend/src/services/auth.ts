@@ -1,5 +1,5 @@
 import { jwtDecode } from "jwt-decode"
-
+import { UserRole } from "../types/userRole"
 import { wsService } from "./wsService"
 
 
@@ -11,6 +11,10 @@ interface AuthPayload {
   exp?: number
 }
 
+interface AuthState {
+  token: string | null
+  role: UserRole | null
+}
 
 // ---------------------------------------------------------------------------------------------
 // Elimina toda la información de autenticación almacenada localmente.
@@ -48,22 +52,30 @@ function isTokenValid(token: string | null): boolean {
 }
 
 
+function isUserRole(
+  value: string | null
+): value is UserRole {
+  return (
+    value !== null &&
+    Object.values(UserRole).some(
+      role => role === value
+    )
+  )
+}
+
+
 // ---------------------------------------------------------------------------------------------
 // Lee y valida la sesión almacenada localmente.
 // Si la información es inexistente o inválida, limpia la sesión.
 // ---------------------------------------------------------------------------------------------
-export function readAuth(): {
-  token: string | null
-  role: string | null
-} {
-
+export function readAuth(): AuthState {
   const token = localStorage.getItem("token")
-  const role = localStorage.getItem("role")
-
+  const storedRole = localStorage.getItem("role")
   if (
     !token ||
-    !role ||
-    !isTokenValid(token)
+    !storedRole ||
+    !isTokenValid(token) ||
+    !isUserRole(storedRole)
   ) {
     clearStoredAuth()
 
@@ -75,7 +87,7 @@ export function readAuth(): {
 
   return {
     token,
-    role
+    role: storedRole
   }
 }
 

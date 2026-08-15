@@ -9,6 +9,7 @@ from app.domain.order.order_transitions import is_valid_order_transition
 from app.domain.order.constants import ACTIVE_ORDER_STATUSES
 from app.domain.errors.base import DomainError
 from app.domain.errors.error_codes import ErrorCode
+from app.domain.events.websocket import WSEvent
 
 from app.services.event_service import EventService
 
@@ -250,7 +251,7 @@ class OrderService:
         for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
             self.events.emit(
                 restaurant_id=order.restaurant_id,
-                event_type="ORDER_UPDATED",
+                event_type=WSEvent.ORDER_UPDATED,
                 payload={"order_id": order.id},
                 target="role",
                 target_id=role.value
@@ -316,14 +317,12 @@ class OrderService:
         self.db.flush()
         new_status = self._calculate_order_status(order)
         self._set_status(order, new_status)
-        self.db.commit()
-        self.db.refresh(order)
         # =========================
         # 🔔 EVENTOS
         # =========================
         self.events.emit(
             restaurant_id=order.restaurant_id,
-            event_type="NEW_ITEM",
+            event_type=WSEvent.NEW_ITEM,
             payload={"order_id": order.id},
             target="station",
             target_id=str(product.station_id)
@@ -332,7 +331,7 @@ class OrderService:
             for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
                 self.events.emit(
                     restaurant_id=order.restaurant_id,
-                    event_type="ORDER_STATUS_CHANGED",
+                    event_type=WSEvent.ORDER_STATUS_CHANGED,
                     payload={"order_id": order.id, "status": order.status.value},
                     target="role",
                     target_id=role.value
@@ -341,11 +340,13 @@ class OrderService:
             logger.debug("ORDER_UPDATED emit order_id=%s", order.id)
             self.events.emit(
                 restaurant_id=order.restaurant_id,
-                event_type="ORDER_UPDATED",
+                event_type=WSEvent.ORDER_UPDATED,
                 payload={"order_id": order.id},
                 target="role",
                 target_id=role.value
             )
+        self.db.commit()
+        self.db.refresh(order)
         return self.to_order_response(order)
 
     # -------------------------
@@ -378,59 +379,111 @@ class OrderService:
                 "Estado de orden actualizado order_id=%s from=%s to=%s",
                 order.id, previous_status.value, new_status.value
             )
-            self.db.commit()
-            self.db.refresh(order)
             for role in [UserRole.ADMIN, UserRole.WAITER]:
                 self.events.emit(
                     restaurant_id=order.restaurant_id,
-                    event_type="ORDER_STATUS_CHANGED",
+                    event_type=WSEvent.ORDER_STATUS_CHANGED,
                     payload={"order_id": order.id, "status": new_status.value},
                     target="role",
                     target_id=role.value
                 )
+            self.db.commit()
+            self.db.refresh(order)
         return self.to_order_response(order)
 
     # -------------------------
     # Enviar a cocina
     # -------------------------
-    def send_to_kitchen(self, order: Order) -> OrderResponse:
+    def send_to_kitchen(
+        self,
+        order: Order
+    ) -> OrderResponse:
+
         if order.status == OrderStatus.CLOSED:
             raise DomainError(
                 "Order is closed",
                 ErrorCode.ORDER_ALREADY_CLOSED
             )
-        pending_items = [i for i in order.items if i.status == OrderItemStatus.PENDING]
+
+        pending_items = [
+            item
+            for item in order.items
+            if item.status == OrderItemStatus.PENDING
+        ]
+
         if not pending_items:
             raise DomainError(
                 "No pending items to send",
                 ErrorCode.NO_PENDING_ITEMS_TO_SEND
             )
+
         previous_status = order.status
+
+        # --------------------------------------------------
+        # Actualizar ítems pendientes
+        # --------------------------------------------------
         for item in pending_items:
             item.status = OrderItemStatus.SENT
-        logger.info("Orden enviada a cocina order_id=%s r=%s", order.id, order.restaurant_id)
+
         new_status = self._calculate_order_status(order)
         self._set_status(order, new_status)
-        self.db.commit()
-        self.db.refresh(order)
-        station_ids = {i.product.station_id for i in pending_items}
+
+        logger.info(
+            "Orden enviada a cocina order_id=%s r=%s",
+            order.id,
+            order.restaurant_id
+        )
+
+        # --------------------------------------------------
+        # Notificar a las estaciones involucradas
+        # --------------------------------------------------
+        station_ids = {
+            item.product.station_id
+            for item in pending_items
+        }
+
         for station_id in station_ids:
             self.events.emit(
                 restaurant_id=order.restaurant_id,
-                event_type="ORDER_UPDATED",
-                payload={"order_id": order.id},
+                event_type=WSEvent.ORDER_UPDATED,
+                payload={
+                    "order_id": order.id
+                },
                 target="station",
                 target_id=str(station_id)
             )
+
+        # --------------------------------------------------
+        # Notificar cambio de estado de la orden
+        # --------------------------------------------------
         if order.status != previous_status:
-            for role in [UserRole.ADMIN, UserRole.WAITER]:
+            for role in [
+                UserRole.ADMIN,
+                UserRole.WAITER
+            ]:
                 self.events.emit(
                     restaurant_id=order.restaurant_id,
-                    event_type="ORDER_STATUS_CHANGED",
-                    payload={"order_id": order.id, "status": order.status.value},
+                    event_type=WSEvent.ORDER_STATUS_CHANGED,
+                    payload={
+                        "order_id": order.id,
+                        "status": order.status.value
+                    },
                     target="role",
                     target_id=role.value
                 )
+
+        # --------------------------------------------------
+        # Un único commit:
+        #
+        # - cambios de la orden
+        # - cambios de los ítems
+        # - eventos EventOutbox
+        #
+        # quedan en la misma transacción.
+        # --------------------------------------------------
+        self.db.commit()
+        self.db.refresh(order)
+
         return self.to_order_response(order)
 
     # -------------------------
@@ -464,23 +517,23 @@ class OrderService:
             cash_register_id=cash_register.id
         )
         self.db.add(payment)
-        self.db.commit()
-        self.db.refresh(payment)
         for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
             self.events.emit(
                 restaurant_id=order.restaurant_id,
-                event_type="PAYMENT_ADDED",
+                event_type=WSEvent.PAYMENT_ADDED,
                 payload={"order_id": order.id, "amount": money(data.amount), "method": data.method},
                 target="role",
                 target_id=role.value
             )
         self.events.emit(
             restaurant_id=order.restaurant_id,
-            event_type="CASH_REGISTER_UPDATED",
+            event_type=WSEvent.CASH_REGISTER_UPDATED,
             payload={"order_id": order.id},
             target="role",
             target_id=UserRole.CASHIER.value
         )
+        self.db.commit()
+        self.db.refresh(payment)
         return payment
 
     # -------------------------
@@ -511,13 +564,10 @@ class OrderService:
         order_id = payment.order_id
         amount = payment.amount
         method = payment.method
-
-        self.db.delete(payment)
-        self.db.commit()
         for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
             self.events.emit(
                 restaurant_id=restaurant_id,
-                event_type="PAYMENT_DELETED",
+                event_type=WSEvent.PAYMENT_DELETED,
                 payload={
                     "order_id": order_id,
                     "amount": money(amount),
@@ -528,11 +578,13 @@ class OrderService:
             )
         self.events.emit(
             restaurant_id=restaurant_id,
-            event_type="CASH_REGISTER_UPDATED",
+            event_type=WSEvent.CASH_REGISTER_UPDATED,
             payload={"order_id": order_id},
             target="role",
             target_id=UserRole.CASHIER.value
         )
+        self.db.delete(payment)
+        self.db.commit()
         return {"deleted": payment_id}
 
     # -------------------------
@@ -569,24 +621,24 @@ class OrderService:
         logger.info("Orden cerrada order_id=%s r=%s total=%s", order.id, order.restaurant_id, total)
         self._set_status(order, OrderStatus.CLOSED)
         order.closed_at = func.now()
-        self.db.commit()
-        self.db.refresh(order)
         # Emitir evento
         for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
             self.events.emit(
                 restaurant_id=order.restaurant_id,
-                event_type="ORDER_CLOSED",
+                event_type=WSEvent.ORDER_CLOSED,
                 payload={"order_id": order.id},
                 target="role",
                 target_id=role.value
             )
         self.events.emit(
             restaurant_id=order.restaurant_id,
-            event_type="CASH_REGISTER_UPDATED",
+            event_type=WSEvent.CASH_REGISTER_UPDATED,
             payload={"order_id": order.id},
             target="role",
             target_id=UserRole.CASHIER.value
         )
+        self.db.commit()
+        self.db.refresh(order)
         return self.to_order_response(order)
 
     # -------------------------
@@ -633,19 +685,19 @@ class OrderService:
         self.db.delete(item)
         new_status = self._calculate_order_status(order)
         self._set_status(order, new_status)
-        self.db.commit()
-        self.db.refresh(order)
         logger.info("Item eliminado order_id=%s item_id=%s", order_id, item_id)
         # 🔔 EVENTO
         for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
             self.events.emit(
                 restaurant_id=restaurant_id,
-                event_type="ORDER_UPDATED",
+                event_type=WSEvent.ORDER_UPDATED,
                 payload={"order_id": order_id},
                 target="role",
                 target_id=role.value
             )
-
+        self.db.commit()
+        self.db.refresh(order)
+        
     # -------------------------
     # Actualizar cantidad por item de la orden
     # -------------------------

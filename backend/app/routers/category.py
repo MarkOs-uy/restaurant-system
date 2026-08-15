@@ -90,22 +90,6 @@ def update_category(
     return service.update_category(user.restaurant_id, category_id, data)
 
 # ----------------------------------------------------------------------------------------------------
-# Eliminar categoría
-# ----------------------------------------------------------------------------------------------------
-@router.delete(
-    "/{category_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Eliminar categoría",
-    description="Elimina una categoría del restaurante."
-)
-def delete_category(
-    category_id: int,
-    user: User = Depends(admin_only),
-    service: CategoryService = Depends(get_category_service)
-):
-    service.delete_category(user.restaurant_id, category_id)
-
-# ----------------------------------------------------------------------------------------------------
 # Activar o desactivar categoría
 # ----------------------------------------------------------------------------------------------------
 @router.patch(

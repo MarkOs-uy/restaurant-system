@@ -24,10 +24,11 @@ export interface CashRegisterDashboard {
   opening_amount: number
   total_sales: number
   orders_count: number
+  transactions_count: number
   average_ticket: number
   by_method: Record<PaymentMethod, number>
-  expected_cash: number
   cash_movements: CashMovement[]
+  expected_cash: number
 }
 
 /**
@@ -46,3 +47,52 @@ export interface CashRegisterCloseSummary {
     counted_cash: number
     difference: number
 }
+
+export type RawCashMovement =
+  Omit<CashMovement, "amount"> & {
+    amount: unknown
+  }
+
+
+export type RawCashRegisterDashboard =
+  Omit<
+    CashRegisterDashboard,
+    | "opening_amount"
+    | "total_sales"
+    | "average_ticket"
+    | "expected_cash"
+    | "by_method"
+    | "cash_movements"
+  > & {
+    opening_amount: unknown
+    total_sales: unknown
+    average_ticket: unknown
+    expected_cash: unknown
+    by_method: Record<PaymentMethod, unknown>
+    cash_movements: RawCashMovement[]
+  }
+
+
+export type RawCashRegisterCloseSummary =
+  Omit<
+    CashRegisterCloseSummary,
+    | "opening_amount"
+    | "closing_amount"
+    | "total_sales"
+    | "cash_in"
+    | "cash_out"
+    | "expected_cash"
+    | "counted_cash"
+    | "difference"
+    | "by_method"
+  > & {
+    opening_amount: unknown
+    closing_amount: unknown
+    total_sales: unknown
+    cash_in: unknown
+    cash_out: unknown
+    expected_cash: unknown
+    counted_cash: unknown
+    difference: unknown
+    by_method: Partial<Record<PaymentMethod, unknown>>
+  }

@@ -1,5 +1,19 @@
 import "./App.css"
-import { Routes, Route, Link } from "react-router-dom"
+
+import {
+  Routes,
+  Route,
+  Link,
+  Navigate
+} from "react-router-dom"
+
+import {
+  useEffect,
+  useState
+} from "react"
+
+import { Toaster } from "react-hot-toast"
+
 import TablesPage from "./pages/TablesPage"
 import OrderDetail from "./pages/OrderDetail"
 import Kitchen from "./pages/Kitchen"
@@ -13,30 +27,78 @@ import ProductsPage from "./pages/ProductsPage"
 import AdminHomePage from "./pages/AdminHomePage"
 import ReportsPage from "./pages/ReportsPage"
 import BackupsPage from "./pages/BackupsPage"
-import ProtectedRoute from "./components/ProtectedRoute"
 import KitchenStations from "./pages/KitchenStations"
 import ManageTables from "./pages/ManageTables"
-import { startHealthMonitor } from "./services/healthMonitor.ts"
-import { useState, useEffect } from "react"
-import { Toaster } from "react-hot-toast"
-import { wsService } from "./services/wsService.ts"
-import { logout, readAuth } from "./services/auth"
+
+import ProtectedRoute from "./components/ProtectedRoute"
+
+import {
+  startHealthMonitor
+} from "./services/healthMonitor"
+
+import {
+  wsService
+} from "./services/wsService"
+
+import {
+  logout,
+  readAuth
+} from "./services/auth"
+
+import { UserRole } from "./types/userRole"
+
+
+function getHomeRoute(
+  role: UserRole | null
+): string {
+  switch (role) {
+    case UserRole.ADMIN:
+      return "/admin"
+
+    case UserRole.WAITER:
+      return "/waiter"
+
+    case UserRole.KITCHEN:
+      return "/kitchen"
+
+    case UserRole.CASHIER:
+      return "/cashier"
+
+    default:
+      return "/login"
+  }
+}
+
 
 function App() {
-  const [role, setRole] = useState<string | null>(null)
-  const isWaiter = role === "ADMIN" || role === "WAITER"
-  const isKitchen = role === "ADMIN" || role === "KITCHEN"
-  const isCashier = role === "ADMIN" || role === "CASHIER"
-  const isAdmin = role === "ADMIN"
+  const [role, setRole] =
+    useState<UserRole | null>(null)
+
+  const isWaiter =
+    role === UserRole.ADMIN ||
+    role === UserRole.WAITER
+
+  const isKitchen =
+    role === UserRole.ADMIN ||
+    role === UserRole.KITCHEN
+
+  const isCashier =
+    role === UserRole.ADMIN ||
+    role === UserRole.CASHIER
+
+  const isAdmin =
+    role === UserRole.ADMIN
 
 
   useEffect(() => {
     startHealthMonitor()
   }, [])
 
+
   useEffect(() => {
     const loadAuth = () => {
       const auth = readAuth()
+
       setRole(auth.role)
 
       if (auth.token) {
@@ -45,13 +107,23 @@ function App() {
         wsService.disconnect()
       }
     }
+
     loadAuth()
-    window.addEventListener("authChanged", loadAuth)
+
+    window.addEventListener(
+      "authChanged",
+      loadAuth
+    )
+
     return () => {
-      window.removeEventListener("authChanged", loadAuth)
+      window.removeEventListener(
+        "authChanged",
+        loadAuth
+      )
     }
   }, [])
-    
+
+
   return (
     <>
       <Toaster
@@ -60,36 +132,85 @@ function App() {
           duration: 4000
         }}
       />
-      {/* NAVBAR DINÁMICO */}
+
       {role && (
         <nav className="navbar">
-          <span className="navbar span" style={{ marginRight: 20 }}>
+          <span style={{ marginRight: 20 }}>
             Rol: <strong>{role}</strong>
           </span>
 
-          {isWaiter && <Link to="/">Mesas</Link>}
-          {isWaiter && <> | <Link to="/waiter">Mozo</Link></>}
-          {isKitchen && <> | <Link to="/kitchen">Cocina</Link></>}
-          {isCashier && <> | <Link to="/cashier">Caja</Link></>}
+          {isWaiter && (
+            <Link to="/">Mesas</Link>
+          )}
+
+          {isWaiter && (
+            <>
+              {" | "}
+              <Link to="/waiter">
+                Mozo
+              </Link>
+            </>
+          )}
+
+          {isKitchen && (
+            <>
+              {" | "}
+              <Link to="/kitchen">
+                Cocina
+              </Link>
+            </>
+          )}
+
+          {isCashier && (
+            <>
+              {" | "}
+              <Link to="/cashier">
+                Caja
+              </Link>
+            </>
+          )}
 
           {isAdmin && (
             <>
               {" | "}
-              <Link to="/admin">Inicio Admin</Link>
+              <Link to="/admin">
+                Inicio Admin
+              </Link>
+
               {" | "}
-              <Link to="/tables/manage">Administración de Mesas</Link>
+              <Link to="/tables/manage">
+                Administración de Mesas
+              </Link>
+
               {" | "}
-              <Link to="/admin/products">Productos</Link>
+              <Link to="/admin/products">
+                Productos
+              </Link>
+
               {" | "}
-              <Link to="/admin/categories">Categorías</Link>
+              <Link to="/admin/categories">
+                Categorías
+              </Link>
+
               {" | "}
-              <Link to="/admin/stations">Estaciones</Link>
+              <Link to="/admin/stations">
+                Estaciones
+              </Link>
+
               {" | "}
-              <Link to="/admin/users">Usuarios</Link>
+              <Link to="/admin/users">
+                Usuarios
+              </Link>
+
               {" | "}
-              <Link to="/admin/reports">Reportes</Link>
+              <Link to="/admin/reports">
+                Reportes
+              </Link>
+
               {" | "}
-              <Link to="/admin/backups">Backups</Link>
+              <Link to="/admin/backups">
+                Backups
+              </Link>
             </>
           )}
 
@@ -106,160 +227,226 @@ function App() {
         </nav>
       )}
 
-      <Routes>
-        {/* LOGIN libre */}
-        <Route path="/login" element={<LoginPage />} />
 
-        {/* ADMIN HOME */}
+      <Routes>
+        <Route
+          path="/login"
+          element={<LoginPage />}
+        />
+
         <Route
           path="/admin"
           element={
-            <ProtectedRoute allowedRoles={["ADMIN"]}>
+            <ProtectedRoute
+              allowedRoles={[
+                UserRole.ADMIN
+              ]}
+            >
               <AdminHomePage />
             </ProtectedRoute>
           }
         />
 
-        {/* MESAS */}
         <Route
           path="/"
           element={
-            <ProtectedRoute allowedRoles={["ADMIN", "WAITER"]}>
-              <TablesPage isAdmin={isAdmin} />
+            <ProtectedRoute
+              allowedRoles={[
+                UserRole.ADMIN,
+                UserRole.WAITER
+              ]}
+            >
+              <TablesPage
+                isAdmin={isAdmin}
+              />
             </ProtectedRoute>
           }
         />
 
-        {/* DETALLE ORDEN */}
         <Route
           path="/orders/:orderId"
           element={
-            <ProtectedRoute allowedRoles={["ADMIN", "WAITER"]}>
+            <ProtectedRoute
+              allowedRoles={[
+                UserRole.ADMIN,
+                UserRole.WAITER
+              ]}
+            >
               <OrderDetail />
             </ProtectedRoute>
           }
         />
 
-        {/* ORDEN NUEVA DESDE MESA */}
         <Route
           path="/orders/table/:tableId"
           element={
-            <ProtectedRoute allowedRoles={["ADMIN", "WAITER"]}>
+            <ProtectedRoute
+              allowedRoles={[
+                UserRole.ADMIN,
+                UserRole.WAITER
+              ]}
+            >
               <OrderDetail />
             </ProtectedRoute>
           }
         />
 
-        {/* COCINA - SELECCIÓN */}
         <Route
           path="/kitchen"
           element={
-            <ProtectedRoute allowedRoles={["ADMIN", "KITCHEN"]}>
+            <ProtectedRoute
+              allowedRoles={[
+                UserRole.ADMIN,
+                UserRole.KITCHEN
+              ]}
+            >
               <KitchenStations />
             </ProtectedRoute>
           }
         />
 
-        {/* COCINA - ESTACIÓN */}
         <Route
           path="/kitchen/:stationId"
           element={
-            <ProtectedRoute allowedRoles={["ADMIN", "KITCHEN"]}>
+            <ProtectedRoute
+              allowedRoles={[
+                UserRole.ADMIN,
+                UserRole.KITCHEN
+              ]}
+            >
               <Kitchen />
             </ProtectedRoute>
           }
         />
 
-        {/* MOZOS */}
         <Route
           path="/waiter"
           element={
-            <ProtectedRoute allowedRoles={["ADMIN", "WAITER"]}>
+            <ProtectedRoute
+              allowedRoles={[
+                UserRole.ADMIN,
+                UserRole.WAITER
+              ]}
+            >
               <WaiterPage />
             </ProtectedRoute>
           }
         />
 
-        {/* CAJA */}
         <Route
           path="/cashier"
           element={
-            <ProtectedRoute allowedRoles={["ADMIN", "CASHIER"]}>
+            <ProtectedRoute
+              allowedRoles={[
+                UserRole.ADMIN,
+                UserRole.CASHIER
+              ]}
+            >
               <CashierPage />
             </ProtectedRoute>
           }
         />
 
-        {/* ADMIN PRODUCTS */}
         <Route
           path="/admin/products"
           element={
-            <ProtectedRoute allowedRoles={["ADMIN"]}>
+            <ProtectedRoute
+              allowedRoles={[
+                UserRole.ADMIN
+              ]}
+            >
               <ProductsPage />
             </ProtectedRoute>
           }
         />
 
-        {/* ADMIN CATEGORIES */}
         <Route
           path="/admin/categories"
           element={
-            <ProtectedRoute allowedRoles={["ADMIN"]}>
+            <ProtectedRoute
+              allowedRoles={[
+                UserRole.ADMIN
+              ]}
+            >
               <CategoriesPage />
             </ProtectedRoute>
           }
         />
 
-        {/* ADMIN STATIONS */}
         <Route
           path="/admin/stations"
           element={
-            <ProtectedRoute allowedRoles={["ADMIN"]}>
+            <ProtectedRoute
+              allowedRoles={[
+                UserRole.ADMIN
+              ]}
+            >
               <StationsPage />
             </ProtectedRoute>
           }
         />
 
-        {/* ADMIN USERS */}
         <Route
           path="/admin/users"
           element={
-            <ProtectedRoute allowedRoles={["ADMIN"]}>
+            <ProtectedRoute
+              allowedRoles={[
+                UserRole.ADMIN
+              ]}
+            >
               <UsersPage />
             </ProtectedRoute>
           }
         />
 
-        {/* ADMIN REPORTS */}
         <Route
           path="/admin/reports"
           element={
-            <ProtectedRoute allowedRoles={["ADMIN"]}>
+            <ProtectedRoute
+              allowedRoles={[
+                UserRole.ADMIN
+              ]}
+            >
               <ReportsPage />
             </ProtectedRoute>
           }
         />
 
-        {/* ADMIN BACKUPS */}
         <Route
           path="/admin/backups"
           element={
-            <ProtectedRoute allowedRoles={["ADMIN"]}>
+            <ProtectedRoute
+              allowedRoles={[
+                UserRole.ADMIN
+              ]}
+            >
               <BackupsPage />
             </ProtectedRoute>
           }
         />
 
-        {/* ADMIN TABLES */}
         <Route
           path="/tables/manage"
           element={
-            <ProtectedRoute allowedRoles={["ADMIN"]}>
+            <ProtectedRoute
+              allowedRoles={[
+                UserRole.ADMIN
+              ]}
+            >
               <ManageTables />
             </ProtectedRoute>
           }
         />
 
+        <Route
+          path="*"
+          element={
+            <Navigate
+              to={getHomeRoute(role)}
+              replace
+            />
+          }
+        />
       </Routes>
     </>
   )

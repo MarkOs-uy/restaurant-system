@@ -1,7 +1,16 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Identity
-from sqlalchemy.orm import relationship
-from datetime import datetime, timezone
 import uuid
+
+from sqlalchemy import (
+    Column, 
+    Integer, 
+    String, 
+    DateTime, 
+    Boolean, 
+    Identity
+)
+from sqlalchemy.orm import relationship
+
+from datetime import datetime, timezone
 
 from app.db.base_class import Base
 
@@ -9,7 +18,7 @@ from app.db.base_class import Base
 class Restaurant(Base):
     __tablename__ = "restaurants"
 
-    id = Column(Integer, Identity(), primary_key=True, index=True)
+    id = Column(Integer, Identity(), primary_key=True)
 
     name = Column(String, nullable=False)
 
@@ -32,21 +41,65 @@ class Restaurant(Base):
     )
 
     # Relaciones
-    tables = relationship("Table", back_populates="restaurant", cascade="all, delete")
-    products = relationship("Product", back_populates="restaurant", cascade="all, delete")
-    payments = relationship("Payment", back_populates="restaurant", cascade="all, delete")
-    orders = relationship("Order", back_populates="restaurant", cascade="all, delete")
-    cash_registers = relationship("CashRegister", back_populates="restaurant", cascade="all, delete")
-    stations = relationship("ProductionStation", back_populates="restaurant", cascade="all, delete")
-    categories = relationship("Category", back_populates="restaurant", cascade="all, delete")
-    order_items = relationship("OrderItem", back_populates="restaurant", cascade="all, delete")
-    users = relationship("User", back_populates="restaurant")
-    domain_events = relationship("DomainEvent", back_populates="restaurant")
+    tables = relationship(
+        "Table",
+        back_populates="restaurant",
+        cascade="all, delete"
+    )
+
+    products = relationship(
+        "Product",
+        back_populates="restaurant",
+        cascade="all, delete"
+    )
+
+    payments = relationship(
+        "Payment",
+        back_populates="restaurant",
+        cascade="all, delete"
+    )
+
+    orders = relationship(
+        "Order",
+        back_populates="restaurant",
+        cascade="all, delete"
+    )
+
+    cash_registers = relationship(
+        "CashRegister",
+        back_populates="restaurant",
+        cascade="all, delete"
+    )
+
+    stations = relationship(
+        "ProductionStation",
+        back_populates="restaurant",
+        cascade="all, delete"
+    )
+
+    categories = relationship(
+        "Category",
+        back_populates="restaurant",
+        cascade="all, delete"
+    )
+
+    order_items = relationship(
+        "OrderItem",
+        back_populates="restaurant",
+        cascade="all, delete"
+    )
+
+    users = relationship(
+        "User",
+        back_populates="restaurant"
+    )
+
     event_outbox = relationship(
         "EventOutbox",
         back_populates="restaurant",
         cascade="all, delete-orphan"
     )
+
     settings = relationship(
         "SystemSettings",
         back_populates="restaurant",

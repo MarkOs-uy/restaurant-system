@@ -8,7 +8,6 @@ from .restaurant import Restaurant
 from .production_station import ProductionStation
 from .category import Category
 from .user import User
-from .domain_event import DomainEvent
 from .restaurant_layout import RestaurantLayout
 from .cash_movement import CashMovement
 from .event_outbox import EventOutbox

@@ -4,6 +4,7 @@ from app.domain.order.order_service import OrderService
 from app.domain.order_item.order_item_transitions import can_transition
 from app.domain.errors.base import DomainError
 from app.domain.errors.error_codes import ErrorCode
+from app.domain.events.websocket import WSEvent
 
 from app.services.event_service import EventService
 
@@ -105,22 +106,30 @@ class OrderItemService:
         new_status: OrderItemStatus,
         user: User
     ) -> OrderItem:
-        item = self._get_item(item_id, user.restaurant_id)
+
+        item = self._get_item(
+            item_id,
+            user.restaurant_id
+        )
 
         order = item.order
-        order_service = OrderService(self.db)
 
-        previous_status = self._process_status_transition(
-            item,
-            new_status,
-            user,
-            order_service
+        order_service = OrderService(
+            self.db
         )
-        self.db.commit()
-        self.db.refresh(item)
-        # =========================
+
+        previous_status = (
+            self._process_status_transition(
+                item,
+                new_status,
+                user,
+                order_service
+            )
+        )
+
+        # ==================================================
         # EVENTOS
-        # =========================
+        # ==================================================
 
         payload = {
             "order_id": order.id,
@@ -131,30 +140,41 @@ class OrderItemService:
             "table": order.table.number
         }
 
-        # cocina
+        # --------------------------------------------------
+        # Cocina
+        # --------------------------------------------------
         self.events.emit(
             restaurant_id=order.restaurant_id,
-            event_type="ITEM_STATUS_CHANGED",
+            event_type=WSEvent.ITEM_STATUS_CHANGED,
             payload=payload,
             target="station",
-            target_id=str(item.product.station_id)
+            target_id=str(
+                item.product.station_id
+            )
         )
 
-        # salón / administración
-        for role in [UserRole.ADMIN, UserRole.WAITER]:
+        # --------------------------------------------------
+        # Salón / administración
+        # --------------------------------------------------
+        for role in [
+            UserRole.ADMIN,
+            UserRole.WAITER
+        ]:
             self.events.emit(
                 restaurant_id=order.restaurant_id,
-                event_type="ITEM_STATUS_CHANGED",
+                event_type=WSEvent.ITEM_STATUS_CHANGED,
                 payload=payload,
                 target="role",
                 target_id=role.value
             )
 
-        # evento READY
+        # --------------------------------------------------
+        # Ítem listo
+        # --------------------------------------------------
         if new_status == OrderItemStatus.READY:
             self.events.emit(
                 restaurant_id=order.restaurant_id,
-                event_type="ITEM_READY",
+                event_type=WSEvent.ITEM_READY,
                 payload={
                     "order_id": order.id,
                     "table": order.table.number,
@@ -165,12 +185,17 @@ class OrderItemService:
                 target_id=UserRole.WAITER.value
             )
 
-        # cambio estado orden
+        # --------------------------------------------------
+        # Cambio de estado general de la orden
+        # --------------------------------------------------
         if order.status != previous_status:
-            for role in [UserRole.ADMIN, UserRole.WAITER]:
+            for role in [
+                UserRole.ADMIN,
+                UserRole.WAITER
+            ]:
                 self.events.emit(
                     restaurant_id=order.restaurant_id,
-                    event_type="ORDER_STATUS_CHANGED",
+                    event_type=WSEvent.ORDER_STATUS_CHANGED,
                     payload={
                         "order_id": order.id,
                         "status": order.status.value
@@ -178,4 +203,13 @@ class OrderItemService:
                     target="role",
                     target_id=role.value
                 )
+
+        # --------------------------------------------------
+        # Commit atómico:
+        #
+        # cambio del dominio + eventos Outbox.
+        # --------------------------------------------------
+        self.db.commit()
+        self.db.refresh(item)
+
         return item

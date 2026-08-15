@@ -4,11 +4,12 @@ from app.domain.errors.base import DomainError
 from app.domain.errors.error_codes import ErrorCode
 
 from app.domain.cash_register.cash_register_service import CashRegisterService
+from app.domain.events.websocket import WSEvent
 from app.services.event_service import EventService
 
 from app.utils.money import money
 
-from app.models.cash_movement import CashMovement, CashMovementType
+from app.models.cash_movement import CashMovement
 from app.models.cash_register import CashRegister
 from app.models.user import UserRole
 from app.schemas.cash_register import CashMovementCreate
@@ -79,11 +80,10 @@ class CashMovementService:
         )
         self.db.add(movement)
         self.db.flush()
-        self.db.commit()
         self.db.refresh(movement)
         self.events.emit(
             restaurant_id=restaurant_id,
-            event_type="CASH_MOVEMENT_ADDED",
+            event_type=WSEvent.CASH_MOVEMENT_ADDED,
             payload={
                 "movement": {
                     "id": movement.id,
@@ -96,6 +96,7 @@ class CashMovementService:
             target="role",
             target_id=UserRole.CASHIER.value
         )
+        self.db.commit()
         return movement
 
     # ---------------------------------------------------------
@@ -115,11 +116,11 @@ class CashMovementService:
             "movement_type": movement_type.value
         }
         self.db.delete(movement)
-        self.db.commit()
         self.events.emit(
             restaurant_id=restaurant_id,
-            event_type="CASH_MOVEMENT_DELETED",
+            event_type=WSEvent.CASH_MOVEMENT_DELETED,
             payload=payload,
             target="role",
             target_id=UserRole.CASHIER.value
         )
+        self.db.commit()

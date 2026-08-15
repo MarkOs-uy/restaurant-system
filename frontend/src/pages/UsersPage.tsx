@@ -5,25 +5,25 @@ import Page from "../components/Page"
 import Card from "../components/Card"
 import DataTable from "../components/DataTable"
 
-interface User {
-  id: number
-  username: string
-  role: string
-  active: boolean
-}
+import { UserRole } from "../types/userRole"
+import type {
+  User,
+  UserCreate,
+  UserUpdate
+} from "../types/user"
 
 export default function UsersPage() {
 
   const [users, setUsers] = useState<User[]>([])
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
-  const [role, setRole] = useState("WAITER")
+  const [role, setRole] = useState<UserRole>(UserRole.WAITER)
   const [editingId, setEditingId] = useState<number | null>(null)
 
   const resetForm = () => {
     setUsername("")
     setPassword("")
-    setRole("WAITER")
+    setRole(UserRole.WAITER)
     setEditingId(null)
   }
 
@@ -32,7 +32,7 @@ export default function UsersPage() {
   // -------------------------
 
   const fetchUsers = async () => {
-    const data = await apiFetch("/users/")
+    const data = await apiFetch<User[]>("/users/")
     setUsers(data)
   }
 
@@ -41,23 +41,45 @@ export default function UsersPage() {
   // -------------------------
 
   const saveUser = async () => {
-    if (!username) return
-    const method = editingId ? "PATCH" : "POST"
-    const url = editingId
-      ? `/users/${editingId}`
-      : `/users/`
-    await apiFetch(url, {
-      method,
-      body: {
-        username,
-        ...(password && { password }),
+    const trimmedUsername = username.trim()
+    if (!trimmedUsername) {
+      return
+    }
+    if (editingId !== null) {
+      const payload: UserUpdate = {
+        username: trimmedUsername,
         role
       }
-    })
+      if (password) {
+        payload.password = password
+      }
+      await apiFetch(
+        `/users/${editingId}`,
+        {
+          method: "PATCH",
+          body: payload
+        }
+      )
+    } else {
+      if (!password) {
+        return
+      }
+      const payload: UserCreate = {
+        username: trimmedUsername,
+        password,
+        role
+      }
+      await apiFetch(
+        "/users/",
+        {
+          method: "POST",
+          body: payload
+        }
+      )
+    }
     resetForm()
     await fetchUsers()
   }
-
   // -------------------------
   // Activar/Desactivar usuarios
   // -------------------------
@@ -73,10 +95,11 @@ export default function UsersPage() {
   // Editar usuarios
   // -------------------------
 
-  const editUser = (u: User) => {
-    setEditingId(u.id)
-    setUsername(u.username)
-    setRole(u.role)
+  const editUser = ( user: User) => {
+    setEditingId(user.id)
+    setUsername(user.username)
+    setRole(user.role)
+    setPassword("")
   }
 
   useEffect(() => {
@@ -104,22 +127,22 @@ export default function UsersPage() {
             style={{ marginLeft: 10 }}
           />
 
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            style={{ marginLeft: 10 }}
-          >
-            <option value="ADMIN">ADMIN</option>
-            <option value="WAITER">WAITER</option>
-            <option value="KITCHEN">KITCHEN</option>
-            <option value="CASHIER">CASHIER</option>
-          </select>
+          {Object.values(UserRole).map(
+            userRole => (
+              <option
+                key={userRole}
+                value={userRole}
+              >
+                {userRole}
+              </option>
+            )
+          )}
 
           <button className="btn btn-primary"
             onClick={saveUser}
             style={{ marginLeft: 10 }}
           >
-            {editingId ? "Actualizar" : "Crear"}
+            {editingId !== null ? "Actualizar" : "Crear"}
           </button>
 
         </div>
@@ -157,8 +180,18 @@ export default function UsersPage() {
                     onClick={() => toggleUser(u.id)}
                     style={{ marginLeft: 5 }}
                   >
-                    Activar / Desactivar
+                    {u.active ? "Desactivar" : "Activar"}
                   </button>
+
+                  {editingId !== null && (
+                    <button
+                      className="btn btn-primary"
+                      onClick={resetForm}
+                      style={{ marginLeft: 10 }}
+                    >
+                      Cancelar
+                    </button>
+                  )}
 
                 </td>
 

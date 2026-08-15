@@ -1,15 +1,26 @@
 import { Link } from "react-router-dom"
 
-const adminActions = [
+interface AdminAction {
+  title: string
+  description: string
+  to: string
+}
+
+const adminActions: AdminAction[] = [
   {
-    title: "Diseño del restaurant",
+    title: "Diseño del restaurante",
     description: "Ver y operar el plano de mesas.",
     to: "/"
   },
   {
-    title: "Manejar Categorías",
+    title: "Manejar categorías",
     description: "Crear, editar y ordenar las categorías del menú.",
     to: "/admin/categories"
+  },
+  {
+  title: "Manejar productos",
+  description: "Crear, editar y activar productos del menú.",
+  to: "/admin/products"
   },
   {
     title: "Manejar estaciones",
@@ -22,7 +33,7 @@ const adminActions = [
     to: "/admin/users"
   },
   {
-    title: "Reportes y Métricas",
+    title: "Reportes y métricas",
     description: "Acceder al centro de reportes.",
     to: "/admin/reports"
   },
@@ -41,9 +52,16 @@ export default function AdminHomePage() {
         <h1>Inicio del Administrador</h1>
       </div>
 
-      <section className="admin-home__grid" aria-label="Accesos principales">
-        {adminActions.map((action) => (
-          <Link className="admin-home__button" to={action.to} key={action.to}>
+      <section
+        className="admin-home__grid"
+        aria-label="Accesos principales"
+      >
+        {adminActions.map(action => (
+          <Link
+            className="admin-home__button"
+            to={action.to}
+            key={action.to}
+          >
             <span>{action.title}</span>
             <small>{action.description}</small>
           </Link>

@@ -1,64 +1,52 @@
 import { useEffect, useMemo, useState } from "react"
 import { apiFetch } from "../api"
+import { moneyToNumber } from "../utils/money"
 
-interface Category {
-  id: number
-  name: string
+import type { Product } from "../types/product"
+import type { Category } from "../types/category"
+
+import type { 
+  ChartPoint,
+  ProductRankItem,
+  SalesReport,
+  ProductsReport,
+  SalesOrderItem,
+  SalesOrdersReport,
+  SalesOrder,
+  RawChartPoint,
+  RawProductEvolutionReport,
+  RawProductRankItem,
+  RawProductsReport,
+  RawSalesOrder,
+  RawSalesOrderItem,
+  RawSalesOrdersReport,
+  RawSalesReport
+} from "../types/reports"
+
+interface DateRangeProps {
+  startDate: string
+  endDate: string
+  onStartDate: (value: string) => void
+  onEndDate: (value: string) => void
 }
 
-interface Product {
-  id: number
-  name: string
-  category_id: number
+interface LineChartProps {
+  data: ChartPoint[]
+  label: string
 }
 
-interface ChartPoint {
-  date: string
-  total: number
+interface ProductTableProps {
+  title: string
+  items: ProductRankItem[]
 }
 
-interface ProductRankItem {
-  product_id: number
-  name: string
-  category_id: number
-  quantity: number
-  total: number
-}
-
-interface SalesReport {
-  series: ChartPoint[]
-  max_day: ChartPoint | null
-  min_day: ChartPoint | null
-}
-
-interface ProductsReport {
-  today_best_seller: ProductRankItem | null
-  top_products: ProductRankItem[]
-  least_products: ProductRankItem[]
-}
-
-interface SalesOrderItem {
-  item_id: number
-  product_id: number
-  product_name: string
-  unit_price: number
-  quantity: number
-  line_total: number
-}
-
-interface SalesOrder {
-  order_id: number
-  table_number: number | null
-  closed_at: string | null
-  items: SalesOrderItem[]
-  subtotal: number
-  discount: number
-  total: number
-}
-
-interface SalesOrdersReport {
+interface SalesOrdersListProps {
   orders: SalesOrder[]
+  startDate: string
+  endDate: string
 }
+
+
 
 const money = new Intl.NumberFormat("es-UY", {
   style: "currency",
@@ -66,12 +54,26 @@ const money = new Intl.NumberFormat("es-UY", {
   maximumFractionDigits: 0
 })
 
-const today = new Date().toISOString().slice(0, 10)
+function toLocalDateString(
+  date: Date
+): string {
+  const year = date.getFullYear()
+  const month = String(
+    date.getMonth() + 1
+  ).padStart(2, "0")
+  const day = String(
+    date.getDate()
+  ).padStart(2, "0")
+
+  return `${year}-${month}-${day}`
+}
+
+const today = toLocalDateString(new Date())
 
 function daysAgo(days: number) {
   const date = new Date()
   date.setDate(date.getDate() - days)
-  return date.toISOString().slice(0, 10)
+  return toLocalDateString(date)
 }
 
 function formatDate(value: string) {
@@ -99,6 +101,112 @@ function formatDateTime(value: string | null) {
     hour: "2-digit",
     minute: "2-digit"
   })
+}
+
+function normalizeChartPoint(
+  point: RawChartPoint
+): ChartPoint {
+  return {
+    ...point,
+    total: moneyToNumber(point.total)
+  }
+}
+
+function normalizeProductRankItem(
+  item: RawProductRankItem
+): ProductRankItem {
+  return {
+    ...item,
+    total: moneyToNumber(item.total)
+  }
+}
+
+function normalizeSalesOrderItem(
+  item: RawSalesOrderItem
+): SalesOrderItem {
+  return {
+    ...item,
+    unit_price:
+      moneyToNumber(item.unit_price),
+    line_total:
+      moneyToNumber(item.line_total)
+  }
+}
+
+function normalizeSalesOrder(
+  order: RawSalesOrder
+): SalesOrder {
+  return {
+    ...order,
+
+    subtotal:
+      moneyToNumber(order.subtotal),
+
+    discount:
+      moneyToNumber(order.discount),
+
+    total:
+      moneyToNumber(order.total),
+
+    items:
+      order.items.map(
+        normalizeSalesOrderItem
+      )
+  }
+}
+
+function normalizeSalesReport(
+  data: RawSalesReport
+): SalesReport {
+  return {
+    series:
+      data.series.map(normalizeChartPoint),
+
+    max_day:
+      data.max_day
+        ? normalizeChartPoint(data.max_day)
+        : null,
+
+    min_day:
+      data.min_day
+        ? normalizeChartPoint(data.min_day)
+        : null
+  }
+}
+
+
+function normalizeProductsReport(
+  data: RawProductsReport
+): ProductsReport {
+  return {
+    today_best_seller:
+      data.today_best_seller
+        ? normalizeProductRankItem(
+            data.today_best_seller
+          )
+        : null,
+
+    top_products:
+      data.top_products.map(
+        normalizeProductRankItem
+      ),
+
+    least_products:
+      data.least_products.map(
+        normalizeProductRankItem
+      )
+  }
+}
+
+function normalizeSalesOrdersReport(
+  data: RawSalesOrdersReport
+): SalesOrdersReport {
+  return {
+    orders:
+      data.orders.map(
+        normalizeSalesOrder
+      )
+  }
 }
 
 function buildQuery(params: Record<string, string>) {
@@ -259,7 +367,7 @@ function buildSalesOrdersPrintHtml(
             <div class="order-header">
               <div>
                 <h2>Orden #${order.order_id}</h2>
-                <p class="muted">${escapeHtml(order.table_number ? `Mesa ${order.table_number}` : "Sin mesa")} - ${escapeHtml(formatDateTime(order.closed_at))}</p>
+                <p class="muted">${escapeHtml(order.table_number !== null ? `Mesa ${order.table_number}` : "Sin mesa")} - ${escapeHtml(formatDateTime(order.closed_at))}</p>
               </div>
               <strong>${escapeHtml(money.format(order.total))}</strong>
             </div>
@@ -333,7 +441,7 @@ function printSalesOrders(
   }, 150)
 }
 
-function LineChart({ data, label }: { data: ChartPoint[]; label: string }) {
+function LineChart({ data, label }: LineChartProps) {
   const width = 720
   const height = 240
   const padding = 28
@@ -398,12 +506,7 @@ function DateRange({
   endDate,
   onStartDate,
   onEndDate
-}: {
-  startDate: string
-  endDate: string
-  onStartDate: (value: string) => void
-  onEndDate: (value: string) => void
-}) {
+}: DateRangeProps) {
   return (
     <div className="report-filters">
       <label>
@@ -419,7 +522,7 @@ function DateRange({
   )
 }
 
-function ProductTable({ title, items }: { title: string; items: ProductRankItem[] }) {
+function ProductTable({ title, items }: ProductTableProps) {
   return (
     <div className="report-rank">
       <h3>{title}</h3>
@@ -457,11 +560,7 @@ function SalesOrdersList({
   orders,
   startDate,
   endDate
-}: {
-  orders: SalesOrder[]
-  startDate: string
-  endDate: string
-}) {
+}: SalesOrdersListProps) {
   const total = orders.reduce((sum, order) => sum + order.total, 0)
 
   return (
@@ -473,7 +572,7 @@ function SalesOrdersList({
           onClick={() => printSalesOrders(orders, startDate, endDate, "pdf")}
           disabled={orders.length === 0}
         >
-          Generar PDF
+          Guardar como PDF
         </button>
 
         <button
@@ -507,7 +606,7 @@ function SalesOrdersList({
                 <div>
                   <h3>Orden #{order.order_id}</h3>
                   <p>
-                    {order.table_number ? `Mesa ${order.table_number}` : "Sin mesa"} ·{" "}
+                    {order.table_number !== null  ? `Mesa ${order.table_number}` : "Sin mesa"} ·{" "}
                     {formatDateTime(order.closed_at)}
                   </p>
                 </div>
@@ -574,15 +673,13 @@ export default function ReportsPage() {
   useEffect(() => {
     const loadFilters = async () => {
       const [categoriesData, productsData] = await Promise.all([
-        apiFetch("/categories/"),
-        apiFetch("/products/")
+        apiFetch<Category[]>("/categories/?active=true"),
+        apiFetch<Product[]>("/products/?active=true")
       ])
-
       setCategories(categoriesData)
       setProducts(productsData)
       setSelectedProductId(productsData[0] ? String(productsData[0].id) : "")
     }
-
     loadFilters()
   }, [])
 
@@ -593,12 +690,18 @@ export default function ReportsPage() {
         end_date: salesEndDate
       })
       const [salesData, salesOrdersData] = await Promise.all([
-        apiFetch(`/reports/sales?${query}`),
-        apiFetch(`/reports/sales/orders?${query}`)
+        apiFetch<RawSalesReport>(`/reports/sales?${query}`),
+        apiFetch<RawSalesOrdersReport>(`/reports/sales/orders?${query}`)
       ])
+      setSalesReport(
+        normalizeSalesReport(salesData)
+      )
 
-      setSalesReport(salesData)
-      setSalesOrdersReport(salesOrdersData)
+      setSalesOrdersReport(
+        normalizeSalesOrdersReport(
+          salesOrdersData
+        )
+      )
     }
 
     loadSales()
@@ -610,14 +713,12 @@ export default function ReportsPage() {
         start_date: productStartDate,
         end_date: productEndDate
       }
-
       if (categoryId !== "all") {
         params.category_id = categoryId
       }
-
-      setProductsReport(await apiFetch(`/reports/products?${buildQuery(params)}`))
+      const data = await apiFetch<RawProductsReport>(`/reports/products?${buildQuery(params)}`)
+      setProductsReport(normalizeProductsReport(data))
     }
-
     loadProductsReport()
   }, [productStartDate, productEndDate, categoryId])
 
@@ -632,8 +733,8 @@ export default function ReportsPage() {
         start_date: productEvolutionStartDate,
         end_date: productEvolutionEndDate
       })
-      const data = await apiFetch(`/reports/products/${selectedProductId}/evolution?${query}`)
-      setProductEvolution(data.series)
+      const data = await apiFetch<RawProductEvolutionReport>(`/reports/products/${selectedProductId}/evolution?${query}`)
+      setProductEvolution(data.series.map(normalizeChartPoint))
     }
 
     loadProductEvolution()
