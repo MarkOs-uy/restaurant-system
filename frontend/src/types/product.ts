@@ -32,3 +32,9 @@ export interface ProductUpdate {
   category_id?: number
   station_id?: number
 }
+
+
+export type RawProduct =
+  Omit<Product, "price"> & {
+    price: unknown
+  }

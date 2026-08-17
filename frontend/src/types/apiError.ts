@@ -1,10 +1,10 @@
 import type { ErrorCode } from "./domainErrors";
 
 export interface ApiError {
-    code?: ErrorCode
-    message?: string
-    context?: unknown
-    status?: number
+  code?: ErrorCode
+  message: string
+  context?: Record<string, unknown>
+  status?: number
 }
 
 export function isApiError(

@@ -23,3 +23,13 @@ export interface CategoryWithProducts {
   active: boolean
   products: Product[]
 }
+
+export type RawProduct =
+  Omit<Product, "price"> & {
+    price: unknown
+  }
+
+export type RawCategoryWithProducts =
+  Omit<CategoryWithProducts, "products"> & {
+    products: RawProduct[]
+  }

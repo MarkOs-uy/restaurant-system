@@ -1,6 +1,7 @@
 import { jwtDecode } from "jwt-decode"
 import { UserRole } from "../types/userRole"
 import { wsService } from "./wsService"
+import type { AuthState} from "../types/auth"
 
 
 // ---------------------------------------------------------------------------------------------
@@ -9,11 +10,6 @@ import { wsService } from "./wsService"
 // ---------------------------------------------------------------------------------------------
 interface AuthPayload {
   exp?: number
-}
-
-interface AuthState {
-  token: string | null
-  role: UserRole | null
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -69,25 +65,41 @@ function isUserRole(
 // Si la información es inexistente o inválida, limpia la sesión.
 // ---------------------------------------------------------------------------------------------
 export function readAuth(): AuthState {
-  const token = localStorage.getItem("token")
-  const storedRole = localStorage.getItem("role")
+  const token =
+    localStorage.getItem("token")
+
+  const storedRole =
+    localStorage.getItem("role")
+
+  const storedRestaurantId =
+    localStorage.getItem("restaurant_id")
+
+  const restaurantId =
+    storedRestaurantId !== null
+      ? Number(storedRestaurantId)
+      : null
+
   if (
     !token ||
     !storedRole ||
     !isTokenValid(token) ||
-    !isUserRole(storedRole)
+    !isUserRole(storedRole) ||
+    restaurantId === null ||
+    Number.isNaN(restaurantId)
   ) {
     clearStoredAuth()
 
     return {
       token: null,
-      role: null
+      role: null,
+      restaurantId: null
     }
   }
 
   return {
     token,
-    role: storedRole
+    role: storedRole,
+    restaurantId
   }
 }
 

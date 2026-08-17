@@ -11,7 +11,10 @@ import type {
   BackupFile,
   BackupRestoreResponse
 } from "../types/backup"
-import type { SystemSettings } from "../types/systemSettings"
+import type { 
+  SystemSettings, 
+  RawSystemSettings 
+} from "../types/systemSettings"
 
 
 const emptyStatus: BackupStatus = {
@@ -37,7 +40,7 @@ const emptySettings: SystemSettings = {
   backup_email: "",
 
   backup_enabled: false,
-  backup_frequency: "manual",
+  backup_frequency: BackupFrequency.MANUAL,
   backup_retention_daily: 30,
   backup_retention_weekly: 4,
   backup_retention_monthly: 12,
@@ -83,6 +86,65 @@ function formatBytes(value: number | null): string {
   } MB`
 }
 
+function normalizeSystemSettings(
+  data: RawSystemSettings
+): SystemSettings {
+  return {
+    smtp_host:
+      data.smtp_host ?? "",
+
+    smtp_port:
+      data.smtp_port,
+
+    smtp_user:
+      data.smtp_user ?? "",
+
+    smtp_password: "",
+
+    smtp_from:
+      data.smtp_from ?? "",
+
+    smtp_use_tls:
+      data.smtp_use_tls,
+
+    backup_email:
+      data.backup_email ?? "",
+
+    backup_enabled:
+      data.backup_enabled,
+
+    backup_frequency:
+      data.backup_frequency,
+
+    backup_time:
+      data.backup_time,
+
+    backup_weekday:
+      data.backup_weekday ?? 0,
+
+    backup_monthday:
+      data.backup_monthday ?? 1,
+
+    backup_retention_daily:
+      data.backup_retention_daily,
+
+    backup_retention_weekly:
+      data.backup_retention_weekly,
+
+    backup_retention_monthly:
+      data.backup_retention_monthly,
+
+    backup_keep_local:
+      data.backup_keep_local,
+
+    backup_send_email:
+      data.backup_send_email,
+
+    backup_timezone:
+      data.backup_timezone
+  }
+}
+
 export default function BackupsPage() {
 
   const [status, setStatus] = useState<BackupStatus>(emptyStatus)
@@ -100,8 +162,8 @@ export default function BackupsPage() {
   }
 
   const loadSettings = async () => {
-    const data = await apiFetch<SystemSettings>("/settings")
-    setSettings(data)
+    const data = await apiFetch<RawSystemSettings>("/settings")
+    setSettings(normalizeSystemSettings(data))
   }
 
   const loadFiles = async()=>{
@@ -148,15 +210,37 @@ export default function BackupsPage() {
     }
   }
 
+
   const saveSettings = async () => {
     setSettingsLoading(true)
+
     try {
+      const {
+        smtp_password,
+        ...rest
+      } = settings
+
+      const payload = {
+        ...rest,
+        ...(smtp_password.trim()
+          ? { smtp_password }
+          : {})
+      }
+
       await apiFetch("/settings", {
         method: "PATCH",
-        body: settings
+        body: payload
       })
-      toast.success("Configuración guardada")
-      await loadStatus()
+
+      toast.success(
+        "Configuración guardada"
+      )
+
+      await Promise.all([
+        loadStatus(),
+        loadSettings()
+      ])
+
     } finally {
       setSettingsLoading(false)
     }
@@ -239,11 +323,12 @@ export default function BackupsPage() {
   const deleteBackup = async(filename:string)=>{
       if(!window.confirm("Eliminar backup?"))
           return
-      await apiFetch(`/backups/${encodeURIComponent(filename)}`,{
-          method:"DELETE"
-      })
+      await apiFetch(`/backups/${encodeURIComponent(filename)}`, {method:"DELETE"})
       toast.success("Backup eliminado")
-      await loadFiles()
+      await Promise.all([
+        loadFiles(),
+        loadStatus()
+      ])
   }
 
   const handleDownload = async (filename: string) => {
@@ -290,6 +375,9 @@ export default function BackupsPage() {
 
       case BackupType.BEFORE_RESTORE:
         return "Antes de restaurar"
+
+      default:
+        return "Desconocido"
     }
   }
 
@@ -358,19 +446,32 @@ export default function BackupsPage() {
           </div>
         </div>
 
-        <div>
-          <span>Último backup automático</span>
-          <strong>
-            {formatDateTime(status.last_automatic_backup_at)}
-          </strong>
-          <span>Próximo backup</span>
-          <strong>
-            {formatDateTime(status.next_automatic_backup_at)}
-          </strong>
-          <span>Resultado</span>
-          <strong>
-            {status.last_backup_result || "Sin resultados"}
-          </strong>
+        <div className="backup-status-grid">
+          <div>
+            <span>Último backup automático</span>
+            <strong>
+              {formatDateTime(
+                status.last_automatic_backup_at
+              )}
+            </strong>
+          </div>
+
+          <div>
+            <span>Próximo backup automático</span>
+            <strong>
+              {formatDateTime(
+                status.next_automatic_backup_at
+              )}
+            </strong>
+          </div>
+
+          <div>
+            <span>Resultado del último backup automático</span>
+            <strong>
+              {status.last_backup_result ||
+                "Sin resultados"}
+            </strong>
+          </div>
         </div>
 
       </section>

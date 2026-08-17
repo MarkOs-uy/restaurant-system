@@ -507,16 +507,44 @@ function DateRange({
   onStartDate,
   onEndDate
 }: DateRangeProps) {
+
+  const handleStartDate = (value: string) => {
+    onStartDate(value)
+    if (value > endDate) {onEndDate(value)}
+  }
+  const handleEndDate = (value: string) => {
+    onEndDate(value)
+    if (value < startDate) {onStartDate(value)}
+  }
+
   return (
     <div className="report-filters">
       <label>
         Desde
-        <input type="date" value={startDate} onChange={event => onStartDate(event.target.value)} />
+        <input
+          type="date"
+          value={startDate}
+          max={endDate}
+          onChange={event =>
+            handleStartDate(
+              event.target.value
+            )
+          }
+        />
       </label>
 
       <label>
         Hasta
-        <input type="date" value={endDate} onChange={event => onEndDate(event.target.value)} />
+        <input
+          type="date"
+          value={endDate}
+          min={startDate}
+          onChange={event =>
+            handleEndDate(
+              event.target.value
+            )
+          }
+        />
       </label>
     </div>
   )
@@ -625,7 +653,7 @@ function SalesOrdersList({
                   </thead>
                   <tbody>
                     {order.items.map(item => (
-                      <tr key={item.item_id}>
+                      <tr key={`${item.product_id}-${item.unit_price}`}>
                         <td>{item.product_name}</td>
                         <td>{money.format(item.unit_price)}</td>
                         <td>{item.quantity}</td>
@@ -685,39 +713,61 @@ export default function ReportsPage() {
 
   useEffect(() => {
     const loadSales = async () => {
+      if (
+        !salesStartDate ||
+        !salesEndDate
+      ) {
+        setSalesReport(null)
+        setSalesOrdersReport(null)
+        return
+      }
       const query = buildQuery({
         start_date: salesStartDate,
         end_date: salesEndDate
       })
-      const [salesData, salesOrdersData] = await Promise.all([
-        apiFetch<RawSalesReport>(`/reports/sales?${query}`),
-        apiFetch<RawSalesOrdersReport>(`/reports/sales/orders?${query}`)
-      ])
-      setSalesReport(
-        normalizeSalesReport(salesData)
-      )
-
-      setSalesOrdersReport(
-        normalizeSalesOrdersReport(
-          salesOrdersData
+      try {
+        const [salesData, salesOrdersData] = await Promise.all([
+          apiFetch<RawSalesReport>(`/reports/sales?${query}`),
+          apiFetch<RawSalesOrdersReport>(`/reports/sales/orders?${query}`)
+        ])
+        setSalesReport(
+          normalizeSalesReport(salesData)
         )
-      )
-    }
 
-    loadSales()
+        setSalesOrdersReport(
+          normalizeSalesOrdersReport(
+            salesOrdersData
+          )
+        )
+      } catch {
+
+      }
+    }
+    void loadSales()
   }, [salesStartDate, salesEndDate])
 
   useEffect(() => {
     const loadProductsReport = async () => {
-      const params: Record<string, string> = {
-        start_date: productStartDate,
-        end_date: productEndDate
+      if (
+        !productStartDate ||
+        !productEndDate
+      ) {
+        setProductsReport(null)
+        return
       }
-      if (categoryId !== "all") {
-        params.category_id = categoryId
+      try {
+        const params: Record<string, string> = {
+          start_date: productStartDate,
+          end_date: productEndDate
+        }
+        if (categoryId !== "all") {
+          params.category_id = categoryId
+        }
+        const data = await apiFetch<RawProductsReport>(`/reports/products?${buildQuery(params)}`)
+        setProductsReport(normalizeProductsReport(data))
+      } catch {
+
       }
-      const data = await apiFetch<RawProductsReport>(`/reports/products?${buildQuery(params)}`)
-      setProductsReport(normalizeProductsReport(data))
     }
     loadProductsReport()
   }, [productStartDate, productEndDate, categoryId])
@@ -729,14 +779,24 @@ export default function ReportsPage() {
     }
 
     const loadProductEvolution = async () => {
-      const query = buildQuery({
-        start_date: productEvolutionStartDate,
-        end_date: productEvolutionEndDate
-      })
-      const data = await apiFetch<RawProductEvolutionReport>(`/reports/products/${selectedProductId}/evolution?${query}`)
-      setProductEvolution(data.series.map(normalizeChartPoint))
-    }
+      if (
+        !productEvolutionStartDate ||
+        !productEvolutionEndDate
+      ) {
+        setProductEvolution([])
+        return
+      }
+      try {
+        const query = buildQuery({
+          start_date: productEvolutionStartDate,
+          end_date: productEvolutionEndDate
+        })
+        const data = await apiFetch<RawProductEvolutionReport>(`/reports/products/${selectedProductId}/evolution?${query}`)
+        setProductEvolution(data.series.map(normalizeChartPoint))
+      } catch {
 
+      }
+    }
     loadProductEvolution()
   }, [selectedProductId, productEvolutionStartDate, productEvolutionEndDate])
 
@@ -793,21 +853,6 @@ export default function ReportsPage() {
                 : "Sin datos"}
             </strong>
           </div>
-        </div>
-
-        <div className="sales-orders-block">
-          <div className="report-section__header">
-            <div>
-              <p>Detalle de ventas</p>
-              <h2>Ventas realizadas por orden</h2>
-            </div>
-          </div>
-
-          <SalesOrdersList
-            orders={salesOrdersReport?.orders || []}
-            startDate={salesStartDate}
-            endDate={salesEndDate}
-          />
         </div>
       </section>
 
@@ -889,6 +934,22 @@ export default function ReportsPage() {
           />
 
           <LineChart data={productEvolution} label="Evolución de ventas por producto" />
+        </div>
+      </section>
+      <section>
+        <div className="sales-orders-block">
+          <div className="report-section__header">
+            <div>
+              <p>Detalle de ventas</p>
+              <h2>Ventas realizadas por orden</h2>
+            </div>
+          </div>
+
+          <SalesOrdersList
+            orders={salesOrdersReport?.orders || []}
+            startDate={salesStartDate}
+            endDate={salesEndDate}
+          />
         </div>
       </section>
     </main>

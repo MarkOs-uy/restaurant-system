@@ -17,7 +17,7 @@ export interface AuthPayload {
   restaurant_id: number
 }
 
-interface AuthState {
+export interface AuthState {
   token: string | null
   role: UserRole | null
   restaurantId: number | null

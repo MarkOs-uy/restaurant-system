@@ -316,7 +316,7 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
   }
 
   /**
-   * Elimina una mesa (modo edición, click derecho)
+   * Desactiva una mesa (modo edición, click derecho)
    */
   const deleteTable = async (id: number) => {
     await apiFetch(`/tables/${id}`, {
@@ -327,7 +327,7 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
   }
 
   /**
-   * Cuadro de diálogo de eliminación de una mesa (modo edición, click derecho)
+   * Cuadro de diálogo de desactivación de una mesa (modo edición, click derecho)
    */
   const requestDeleteTable = (table: Table) => {
     toast.custom((t) => (
@@ -342,7 +342,7 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
           boxShadow: "0 8px 24px rgba(0,0,0,0.35)"
         }}
       >
-        <strong>Eliminar mesa {table.number}?</strong>
+        <strong>Desactivar mesa {table.number}?</strong>
         <p style={{ margin: "8px 0 14px", opacity: 0.8 }}>
           La mesa quedará inactiva y podrás reactivarla luego.
         </p>
@@ -359,7 +359,7 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
 
               try {
                 await deleteTable(table.id)
-                toast.success(`Mesa ${table.number} eliminada`)
+                toast.success(`Mesa ${table.number} desactivada`)
               } catch {
                 // El error ya fue gestionado por apiFetch.
               }
@@ -372,7 +372,7 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
               color: "white"
             }}
           >
-            Eliminar
+            Desactivar
           </button>
         </div>
       </div>
@@ -609,7 +609,7 @@ export default function TablesPage({ isAdmin }: { isAdmin: boolean }) {
           marginBottom: 10,
           fontSize: 14
         }}>
-          🛠 Modo edición activo — arrastrar mesas / click derecho elimina
+          🛠 Modo edición activo — arrastrar mesas / click derecho desactiva
         </div>
       )}
 

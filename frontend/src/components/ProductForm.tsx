@@ -96,11 +96,12 @@ export default function ProductForm({
   return (
     <div
       style={{
-        border: "1px solid #ccc",
+        border: "1px solid #333",
         padding: 20,
         marginBottom: 20,
         borderRadius: 8,
-        background: "#fafafa"
+        background: "#1e1e1e",
+        color: "white"
       }}
     >
 
@@ -121,7 +122,11 @@ export default function ProductForm({
           }
           style={{
             width: 250,
-            padding: 5
+            padding: 8,
+            background: "#111",
+            color: "white",
+            border: "1px solid #444",
+            borderRadius: 6
           }}
         />
       </div>
@@ -140,7 +145,11 @@ export default function ProductForm({
           }
           style={{
             width: 120,
-            padding: 5
+            padding: 8,
+            background: "#111",
+            color: "white",
+            border: "1px solid #444",
+            borderRadius: 6
           }}
         />
       </div>
@@ -159,7 +168,13 @@ export default function ProductForm({
                 : ""
             )
           }}
-          style={{ padding: 5 }}
+          style={{
+            padding: 8,
+            background: "#111",
+            color: "white",
+            border: "1px solid #444",
+            borderRadius: 6
+          }}
         >
           <option value="">
             Seleccionar categoría
@@ -190,7 +205,13 @@ export default function ProductForm({
                 : ""
             )
           }}
-          style={{ padding: 5 }}
+          style={{
+            padding: 8,
+            background: "#111",
+            color: "white",
+            border: "1px solid #444",
+            borderRadius: 6
+          }}
         >
           <option value="">
             Seleccionar estación
@@ -210,20 +231,16 @@ export default function ProductForm({
 
       {/* BOTONES */}
       <button
+        className="btn btn-primary"
         onClick={handleSubmit}
-        style={{
-          marginRight: 10,
-          padding: "6px 12px"
-        }}
+        style={{ marginRight: 10 }}
       >
         Guardar
       </button>
 
       <button
+        className="btn btn-primary"
         onClick={onCancel}
-        style={{
-          padding: "6px 12px"
-        }}
       >
         Cancelar
       </button>

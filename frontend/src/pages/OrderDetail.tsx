@@ -7,13 +7,21 @@ import type { WSEventParsed } from "../ws"
 
 import { moneyToNumber } from "../utils/money"
 
+import { showToast } from "../utils/showToast"
+
 import type {
   AddProductToTableResponse,
   OrderDetail,
   RawOrderDetail
 } from "../types/order"
 
-import type { CategoryWithProducts } from "../types/category"
+import type { 
+  CategoryWithProducts,
+  RawProduct,
+  RawCategoryWithProducts
+} from "../types/category"
+
+import type { Product } from "../types/product"
 
 import { OrderStatus } from "../types/orderStatus"
 import { OrderItemStatus } from "../types/orderItemStatus"
@@ -79,39 +87,37 @@ function normalizeOrder(
   }
 }
 
+function normalizeProduct(
+  product: RawProduct
+): Product {
+  return {
+    ...product,
+    price: moneyToNumber(product.price)
+  }
+}
 
 export default function OrderDetail() {
   const { orderId, tableId } = useParams()
 
-  const id = orderId
-    ? Number(orderId)
-    : null
+  const id = orderId ? Number(orderId) : null
 
   const navigate = useNavigate()
 
-  const [order, setOrder] =
-    useState<OrderDetail | null>(null)
+  const [order, setOrder] = useState<OrderDetail | null>(null)
 
-  const [loading, setLoading] =
-    useState(true)
+  const [loading, setLoading] = useState(true)
 
-  const [categories, setCategories] =
-    useState<CategoryWithProducts[]>([])
+  const [categories, setCategories] = useState<CategoryWithProducts[]>([])
 
-  const [openCategory, setOpenCategory] =
-    useState<number | null>(null)
+  const [openCategory, setOpenCategory] = useState<number | null>(null)
 
-  const [paymentAmount, setPaymentAmount] =
-    useState("")
+  const [paymentAmount, setPaymentAmount] = useState("")
 
-  const [quantities, setQuantities] =
-    useState<Record<number, number>>({})
+  const [quantities, setQuantities] = useState<Record<number, number>>({})
 
-  const [discount, setDiscount] =
-    useState("")
+  const [discount, setDiscount] = useState("")
 
-  const [discountType, setDiscountType] =
-    useState<"amount" | "percent">("amount")
+  const [discountType, setDiscountType] = useState<"amount" | "percent">("amount")
 
   const updating = useRef(false)
 
@@ -123,33 +129,24 @@ export default function OrderDetail() {
    */
   const fetchOrder = async () => {
     if (!id) return
-
     try {
-      const data =
-        await apiFetch<RawOrderDetail>(
-          `/orders/${id}`
-        )
-
+      const data = await apiFetch<RawOrderDetail>(`/orders/${id}`)
       setOrder(normalizeOrder(data))
     } finally {
       setLoading(false)
     }
   }
 
-
   /**
    * Carga las categorías activas junto con sus productos
    * disponibles para agregar a la orden.
    */
   const fetchCategories = async () => {
-    const data =
-      await apiFetch<CategoryWithProducts[]>(
-        "/categories/with-products"
-      )
-
-    setCategories(data)
+    const data = await apiFetch<RawCategoryWithProducts[]>("/categories/with-products")
+    setCategories(
+      data.map(category => ({...category, products: category.products.map(normalizeProduct)}))
+    )
   }
-
 
   /**
    * Agrega un producto a la orden.
@@ -157,18 +154,13 @@ export default function OrderDetail() {
    * Si todavía no existe una orden para la mesa,
    * el backend la crea y devuelve su identificador.
    */
-  const addProduct = async (
-    productId: number
-  ) => {
-    const quantity =
-      quantities[productId] || 1
+  const addProduct = async (productId: number) => {
+    const quantity = quantities[productId] || 1
 
-    if (
-      order?.status === OrderStatus.CLOSED
-    ) {
+    if (order?.status === OrderStatus.CLOSED || order?.status === OrderStatus.CANCELLED) {
+      showToast("No se pueden agregar productos a una orden cerrada")
       return
     }
-
     if (!orderId) {
       if (!tableId) return
 
@@ -199,56 +191,73 @@ export default function OrderDetail() {
       }
     )
 
+    setQuantities(current => ({...current, [productId]: 1}))
+
     await fetchOrder()
   }
 
 
   /**
    * Elimina un ítem pendiente de la orden.
+   *
+   * Si se trata del último ítem activo, solicita confirmación
+   * porque su eliminación puede cancelar la orden completa.
    */
   const removeItem = async (
     orderId: number,
     itemId: number
   ) => {
-    await apiFetch(
-      `/orders/${orderId}/items/${itemId}`,
-      {
-        method: "DELETE"
-      }
+    if (!order) return
+
+    const activeItems = order.items.filter(
+      item =>
+        item.status !== OrderItemStatus.CANCELLED
     )
 
-    await fetchOrder()
+    const isLastActiveItem =
+      activeItems.length === 1 &&
+      activeItems[0].id === itemId
+
+    if (
+      isLastActiveItem &&
+      !window.confirm(
+        "Este es el único producto de la orden.\n\n" +
+        "Al eliminarlo se cancelará la orden.\n" +
+        "¿Desea continuar?"
+      )
+    ) {
+      return
+    }
+
+    try {
+      await apiFetch(
+        `/orders/${orderId}/items/${itemId}`,
+        {
+          method: "DELETE"
+        }
+      )
+
+      await fetchOrder()
+    } catch {
+      // apiFetch ya mostró el error.
+    }
   }
-
-
   /**
    * Actualiza la cantidad de un ítem pendiente.
    *
    * El ref evita enviar modificaciones concurrentes
    * mientras una actualización anterior sigue en curso.
    */
-  const updateQuantity = async (
-    itemId: number,
-    quantity: number
-  ) => {
+  const updateQuantity = async (itemId: number, quantity: number) => {
     if (updating.current) return
-
     updating.current = true
-
     try {
-      await apiFetch(
-        `/orders/order-items/${itemId}?quantity=${quantity}`,
-        {
-          method: "PATCH"
-        }
-      )
-
+      await apiFetch(`/orders/order-items/${itemId}?quantity=${quantity}`,{method: "PATCH"})
       await fetchOrder()
     } finally {
       updating.current = false
     }
   }
-
 
   /**
    * Marca un ítem READY como entregado.
@@ -273,9 +282,7 @@ export default function OrderDetail() {
   /**
    * Registra un pago para la orden actual.
    */
-  const registerPayment = async (
-    method: PaymentMethod
-  ) => {
+  const registerPayment = async (method: PaymentMethod) => {
     if (!id) return
 
     const amount = Number(paymentAmount)
@@ -288,8 +295,7 @@ export default function OrderDetail() {
       return
     }
 
-    await apiFetch(
-      `/orders/${id}/payments`,
+    await apiFetch(`/orders/${id}/payments`,
       {
         method: "POST",
         body: {
@@ -302,24 +308,14 @@ export default function OrderDetail() {
     await fetchOrder()
   }
 
-
   /**
    * Elimina un pago registrado mientras la orden
    * todavía permanece abierta.
    */
-  const cancelPayment = async (
-    paymentId: number
-  ) => {
-    await apiFetch(
-      `/orders/payments/${paymentId}`,
-      {
-        method: "DELETE"
-      }
-    )
-
+  const cancelPayment = async (paymentId: number) => {
+    await apiFetch(`/orders/payments/${paymentId}`,{method: "DELETE"})
     await fetchOrder()
   }
-
 
   /**
    * Cierra una orden que cumple las reglas de negocio
@@ -327,17 +323,9 @@ export default function OrderDetail() {
    */
   const closeOrder = async () => {
     if (!id) return
-
-    await apiFetch(
-      `/orders/${id}/close`,
-      {
-        method: "POST"
-      }
-    )
-
+    await apiFetch(`/orders/${id}/close`,{method: "POST"})
     await fetchOrder()
   }
-
 
   /**
    * Envía todos los ítems pendientes de la orden
@@ -345,14 +333,7 @@ export default function OrderDetail() {
    */
   const sendToKitchen = async () => {
     if (!id) return
-
-    await apiFetch(
-      `/orders/${id}/send-to-kitchen`,
-      {
-        method: "POST"
-      }
-    )
-
+    await apiFetch(`/orders/${id}/send-to-kitchen`,{method: "POST"})
     await fetchOrder()
   }
 
@@ -360,10 +341,7 @@ export default function OrderDetail() {
    * El catálogo no depende de la orden,
    * por lo que se carga una sola vez.
    */
-  useEffect(() => {
-    fetchCategories()
-  }, [])
-
+  useEffect(() => {fetchCategories()}, [])
 
   /**
    * Carga el detalle cuando existe una orden.
@@ -388,10 +366,7 @@ export default function OrderDetail() {
   useEffect(() => {
     if (!id) return
 
-    const handler = ({
-      type,
-      data
-    }: WSEventParsed) => {
+    const handler = ({type, data}: WSEventParsed) => {
       if (!ORDER_DETAIL_EVENTS.has(type)) {
         return
       }
@@ -405,12 +380,9 @@ export default function OrderDetail() {
 
       fetchOrder()
     }
-
     wsService.subscribe(handler)
 
-    return () => {
-      wsService.unsubscribe(handler)
-    }
+    return () => {wsService.unsubscribe(handler)}
   }, [id])
 
 
@@ -420,10 +392,7 @@ export default function OrderDetail() {
    */
   useEffect(() => {
     if (!order) return
-
-    setPaymentAmount(
-      order.remaining.toFixed(2)
-    )
+    setPaymentAmount(order.remaining.toFixed(2))
   }, [order?.remaining])
 
   if (loading) return <p>Cargando...</p>
@@ -470,41 +439,37 @@ export default function OrderDetail() {
   }
 
   /**
+   * Condiciones para desabilitar descuentos y agregar productos
+   */
+  const orderLocked = order?.status === OrderStatus.CLOSED || order?.status === OrderStatus.CANCELLED
+
+  /**
    * Persiste el descuento monetario aplicado a la orden.
    */
-  const setOrderDiscount = async (
-    amount: number
-  ) => {
+  const setOrderDiscount = async (amount: number) => {
     if (!order) return
-
-    await apiFetch(
-      `/orders/${order.id}/discount?discount=${amount}`,
-      {
-        method: "PUT"
-      }
-    )
-
+    await apiFetch(`/orders/${order.id}/discount?discount=${amount}`,{method: "PUT"})
     setDiscount("")
-
     await fetchOrder()
   }
-
 
   /**
    * Convierte, cuando corresponde, un porcentaje
    * en un importe monetario y aplica el descuento.
    */
   const applyDiscount = async () => {
-    if (
-      !order ||
-      discount.trim() === ""
-    ) {
+    if (!order || discount.trim() === "") {
       return
     }
-
-    let finalDiscount =
-      Number(discount)
-
+    if (
+      !order ||
+      order.status === OrderStatus.CLOSED ||
+      order.status === OrderStatus.CANCELLED
+    ) {
+      showToast("No se puede modificar una orden cerrada")
+      return
+    }
+    let finalDiscount = Number(discount)
     if (
       !Number.isFinite(finalDiscount) ||
       finalDiscount < 0
@@ -512,14 +477,12 @@ export default function OrderDetail() {
       alert("Descuento inválido")
       return
     }
-
     if (
       discountType === "percent"
     ) {
       finalDiscount =
         (order.subtotal * finalDiscount) / 100
     }
-
     await setOrderDiscount(finalDiscount)
   }
 
@@ -527,10 +490,9 @@ export default function OrderDetail() {
   /**
    * Elimina cualquier descuento existente.
    */
-  const removeDiscount = async () => {
-    await setOrderDiscount(0)
-  }
+  const removeDiscount = async () => {await setOrderDiscount(0)}
 
+  
   return (
 
     <div
@@ -550,9 +512,7 @@ export default function OrderDetail() {
           <p>
             Estado:{" "}
             <strong
-              style={{
-                color: getStatusColor()
-              }}
+              style={{color: getStatusColor()}}
             >
               {order.status}
             </strong>
@@ -721,13 +681,27 @@ export default function OrderDetail() {
               inputMode="decimal"
               placeholder="Monto descuento"
               value={discount}
-              onChange={(e) => setDiscount(e.target.value)}
-              style={{ marginRight: 10, padding: 5 }}
+              onChange={e => setDiscount(e.target.value)}
+              disabled={orderLocked}
+              style={{
+                marginRight: 10,
+                padding: 5,
+                opacity: orderLocked ? 0.5 : 1
+              }}
             />
 
-            <button className="btn btn-primary"
+            <button
+              className="btn btn-primary"
               onClick={applyDiscount}
-              style={{ padding: 8, borderRadius: 6 }}
+              disabled={orderLocked}
+              style={{
+                padding: 8,
+                borderRadius: 6,
+                opacity: orderLocked ? 0.5 : 1,
+                cursor: orderLocked
+                  ? "not-allowed"
+                  : "pointer"
+              }}
             >
               Aplicar Descuento
             </button>
@@ -736,7 +710,16 @@ export default function OrderDetail() {
               <button
                 className="btn btn-primary"
                 onClick={removeDiscount}
-                style={{ padding: 8, borderRadius: 6, marginLeft: 10 }}
+                disabled={orderLocked}
+                style={{
+                  padding: 8,
+                  borderRadius: 6,
+                  marginLeft: 10,
+                  opacity: orderLocked ? 0.5 : 1,
+                  cursor: orderLocked
+                    ? "not-allowed"
+                    : "pointer"
+                }}
               >
                 Quitar Descuento
               </button>
@@ -877,18 +860,20 @@ export default function OrderDetail() {
         {categories.map(category => (
           <div key={category.id} style={{ marginBottom: 15 }}>
             <div
-              onClick={() =>
-                setOpenCategory(
-                  openCategory === category.id ? null : category.id
-                )
-              }
+              onClick={() => {
+                if (orderLocked) return
+                setOpenCategory(openCategory === category.id ? null : category.id)
+              }}
               style={{
-                cursor: "pointer",
+                cursor: orderLocked
+                  ? "not-allowed"
+                  : "pointer",
                 fontWeight: "bold",
                 background: "#eee",
                 color: "#111",
                 padding: 10,
-                borderRadius: 6
+                borderRadius: 6,
+                opacity: orderLocked ? 0.5 : 1
               }}
             >
               {category.name}
@@ -896,8 +881,9 @@ export default function OrderDetail() {
 
             {openCategory === category.id && (
               <div style={{ padding: 10 }}>
-                {category.products.map(p => (
-                  <div key={p.id}
+                {category.products.map(product => (
+                  <div
+                    key={product.id}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -905,34 +891,48 @@ export default function OrderDetail() {
                       marginBottom: 6
                     }}
                   >
-
-                    <button className="btn btn-product"
-                      onClick={() => addProduct(p.id)}
+                    <button
+                      className="btn btn-product"
+                      disabled={orderLocked}
+                      onClick={() =>
+                        addProduct(product.id)
+                      }
                     >
-                      {p.name} - ${p.price}
+                      {product.name} - $
+                      {product.price.toFixed(2)}
                     </button>
 
-                    <button className="btn btn-primary"
+                    <button
+                      className="btn btn-primary"
+                      disabled={orderLocked}
                       onClick={() =>
                         setQuantities(current => ({
                           ...current,
-                          [p.id]: Math.max(
-                            (current[p.id] || 1) - 1,
-                            1
-                          )
+
+                          [product.id]:
+                            Math.max(
+                              (current[product.id] || 1) - 1,
+                              1
+                            )
                         }))
                       }
                     >
                       −
                     </button>
 
-                    <strong>{quantities[p.id] || 1}</strong>
+                    <strong>
+                      {quantities[product.id] || 1}
+                    </strong>
 
-                    <button className="btn btn-primary"
+                    <button
+                      className="btn btn-primary"
+                      disabled={orderLocked}
                       onClick={() =>
                         setQuantities(current => ({
                           ...current,
-                          [p.id]: (current[p.id] || 1) + 1
+
+                          [product.id]:
+                            (current[product.id] || 1) + 1
                         }))
                       }
                     >
@@ -944,9 +944,8 @@ export default function OrderDetail() {
             )}
           </div>
         ))}
-      </div>
     </div>
-
+  </div>      
   )
 
 }

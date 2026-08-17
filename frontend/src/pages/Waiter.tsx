@@ -321,7 +321,6 @@ export default function Waiter() {
             )
             return
           }
-          console.log("FETCH ORDERS POR ITEM_STATUS_CHANGED")
           //fetchOrders()
           dispatch({
             type: "ITEM_STATUS_CHANGED",

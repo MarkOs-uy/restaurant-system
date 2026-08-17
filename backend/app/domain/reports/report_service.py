@@ -166,20 +166,52 @@ class ReportService:
             order_id=order.id,
             table_number=order.table.number if order.table else None,
             closed_at=order.closed_at,
-            items=[
-                SalesOrderItemOut(
-                    item_id=item.id,
-                    product_id=item.product_id,
-                    product_name=item.product.name if item.product else "Producto eliminado",
-                    unit_price=item.unit_price,
-                    quantity=item.quantity,
-                    line_total=item.quantity * item.unit_price
-                )
-                for item in active_items
-            ],
+            items=self._group_sales_order_items(active_items),
             subtotal=subtotal,
             discount=discount,
             total=max(subtotal - discount, Decimal("0"))
+        )
+
+    # --------------------------------------------------------------------------------------
+    # Agrupa los productos para el reporte de ventas
+    # --------------------------------------------------------------------------------------
+    def _group_sales_order_items(self, items: list[OrderItem]) -> list[SalesOrderItemOut]:
+        grouped: dict[tuple[int, Decimal], SalesOrderItemOut] = {}
+        for item in items:
+            key = (
+                item.product_id,
+                item.unit_price
+            )
+
+            if key in grouped:
+                grouped_item = grouped[key]
+
+                grouped_item.quantity += item.quantity
+                grouped_item.line_total += (
+                    item.quantity *
+                    item.unit_price
+                )
+            else:
+                grouped[key] = SalesOrderItemOut(
+                    item_id=item.id,
+                    product_id=item.product_id,
+                    product_name=(
+                        item.product.name
+                        if item.product
+                        else "Producto eliminado"
+                    ),
+                    unit_price=item.unit_price,
+                    quantity=item.quantity,
+                    line_total=(
+                        item.quantity *
+                        item.unit_price
+                    )
+                )
+
+        return sorted(
+            grouped.values(),
+            key=lambda item:
+                item.product_name.lower()
         )
 
     # --------------------------------------------------------------------------------------

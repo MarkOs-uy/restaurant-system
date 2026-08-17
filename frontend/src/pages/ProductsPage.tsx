@@ -9,7 +9,8 @@ import { apiFetch } from "../api"
 import type {
   Product,
   ProductCreate,
-  ProductUpdate
+  ProductUpdate,
+  RawProduct
 } from "../types/product"
 
 import type { Category } from "../types/category"
@@ -20,10 +21,36 @@ import Card from "../components/Card"
 import DataTable from "../components/DataTable"
 import ProductForm from "../components/ProductForm"
 
+import { moneyToNumber } from "../utils/money"
 
-type GroupedProducts =
-  Record<string, Product[]>
 
+type GroupedProducts = Record<string, Product[]>
+
+
+function normalizeProduct(
+  product: RawProduct
+): Product {
+  return {
+    ...product,
+    price: moneyToNumber(product.price)
+  }
+}
+
+
+function compareProducts(
+  a: Product,
+  b: Product
+): number {
+  if (a.active !== b.active) {
+    return a.active ? -1 : 1
+  }
+
+  return a.name.localeCompare(
+    b.name,
+    "es",
+    { sensitivity: "base" }
+  )
+}
 
 export default function ProductsPage() {
   const [products, setProducts] =
@@ -57,17 +84,17 @@ export default function ProductsPage() {
       activeProducts,
       inactiveProducts
     ] = await Promise.all([
-      apiFetch<Product[]>(
+      apiFetch<RawProduct[]>(
         "/products/?active=true"
       ),
-      apiFetch<Product[]>(
+      apiFetch<RawProduct[]>(
         "/products/?active=false"
       )
     ])
 
     setProducts([
-      ...activeProducts,
-      ...inactiveProducts
+      ...activeProducts.map(normalizeProduct),
+      ...inactiveProducts.map(normalizeProduct)
     ])
   }
 
@@ -185,10 +212,8 @@ export default function ProductsPage() {
       {}
     )
 
-
-  const toggleCategory = (
-    categoryName: string
-  ) => {
+// Activa-Desactiva una categoría
+  const toggleCategory = (categoryName: string) => {
     setOpenCategories(previous => ({
       ...previous,
       [categoryName]:
@@ -284,11 +309,7 @@ export default function ProductsPage() {
                       categoryName
                     ] &&
                       [...items]
-                        .sort((a, b) =>
-                          a.name.localeCompare(
-                            b.name
-                          )
-                        )
+                        .sort(compareProducts)
                         .map(product => (
                           <tr
                             key={product.id}

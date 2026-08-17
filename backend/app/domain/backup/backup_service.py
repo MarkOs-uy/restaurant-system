@@ -602,7 +602,11 @@ class BackupService:
                     tz=timezone.utc
                 ),
                 size=path.stat().st_size,
-                type=path.parent.name
+                type=(
+                    "manual"
+                    if path.parent == directory
+                    else path.parent.name
+                )
             )
             for path in files
         ]

@@ -33,10 +33,10 @@ export interface TablePosition {
 }
 
 export interface TableUpdate {
-  number: number
-  capacity: number
-  shape: TableShape
-  active: boolean
+  number?: number
+  capacity?: number
+  shape?: TableShape
+  active?: boolean
 }
 
 export const TableShape = {

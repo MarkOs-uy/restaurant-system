@@ -24,7 +24,6 @@ export interface ProductsReport {
 }
 
 export interface SalesOrderItem {
-  item_id: number
   product_id: number
   product_name: string
   unit_price: number

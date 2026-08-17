@@ -11,6 +11,9 @@ import type {
 import { TableShape } from "../types/table"
 
 
+
+
+
 export default function ManageTables() {
   const navigate = useNavigate()
 
@@ -79,8 +82,7 @@ export default function ManageTables() {
     return (
       original.number !== table.number ||
       original.capacity !== table.capacity ||
-      original.shape !== table.shape ||
-      original.active !== table.active
+      original.shape !== table.shape
     )
   }
 
@@ -124,8 +126,30 @@ export default function ManageTables() {
     const payload: TableUpdate = {
       number: table.number,
       capacity: table.capacity,
-      shape: table.shape,
-      active: table.active
+      shape: table.shape
+    }
+
+    await apiFetch(
+      `/tables/${table.id}`,
+      {
+        method: "PATCH",
+        body: payload
+      }
+    )
+
+    await loadTables()
+  }
+
+  /**
+   * Activa o desactiva una mesa y persiste
+   * inmediatamente el cambio.
+   */
+  const toggleTableActive = async (
+    table: Table,
+    active: boolean
+  ) => {
+    const payload: TableUpdate = {
+      active
     }
 
     await apiFetch(
@@ -192,7 +216,17 @@ export default function ManageTables() {
                 </tr>
             )}
             {activeTables.map((t) => (
-            <tr key={t.id}>
+            <tr
+              key={t.id}
+              style={{
+                background: hasChanges(t)
+                  ? "rgba(255, 193, 7, 0.12)"
+                  : "transparent",
+                outline: hasChanges(t)
+                  ? "1px solid rgba(255, 193, 7, 0.45)"
+                  : "none"
+              }}
+            >
 
                 <td>
                     <input
@@ -247,13 +281,16 @@ export default function ManageTables() {
                 </td>
 
                 <td style={{ textAlign: "center" }}>
-                <input
+                  <input
                     type="checkbox"
                     checked={t.active}
-                    onChange={(e) =>
-                    updateField(t.id, "active", e.target.checked)
+                    onChange={e =>
+                      void toggleTableActive(
+                        t,
+                        e.target.checked
+                      )
                     }
-                />
+                  />
                 </td>
 
                 <td>
@@ -295,7 +332,17 @@ export default function ManageTables() {
                 </tr>
             )}
             {inactiveTables.map((t) => (
-            <tr key={t.id}>
+            <tr
+              key={t.id}
+              style={{
+                background: hasChanges(t)
+                  ? "rgba(255, 193, 7, 0.12)"
+                  : "transparent",
+                outline: hasChanges(t)
+                  ? "1px solid rgba(255, 193, 7, 0.45)"
+                  : "none"
+              }}
+            >
 
                 <td>
                     <input
@@ -350,26 +397,39 @@ export default function ManageTables() {
                 </td>
 
                 <td style={{ textAlign: "center" }}>
-                    <input
-                        type="checkbox"
-                        checked={t.active}
-                        onChange={(e) =>
-                        updateField(t.id, "active", e.target.checked)
-                        }
-                    />
+                  <input
+                    type="checkbox"
+                    checked={t.active}
+                    onChange={e =>
+                      void toggleTableActive(
+                        t,
+                        e.target.checked
+                      )
+                    }
+                  />
                 </td>
 
                 <td>
-                    <button
-                        onClick={() => updateTable(t)}
-                        disabled={!hasChanges(t)}
-                        style={{
-                            opacity: hasChanges(t) ? 1 : 0.5,
-                            cursor: hasChanges(t) ? "pointer" : "not-allowed"
-                        }}
-                    >
-                        Guardar
-                    </button>
+                  <button
+                    onClick={() => updateTable(t)}
+                    disabled={!hasChanges(t)}
+                    style={{
+                      opacity: hasChanges(t) ? 1 : 0.35,
+                      cursor: hasChanges(t)
+                        ? "pointer"
+                        : "not-allowed",
+                      fontWeight: hasChanges(t)
+                        ? "bold"
+                        : "normal",
+                      boxShadow: hasChanges(t)
+                        ? "0 0 0 2px rgba(255, 193, 7, 0.35)"
+                        : "none"
+                    }}
+                  >
+                    {hasChanges(t)
+                      ? "Guardar cambios"
+                      : "Guardado"}
+                  </button>
                 </td>
 
             </tr>

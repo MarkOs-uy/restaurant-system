@@ -134,18 +134,24 @@ export async function apiFetch<T = unknown>(
 
         const error: ApiError = {
             code:
-                typeof responseData.error === "string"
+                typeof responseData.code === "string"
+                ? responseData.code as ApiError["code"]
+                : typeof responseData.error === "string"
                     ? responseData.error as ApiError["code"]
                     : undefined,
 
             message:
-                typeof responseData.detail === "string"
+                typeof responseData.message === "string"
+                ? responseData.message
+                : typeof responseData.detail === "string"
                     ? responseData.detail
                     : `HTTP ${res.status}`,
 
-            context: responseData.context,
+            context:
+                responseData.context,
 
-            status: res.status
+            status:
+                res.status
         }
 
         if (!suppressErrorToast) {

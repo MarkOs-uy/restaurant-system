@@ -1,10 +1,16 @@
 import { useEffect, useReducer, useRef, useState } from "react"
 import { apiFetch } from "../api"
+
+import { isApiError } from "../types/apiError"
+import { ErrorCode } from "../types/domainErrors"
+import { showToast } from "../utils/showToast"
+
 import { CashMovementType,
   OrderStatus,
   PaymentMethod,
   WSEvent,  
    } from "../types"
+
 import type { 
   CashRegisterDashboard, 
   CashMovement, 
@@ -322,15 +328,40 @@ export default function CashierPage() {
   }
 
   const fetchDashboard = async () => {
-    const data =
-      await apiFetch<RawCashRegisterDashboard>(
-        "/cash-register/dashboard"
-      )
+    try {
+      const data =
+        await apiFetch<RawCashRegisterDashboard>(
+          "/cash-register/dashboard",
+          {
+            suppressErrorToast: true
+          }
+        )
 
-    dispatch({
-      type: "SET_DASHBOARD",
-      payload: normalizeDashboard(data)
-    })
+      dispatch({
+        type: "SET_DASHBOARD",
+        payload: normalizeDashboard(data)
+      })
+
+    } catch (error: unknown) {
+      if (
+        isApiError(error) &&
+        error.code ===
+          ErrorCode.CASH_REGISTER_NOT_OPEN
+      ) {
+        dispatch({
+          type: "SET_DASHBOARD",
+          payload: null
+        })
+
+        return
+      }
+
+      showToast(
+        error instanceof Error
+          ? error.message
+          : "No se pudo cargar la caja"
+      )
+    }
   }
 
   const fetchActiveOrders = async () => {
@@ -375,43 +406,31 @@ export default function CashierPage() {
         paymentInputRef.current?.focus()
       },50)
     } catch(err:any){
-      alert(err.message)
+
     }
   }
 
-  const registerPayment = async (
-    method: PaymentMethod,
-    amountOverride?: number
-  ) => {
+  /**
+   * Registrar un pago
+   */
+  const registerPayment = async (method: PaymentMethod, amountOverride?: number) => {
     if (!selectedOrder) return
     if (processingPayment) return
 
-    setProcessingPayment(true)
+    let amount = amountOverride ?? Number(paymentAmount)
 
-    let amount =
-      amountOverride ??
-      Number(paymentAmount)
-
-    if (
-      Number.isNaN(amount) ||
-      amount <= 0
-    ) {
+    if ( !Number.isFinite(amount) || amount <= 0) {
       amount = selectedOrder.remaining
     }
 
-    if (amount <= 0) {
-      setProcessingPayment(false)
-      return
-    }
+    if (amount <= 0) { return}
 
-    amount = Math.min(
-      amount,
-      selectedOrder.remaining
-    )
+    amount = Math.min( amount, selectedOrder.remaining)
+
+    setProcessingPayment(true)
 
     try {
-      await apiFetch(
-        `/orders/${selectedOrder.id}/payments`,
+      await apiFetch(`/orders/${selectedOrder.id}/payments`,
         {
           method: "POST",
           body: {
@@ -420,36 +439,38 @@ export default function CashierPage() {
           }
         }
       )
-
       setPaymentAmount("")
       await selectOrder(selectedOrder.id)
-    } catch (err: any) {
-      alert(err.message)
+    } catch {
+      // apiFetch ya mostró el error.
     } finally {
       setProcessingPayment(false)
     }
   }
 
+  /**
+   * Realiza un descuento en la orden seleccionada
+   */
   const setOrderDiscount = async (amount: number) => {
     if (!selectedOrder) return
     try {
-      await apiFetch(
-        `/orders/${selectedOrder.id}/discount?discount=${amount}`,
-        { method: "PUT" }
-      )
+      await apiFetch(`/orders/${selectedOrder.id}/discount?discount=${amount}`, { method: "PUT" })
       setDiscount("")
       await selectOrder(selectedOrder.id)
       await fetchActiveOrders()
     } catch (err: any) {
-      alert(err.message)
+      // apiFetch ya mostró el error.
     }
   }
 
+  /**
+   * Aplica un descuento en la orden seleccionada
+   */
   const applyDiscount = async () => {
     if (!selectedOrder || discount.trim() === "") return
     let finalDiscount = Number(discount)
     if (Number.isNaN(finalDiscount) || finalDiscount < 0) {
-      alert("Descuento invalido")
+      showToast("Descuento invalido")
       return
     }
     if (discountType === "percent") {
@@ -458,28 +479,32 @@ export default function CashierPage() {
     await setOrderDiscount(finalDiscount)
   }
 
+  /**
+   * Elimina un descuento en la orden seleccionada
+   */
+  const removeDiscount = async () => {await setOrderDiscount(0)}
 
-  const removeDiscount = async () => {
-    await setOrderDiscount(0)
-  }
-
-
+  /**
+   * Abre el modal para agregar un movimiento de caja
+   */
   const openMovementModal = ( type: CashMovementType ) => {
     setMovementAmount("")
     setMovementReason("")
     dispatch({ type: "OPEN_MOVEMENT_MODAL", payload: type })
   }
 
-
+  /**
+   * Registra un movimiento de caja
+   */
   const registrarMovimiento = async () => {
     if (!state.movementType) return
 
     if (!movementAmount || Number(movementAmount) <= 0) {
-      alert("Monto inválido")
+      showToast("Monto inválido")
       return
     }
     if (!movementReason.trim()) {
-      alert("Debe indicar un motivo")
+      showToast("Debe indicar un motivo")
       return
     }
     try {
@@ -492,7 +517,7 @@ export default function CashierPage() {
         }
       })
     } catch (err: any) {
-      alert(err.message)
+      // apiFetch ya mostró el error.
       return
     }
     await fetchDashboard()
@@ -504,12 +529,15 @@ export default function CashierPage() {
     },50)
   }
 
-
+  /**
+   * Cerrar caja
+   */
   const closeCashRegister = async () => {
     if (!realCash) {
-      alert("Ingrese efectivo contado")
+      showToast("Ingrese efectivo contado")
       return
     }
+
     try {
       const summary =
         await apiFetch<RawCashRegisterCloseSummary>(
@@ -519,23 +547,54 @@ export default function CashierPage() {
             body: {
               counted_cash: Number(realCash),
               difference_reason: differenceReason
-            }
+            },
+            suppressErrorToast: true
           }
         )
 
-      setCloseSummary(
-        normalizeCloseSummary(summary)
-      )
-    } catch (err: any) {
-      switch (err.code) {
-        case "order_has_remaining_balance":
-          alert(`Falta pagar ${err.context.remaining}`)
-        break
-        case "order_items_not_delivered":
-          alert(`Platos pendientes: ${err.context.items.join(", ")}`)
-        break
+      const normalizedSummary = normalizeCloseSummary(summary)
+
+      setCloseModalOpen(false)
+
+      setCloseSummary(normalizedSummary)
+
+      setShowCloseSummary(true)
+
+      dispatch({
+        type: "SET_DASHBOARD",
+        payload: null
+      })
+
+    } catch (error: unknown) {
+      if (!isApiError(error)) {
+        showToast("No se pudo cerrar la caja")
+        return
+      }
+
+      switch (error.code) {
+        case ErrorCode.ORDER_HAS_REMAINING_BALANCE: {
+          const remaining = error.context?.remaining
+          showToast(`Falta pagar ${ typeof remaining === "number" || typeof remaining === "string" ? remaining: ""}`)
+          break
+        }
+
+        case ErrorCode.ORDER_ITEMS_NOT_DELIVERED: {
+          const items = error.context?.items
+          showToast(Array.isArray(items) ? `Platos pendientes: ${items.join(", ")}` : "Hay platos pendientes de entregar")
+          break
+        }
+
+        case ErrorCode.CASH_REGISTER_PENDING_ORDERS:
+          showToast(
+            "No se puede cerrar la caja mientras existan órdenes abiertas"
+          )
+          break
+
         default:
-          alert(err.message)
+          showToast(
+            error.message ||
+            "No se pudo cerrar la caja"
+          )
       }
     }
   }
@@ -564,9 +623,15 @@ export default function CashierPage() {
 
     // CARGA INICIAL
     const init = async () => {
-      await fetchDashboard()
-      await safeFetchOrders()
-      dispatch({ type: "SET_LOADING", payload: false })
+      try {
+        await fetchDashboard()
+        await safeFetchOrders()
+      } finally {
+        dispatch({
+          type: "SET_LOADING",
+          payload: false
+        })
+      }
     }
 
     init()
@@ -689,46 +754,6 @@ export default function CashierPage() {
 
   if (state.loading) return <div style={{ padding: 40 }}>Cargando...</div>
 
-  if (!state.dashboard) {
-    return (
-      <div style={{ padding: 40 }}>
-        <h1>💰 Abrir Caja</h1>
-        <input
-          type="number"
-          placeholder="Monto inicial"
-          value={openingAmount}
-          ref={paymentInputRef}
-          onChange={e => setOpeningAmount(e.target.value)}
-        />
-        <button
-          onClick={async () => {
-            const amount = Number(openingAmount)
-            if (!openingAmount || isNaN(amount)) {
-              alert("Ingrese un monto válido")
-              return
-            }
-            if (amount < 0) {
-              alert("El monto no puede ser negativo")
-              return
-            }
-            try {
-              await apiFetch("/cash-register/open", {
-                method: "POST",
-                body: {
-                  opening_amount: amount
-                }
-              })
-              await fetchDashboard()
-            } catch (err: any) {
-              alert(err.message)
-            }
-          }}
-        >
-          Abrir Caja
-        </button>
-      </div>
-    )
-  }
 
   if(showCloseSummary && closeSummary){
     return (
@@ -812,15 +837,54 @@ export default function CashierPage() {
               setCloseSummary(null)
               setRealCash("")
               setDifferenceReason("")
-
-              await fetchDashboard()
-              await fetchActiveOrders()
             }}
           >
             Finalizar
           </button>
 
         </div>
+      </div>
+    )
+  }
+
+
+  if (!state.dashboard) {
+    return (
+      <div style={{ padding: 40 }}>
+        <h1>💰 Abrir Caja</h1>
+        <input
+          type="number"
+          placeholder="Monto inicial"
+          value={openingAmount}
+          ref={paymentInputRef}
+          onChange={e => setOpeningAmount(e.target.value)}
+        />
+        <button
+          onClick={async () => {
+            const amount = Number(openingAmount)
+            if (!openingAmount || isNaN(amount)) {
+              showToast("Ingrese un monto válido")
+              return
+            }
+            if (amount < 0) {
+              showToast("El monto no puede ser negativo")
+              return
+            }
+            try {
+              await apiFetch("/cash-register/open", {
+                method: "POST",
+                body: {
+                  opening_amount: amount
+                }
+              })
+              await fetchDashboard()
+            } catch (err: any) {
+            // apiFetch ya mostró el error.
+            }
+          }}
+        >
+          Abrir Caja
+        </button>
       </div>
     )
   }
@@ -892,7 +956,7 @@ export default function CashierPage() {
                     })
                     await fetchDashboard()
                   } catch (err: any) {
-                    alert(err.message)
+                  // apiFetch ya mostró el error.
                   }
                 }}
                 style={{
@@ -1313,7 +1377,7 @@ export default function CashierPage() {
                           method: "DELETE"
                         })
                       } catch (err: any) {
-                        alert(err.message)
+                      // apiFetch ya mostró el error.
                       }
 
                     }}
@@ -1394,11 +1458,9 @@ export default function CashierPage() {
                 <button
                   onClick={async () => {
                     try {
-                      await apiFetch(`/orders/${selectedOrder.id}/close`, {
-                        method: "POST"
-                      })
+                      await apiFetch(`/orders/${selectedOrder.id}/close`, {method: "POST"})
                     } catch (err: any) {
-                      alert(err.message)
+                    // apiFetch ya mostró el error.
                     }
                   }}
                   style={{ marginTop: 20, width: "100%", padding: 14, background: "#1976d2", color: "white", borderRadius: 6 }}

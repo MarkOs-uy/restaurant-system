@@ -80,10 +80,10 @@ export default function UsersPage() {
     resetForm()
     await fetchUsers()
   }
+
   // -------------------------
   // Activar/Desactivar usuarios
   // -------------------------
-
   const toggleUser = async (id: number) => {
     await apiFetch(`/users/${id}/toggle`, {
       method: "PATCH"
@@ -94,7 +94,6 @@ export default function UsersPage() {
   // -------------------------
   // Editar usuarios
   // -------------------------
-
   const editUser = ( user: User) => {
     setEditingId(user.id)
     setUsername(user.username)
@@ -127,16 +126,25 @@ export default function UsersPage() {
             style={{ marginLeft: 10 }}
           />
 
-          {Object.values(UserRole).map(
-            userRole => (
-              <option
-                key={userRole}
-                value={userRole}
-              >
-                {userRole}
-              </option>
-            )
-          )}
+          <select
+            value={role}
+            onChange={e =>
+              setRole(
+                e.target.value as UserRole
+              )
+            }
+          >
+            {Object.values(UserRole).map(
+              userRole => (
+                <option
+                  key={userRole}
+                  value={userRole}
+                >
+                  {userRole}
+                </option>
+              )
+            )}
+          </select>
 
           <button className="btn btn-primary"
             onClick={saveUser}
@@ -144,6 +152,16 @@ export default function UsersPage() {
           >
             {editingId !== null ? "Actualizar" : "Crear"}
           </button>
+
+          {editingId !== null && (
+            <button
+              className="btn btn-primary"
+              onClick={resetForm}
+              style={{ marginLeft: 10 }}
+            >
+              Cancelar
+            </button>
+          )}
 
         </div>
 
@@ -182,16 +200,6 @@ export default function UsersPage() {
                   >
                     {u.active ? "Desactivar" : "Activar"}
                   </button>
-
-                  {editingId !== null && (
-                    <button
-                      className="btn btn-primary"
-                      onClick={resetForm}
-                      style={{ marginLeft: 10 }}
-                    >
-                      Cancelar
-                    </button>
-                  )}
 
                 </td>
 

@@ -1,6 +1,5 @@
 import {
   useState,
-  type FormEvent
 } from "react"
 
 import { useNavigate } from "react-router-dom"
@@ -38,10 +37,7 @@ export default function LoginPage() {
   // -------------------------------------------------------------------------------------------
   // Autentica al usuario y establece la sesión local.
   // -------------------------------------------------------------------------------------------
-  async function login(
-    event: FormEvent<HTMLFormElement>
-  ): Promise<void> {
-    event.preventDefault()
+  async function login(): Promise<void> {
 
     if (loggingIn) return
 
@@ -94,8 +90,7 @@ export default function LoginPage() {
           }
         )
 
-      const token =
-        data.access_token
+      const token = data.access_token
 
       if (!token) {
         throw new Error(
@@ -103,27 +98,15 @@ export default function LoginPage() {
         )
       }
 
-      const decoded =
-        jwtDecode<AuthPayload>(token)
+      const decoded = jwtDecode<AuthPayload>(token)
 
-      localStorage.setItem(
-        "token",
-        token
-      )
+      localStorage.setItem( "token", token)
 
-      localStorage.setItem(
-        "role",
-        decoded.role
-      )
+      localStorage.setItem( "role", decoded.role)
 
-      localStorage.setItem(
-        "restaurant_id",
-        String(decoded.restaurant_id)
-      )
+      localStorage.setItem( "restaurant_id", String(decoded.restaurant_id))
 
-      window.dispatchEvent(
-        new Event("authChanged")
-      )
+      window.dispatchEvent(new Event("authChanged"))
 
       switch (decoded.role) {
         case UserRole.ADMIN:
@@ -147,18 +130,10 @@ export default function LoginPage() {
       }
 
     } catch (error: unknown) {
-      console.error(
-        "Login error:",
-        error
-      )
+      console.error("Login error:", error)
 
-      if (
-        isApiError(error) &&
-        error.status === 401
-      ) {
-        showToast(
-          "Usuario o contraseña incorrectos"
-        )
+      if (isApiError(error) && error.status === 401) {
+        showToast("Usuario o contraseña incorrectos")
         return
       }
 
@@ -167,9 +142,7 @@ export default function LoginPage() {
         return
       }
 
-      showToast(
-        "No pudimos iniciar sesión"
-      )
+      showToast("No pudimos iniciar sesión")
 
     } finally {
       setLoggingIn(false)
@@ -190,11 +163,14 @@ export default function LoginPage() {
         position: "fixed",
         top: 0,
         left: 0,
-        zIndex: 9999
+        zIndex: 100
       }}
     >
       <form
-        onSubmit={login}
+        onSubmit={event => {
+          event.preventDefault()
+          void login()
+        }}
         style={{
           background:
             "rgba(22, 28, 45, 0.45)",
