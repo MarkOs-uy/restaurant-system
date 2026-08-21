@@ -140,13 +140,14 @@ export default function StationsPage() {
     setName("")
   }
 
-
   return (
     <Page title="Estaciones">
       <Card>
-        <div style={{ marginBottom: 20 }}>
+
+        {/* Alta / edición */}
+        <div className="admin-form-row">
           <input
-            placeholder="Nombre estación"
+            placeholder="Nombre de la estación"
             value={name}
             onChange={event =>
               setName(event.target.value)
@@ -156,7 +157,6 @@ export default function StationsPage() {
           <button
             className="btn btn-primary"
             onClick={saveStation}
-            style={{ marginLeft: 10 }}
           >
             {editingId !== null
               ? "Actualizar"
@@ -165,9 +165,8 @@ export default function StationsPage() {
 
           {editingId !== null && (
             <button
-              className="btn btn-primary"
+              className="btn btn-secondary"
               onClick={cancelEdit}
-              style={{ marginLeft: 10 }}
             >
               Cancelar
             </button>
@@ -180,14 +179,19 @@ export default function StationsPage() {
             <tr>
               <th>Nombre</th>
               <th>Estado</th>
-              <th>Acciones</th>
+              <th className="admin-actions-column">
+                Acciones
+              </th>
             </tr>
           </thead>
 
           <tbody>
             {stations.length === 0 && (
               <tr>
-                <td colSpan={3}>
+                <td
+                  colSpan={3}
+                  className="admin-table-empty"
+                >
                   No hay estaciones
                 </td>
               </tr>
@@ -195,42 +199,60 @@ export default function StationsPage() {
 
             {stations.map(station => (
               <tr key={station.id}>
-                <td>{station.name}</td>
-
                 <td>
-                  {station.active
-                    ? "Activa"
-                    : "Inactiva"}
+                  <strong>
+                    {station.name}
+                  </strong>
                 </td>
 
                 <td>
-                  <button
-                    className="btn btn-primary"
-                    onClick={() =>
-                      editStation(station)
+                  <span
+                    className={
+                      station.active
+                        ? "status-badge status-badge--active"
+                        : "status-badge status-badge--inactive"
                     }
-                  >
-                    Editar
-                  </button>
-
-                  <button
-                    className="btn btn-primary"
-                    onClick={() =>
-                      toggleStation(station.id)
-                    }
-                    style={{
-                      marginLeft: 10
-                    }}
                   >
                     {station.active
-                      ? "Desactivar"
-                      : "Activar"}
-                  </button>
+                      ? "Activa"
+                      : "Inactiva"}
+                  </span>
+                </td>
+
+                <td>
+                  <div className="admin-table-actions">
+
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() =>
+                        editStation(station)
+                      }
+                    >
+                      Editar
+                    </button>
+
+                    <button
+                      className={
+                        station.active
+                          ? "btn btn-danger"
+                          : "btn btn-success"
+                      }
+                      onClick={() =>
+                        toggleStation(station.id)
+                      }
+                    >
+                      {station.active
+                        ? "Desactivar"
+                        : "Activar"}
+                    </button>
+
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </DataTable>
+
       </Card>
     </Page>
   )

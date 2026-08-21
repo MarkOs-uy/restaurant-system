@@ -120,9 +120,55 @@ function App() {
         "authChanged",
         loadAuth
       )
+
+      wsService.disconnect()
     }
   }, [])
 
+
+  useEffect(() => {
+
+    const reconnectIfAuthenticated = () => {
+      if (!localStorage.getItem("token")) {
+        return
+      }
+
+      wsService.reconnect()
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        reconnectIfAuthenticated()
+      }
+    }
+
+    const handleOnline = () => {
+      reconnectIfAuthenticated()
+    }
+
+    document.addEventListener(
+      "visibilitychange",
+      handleVisibilityChange
+    )
+
+    window.addEventListener(
+      "online",
+      handleOnline
+    )
+
+    return () => {
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange
+      )
+
+      window.removeEventListener(
+        "online",
+        handleOnline
+      )
+    }
+
+  }, [])
 
   return (
     <>

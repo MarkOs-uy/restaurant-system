@@ -132,6 +132,36 @@ function isOrderClosedPayload(
 }
 
 /**
+ * Asigna una etiqueta al item dependiendo de su status
+ */
+function orderItemStatusLabel(
+  status: OrderItemStatus
+): string {
+  switch (status) {
+    case OrderItemStatus.PENDING:
+      return "Pendiente"
+
+    case OrderItemStatus.SENT:
+      return "Enviado"
+
+    case OrderItemStatus.IN_PROGRESS:
+      return "Preparando"
+
+    case OrderItemStatus.READY:
+      return "Listo"
+
+    case OrderItemStatus.DELIVERED:
+      return "Entregado"
+
+    case OrderItemStatus.CANCELLED:
+      return "Cancelado"
+
+    default:
+      return status
+  }
+}
+
+/**
  * Calcula cuántos minutos han transcurrido desde
  * la creación de una orden.
  *
@@ -377,8 +407,11 @@ export default function Waiter() {
   /**
    * Marca un único item como entregado.
    *
-   * El backend emitirá el evento correspondiente y la pantalla
-   * se actualizará a través del WebSocket.
+   * Tras confirmar la actualización en el backend,
+   * refresca las órdenes para actualizar inmediatamente
+   * la pantalla local.
+   *
+   * El WebSocket mantiene sincronizados los demás clientes.
    */
   const markAsDelivered = async (itemId: number) => {
     await apiFetch(`/order-items/${itemId}/status`, {
@@ -387,6 +420,7 @@ export default function Waiter() {
         status: OrderItemStatus.DELIVERED
       }
     })
+    await fetchOrders()
   }
 
   /**
@@ -395,6 +429,9 @@ export default function Waiter() {
    *
    * Las actualizaciones se ejecutan en paralelo porque son
    * operaciones independientes.
+   *
+   * Al finalizar, se refrescan las órdenes para actualizar
+   * inmediatamente la pantalla local.
    */
   const deliverAllReady = async (order: Order) => {
     const readyItems = order.items.filter(
@@ -413,6 +450,7 @@ export default function Waiter() {
         })
       )
     )
+    await fetchOrders()
   }
 
   /* =========================
@@ -446,117 +484,136 @@ export default function Waiter() {
   ========================= */
 
   const renderOrders = (ordersList: Order[]) =>
-    ordersList.map(order => {
-      const minutes = orderWaitingMinutes(order.created_at)
+    ordersList.map(order => {const minutes = orderWaitingMinutes(order.created_at)
       const ready = hasReadyItems(order)
       return (
-        <div
+        <article
           key={order.id}
-          className="card"
-          style={{
-            border: ready
-              ? "1px solid var(--status-inprogress)"
-              : "1px solid var(--color-border)",
-            backgroundColor: ready
-              ? "rgba(59, 130, 246, 0.1)"
-              : "rgba(22, 28, 45, 0.4)",
-            boxShadow: ready
-              ? "0 0 16px rgba(59, 130, 246, 0.15)"
-              : "var(--shadow-sm)",
-            marginBottom: 20
-          }}
+          className={
+            ready
+              ? "waiter-order waiter-order--ready"
+              : "waiter-order"
+          }
         >
-          <h2>
-            Mesa {order.table_number}
+          <header className="waiter-order__header">
+
+            <div>
+              <h3>
+                Mesa {order.table_number}
+                {ready && (
+                  <span
+                    className="waiter-order__bell"
+                    aria-label="Hay platos listos"
+                  >
+                    🔔
+                  </span>
+                )}
+              </h3>
+
+              <span
+                className="waiter-order__time"
+                style={{
+                  color:
+                    waitingColor(minutes)
+                }}
+              >
+                ⏱ {minutes} min
+              </span>
+            </div>
+
             {ready && (
-              <span style={{ marginLeft: 10 }}>🔔</span>
+              <button
+                type="button"
+                className="btn btn-success"
+                onClick={() =>
+                  deliverAllReady(order)
+                }
+              >
+                Entregar todo
+              </button>
             )}
-            <span
-              style={{
-                marginLeft: 12,
-                fontSize: 14,
-                fontWeight: "bold",
-                color: waitingColor(minutes)
-              }}
-            >
-              ⏱ {minutes} min
-            </span>
-          </h2>
 
-          {ready && (
-            <button
-              onClick={() => deliverAllReady(order)}
-              style={{
-                marginBottom: 10,
-                backgroundColor: "green",
-                color: "white",
-                borderRadius: 6,
-                padding: "6px 12px",
-                fontWeight: "bold"
-              }}
-            >
-              Entregar todo
-            </button>
-          )}
+          </header>
 
-          <ul>
+          <div className="waiter-order__items">
             {order.items.map(item => (
-              <li key={item.id} style={{ marginBottom: 5 }}>
-                {item.product_name} x {item.quantity}
+              <div
+                key={item.id}
+                className="waiter-order-item"
+              >
+                <div className="waiter-order-item__name">
+                  <span>
+                    {item.product_name}
+                  </span>
+
+                  <strong>
+                    × {item.quantity}
+                  </strong>
+                </div>
+
                 <span
+                  className="waiter-order-item__status"
                   style={{
-                    marginLeft: 10,
-                    padding: "2px 8px",
-                    borderRadius: 6,
-                    backgroundColor: statusColor(item.status),
-                    color: "white",
-                    fontSize: 12,
-                    fontWeight: "bold"
+                    backgroundColor:
+                      statusColor(item.status)
                   }}
                 >
-                  {item.status}
+                  {orderItemStatusLabel(
+                    item.status
+                  )}
                 </span>
 
-                {item.status === OrderItemStatus.READY && (
+                {item.status ===
+                  OrderItemStatus.READY && (
                   <button
-                    onClick={() => markAsDelivered(item.id)}
-                    style={{
-                      marginLeft: 10,
-                      backgroundColor: "green",
-                      color: "white",
-                      borderRadius: 6,
-                      padding: "4px 8px"
-                    }}
+                    type="button"
+                    className="btn btn-success"
+                    onClick={() =>
+                      markAsDelivered(
+                        item.id
+                      )
+                    }
                   >
                     Entregar
                   </button>
                 )}
-              </li>
+              </div>
             ))}
-          </ul>
-        </div>
+          </div>
+        </article>
       )
     })
 
   return (
-    <div style={{ padding: 40 }}>
+    <div className="waiter-page">
       <h1>Pantalla de Mozo</h1>
-      {orders.length === 0 && ( <p>No hay órdenes activas</p>)}
+      {orders.length === 0 && (
+        <div className="waiter-empty">
+          <strong>No hay órdenes activas</strong>
+          <span>
+            Las nuevas órdenes aparecerán aquí.
+          </span>
+        </div>
+      )}
       {readyOrders.length > 0 && (
-        <>
-          <h2 style={{ color: "dodgerblue" }}>
-            🔔 Listos para entregar
-          </h2>
+        <section className="waiter-section waiter-section--ready">
+          <div className="waiter-section__header">
+            <h2>🔔 Listos para entregar</h2>
+            <span>{readyOrders.length}</span>
+          </div>
+
           {renderOrders(readyOrders)}
-        </>
+        </section>
       )}
       {cookingOrders.length > 0 && (
-        <>
-          <h2 style={{ marginTop: 40 }}>
-            ⏳ En preparación
-          </h2>
+        <section className="waiter-section">
+          <div className="waiter-section__header">
+            <h2>⏳ En preparación</h2>
+            <span>{cookingOrders.length}</span>
+          </div>
+
           {renderOrders(cookingOrders)}
-        </>
+        </section>
       )}
     </div>
   )

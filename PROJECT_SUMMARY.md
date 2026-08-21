@@ -1,38 +1,44 @@
 # 📊 Project Summary
-Generated: 2026-06-23 18:52:33.817978
+Generated: 2026-08-19 15:59:21.818450
 
 ## 📁 Estructura del proyecto
 
 ```
 - ./
   - analyze_project.py
+  - .agents/
+  - .devcontainer/
   - backend/
     - alembic/
       - env.py
       - versions/
         - 0d21e3868b2f_add_draft_status_to_orderstatus.py
         - 1b3cb23f2af7_add_backup_settings.py
+        - 27cc3e563d72_add_more_and_more_backup_settings.py
         - 50f5f9de1220_add_table_shape.py
         - 530c9b9f2a9f_initial_schema.py
         - 5aa86605f254_add_discount_to_orders.py
         - 6ba12f28852f_cambios_en_cashregister.py
         - 6e40084bfae8_create_event_outbox.py
         - 72a2554e30d4_rename_users_name_to_users_username.py
+        - 789ad8c3f1b5_auditoria.py
         - 7b0b567ffe9e_add_discount_to_orders.py
         - 7fd07db91f0d_refactor_restaurant_layout_structure.py
+        - 85d684a75027_add_more_backup_settings.py
         - 900c4d6546a2_creando_tabla_de_eventos.py
         - 9607a137eec7_add_password_to_user.py
         - a4b707b32039_restaurant_layout.py
+        - a5fb39b05ac8_category_active_and_product_station_.py
         - b30663f913d9_add_cash_register_audit_fields.py
+        - ca4a5b4c9e74_eliminar_retention_days_y_agregar_.py
         - e2398672eb07_agregar_índice_a_tabla_de_eventos_por_.py
+        - f2b920bbec2b_align_remaining_backend_model.py
         - fa7705341950_add_table_coordinates.py
+        - fdb697085b8d_add_more_and_more_and_more_backup_.py
     - app/
       - main.py
+      - restore_pending.py
       - seed.py
-      - seed_products.py
-      - seed_restaurant.py
-      - seed_stations.py
-      - seed_users.py
       - core/
         - config.py
         - redis.py
@@ -50,8 +56,8 @@ Generated: 2026-06-23 18:52:33.817978
         - backup/
           - backup_service.py
           - dependencies.py
-        - backups/
-          - backup_service.py
+          - restore_executor.py
+          - schedule_utils.py
         - cash_register/
           - cash_movement_service.py
           - cash_register_service.py
@@ -62,6 +68,8 @@ Generated: 2026-06-23 18:52:33.817978
         - errors/
           - base.py
           - error_codes.py
+        - events/
+          - websocket.py
         - kitchen/
           - dependencies.py
           - kitchen_service.py
@@ -97,11 +105,14 @@ Generated: 2026-06-23 18:52:33.817978
           - user_service.py
       - events/
         - redis_listener.py
+      - infraestructure/
+        - restart/
+          - restart_manager.py
       - models/
         - cash_movement.py
         - cash_register.py
         - category.py
-        - domain_event.py
+        - enums.py
         - event_outbox.py
         - order.py
         - order_item.py
@@ -129,18 +140,22 @@ Generated: 2026-06-23 18:52:33.817978
         - system_settings.py
         - tables.py
         - users.py
+      - scheduler/
+        - backup_jobs.py
+        - scheduler.py
       - schemas/
         - auth.py
+        - backup.py
         - base.py
         - cash_register.py
         - category.py
         - layout.py
         - product.py
+        - reports.py
         - station.py
         - system_settings.py
         - table.py
         - user.py
-        - waiter.py
         - order/
           - kitchen.py
           - order.py
@@ -156,11 +171,21 @@ Generated: 2026-06-23 18:52:33.817978
         - manager.py
         - ws.py
     - backups/
+      - restaurant_1/
+        - automatic/
+    - docs/
+    - uploads/
+      - layouts/
+        - 1/
   - backups/
     - daily/
     - last/
     - manual/
     - monthly/
+    - restaurant_1/
+      - before_restore/
+      - daily/
+      - manual/
     - weekly/
   - frontend/
     - dist/
@@ -562,6 +587,93 @@ def downgrade() -> None:
 
     op.drop_table("system_settings")
 
+```
+
+---
+
+### .\backend\alembic\versions\27cc3e563d72_add_more_and_more_backup_settings.py
+
+**Funciones (2):**
+- upgrade
+- downgrade
+
+**Clases (0):**
+
+**Imports (4):**
+- typing.Sequence
+- typing.Union
+- alembic.op
+- sqlalchemy
+
+```python
+"""add more and more backup settings
+
+Revision ID: 27cc3e563d72
+Revises: 85d684a75027
+Create Date: 2026-06-28 20:33:57.475524
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+
+
+# revision identifiers, used by Alembic.
+revision: str = '27cc3e563d72'
+down_revision: Union[str, Sequence[str], None] = '85d684a75027'
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade():
+
+    op.add_column(
+        "system_settings",
+        sa.Column(
+            "last_automatic_backup_at",
+            sa.DateTime(timezone=True),
+            nullable=True,
+        ),
+    )
+
+    op.add_column(
+        "system_settings",
+        sa.Column(
+            "next_automatic_backup_at",
+            sa.DateTime(timezone=True),
+            nullable=True,
+        ),
+    )
+
+    op.add_column(
+        "system_settings",
+        sa.Column(
+            "last_backup_result",
+            sa.String(),
+            nullable=True,
+        ),
+    )
+
+    op.drop_column("system_settings", "backup_next_run")
+    op.drop_column("system_settings", "backup_last_run")
+
+def downgrade():
+
+    op.drop_column(
+        "system_settings",
+        "next_automatic_backup_at",
+    )
+
+    op.drop_column(
+        "system_settings",
+        "last_automatic_backup_at",
+    )
+
+    op.drop_column(
+        "system_settings",
+        "last_backup_result",
+    )
 ```
 
 ---
@@ -1264,6 +1376,113 @@ def downgrade() -> None:
 
 ---
 
+### .\backend\alembic\versions\789ad8c3f1b5_auditoria.py
+
+**Funciones (2):**
+- upgrade
+- downgrade
+
+**Clases (0):**
+
+**Imports (5):**
+- typing.Sequence
+- typing.Union
+- alembic.op
+- sqlalchemy
+- sqlalchemy.dialects.postgresql
+
+```python
+"""auditoria
+
+Revision ID: 789ad8c3f1b5
+Revises: a5fb39b05ac8
+Create Date: 2026-08-12 03:21:56.691752
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
+
+# revision identifiers, used by Alembic.
+revision: str = '789ad8c3f1b5'
+down_revision: Union[str, Sequence[str], None] = 'a5fb39b05ac8'
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    """Upgrade schema."""
+
+    # Las órdenes siempre deben tener fecha de creación.
+    op.alter_column(
+        "orders",
+        "created_at",
+        existing_type=postgresql.TIMESTAMP(timezone=True),
+        nullable=False,
+        existing_server_default=sa.text("now()")
+    )
+
+    # El layout siempre debe tener configuración de grilla y snap.
+    op.alter_column(
+        "restaurant_layout",
+        "grid_size",
+        existing_type=sa.INTEGER(),
+        nullable=False,
+        existing_server_default=sa.text("40")
+    )
+
+    op.alter_column(
+        "restaurant_layout",
+        "snap_to_grid",
+        existing_type=sa.BOOLEAN(),
+        nullable=False,
+        existing_server_default=sa.text("true")
+    )
+
+    # restaurant_id ya es PRIMARY KEY, por lo que este UNIQUE es redundante.
+    op.drop_constraint(
+        "restaurant_layout_restaurant_id_key",
+        "restaurant_layout",
+        type_="unique"
+    )
+
+    # Toda configuración persistida debe tener puerto SMTP definido.
+    op.alter_column(
+        "system_settings",
+        "smtp_port",
+        existing_type=sa.INTEGER(),
+        nullable=False
+    )
+    # ### end Alembic commands ###
+
+
+def downgrade() -> None:
+    """Downgrade schema."""
+    # ### commands auto generated by Alembic - please adjust! ###
+    op.alter_column('system_settings', 'smtp_port',
+               existing_type=sa.INTEGER(),
+               nullable=True)
+    op.create_unique_constraint(op.f('restaurant_layout_restaurant_id_key'), 'restaurant_layout', ['restaurant_id'], postgresql_nulls_not_distinct=False)
+    op.alter_column('restaurant_layout', 'snap_to_grid',
+               existing_type=sa.BOOLEAN(),
+               nullable=True,
+               existing_server_default=sa.text('true'))
+    op.alter_column('restaurant_layout', 'grid_size',
+               existing_type=sa.INTEGER(),
+               nullable=True,
+               existing_server_default=sa.text('40'))
+    op.alter_column('orders', 'created_at',
+               existing_type=postgresql.TIMESTAMP(timezone=True),
+               nullable=True,
+               existing_server_default=sa.text('now()'))
+    # ### end Alembic commands ###
+
+```
+
+---
+
 ### .\backend\alembic\versions\7b0b567ffe9e_add_discount_to_orders.py
 
 **Funciones (2):**
@@ -1405,6 +1624,104 @@ def downgrade():
         "restaurant_layout",
         ["id"]
     )
+```
+
+---
+
+### .\backend\alembic\versions\85d684a75027_add_more_backup_settings.py
+
+**Funciones (2):**
+- upgrade
+- downgrade
+
+**Clases (0):**
+
+**Imports (4):**
+- typing.Sequence
+- typing.Union
+- alembic.op
+- sqlalchemy
+
+```python
+"""add more backup settings
+
+Revision ID: 85d684a75027
+Revises: 1b3cb23f2af7
+Create Date: 2026-06-28 16:38:19.706936
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+
+
+# revision identifiers, used by Alembic.
+revision: str = '85d684a75027'
+down_revision: Union[str, Sequence[str], None] = '1b3cb23f2af7'
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade():
+
+    op.add_column(
+        "system_settings",
+        sa.Column(
+            "backup_frequency",
+            sa.String(),
+            nullable=False,
+            server_default="manual"
+        )
+    )
+
+    op.add_column(
+        "system_settings",
+        sa.Column(
+            "backup_retention_days",
+            sa.Integer(),
+            nullable=False,
+            server_default="30"
+        )
+    )
+
+    op.add_column(
+        "system_settings",
+        sa.Column(
+            "backup_enabled",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.true()
+        )
+    )
+
+    op.add_column(
+        "system_settings",
+        sa.Column(
+            "backup_last_run",
+            sa.DateTime(timezone=True),
+            nullable=True
+        )
+    )
+
+    op.add_column(
+        "system_settings",
+        sa.Column(
+            "backup_next_run",
+            sa.DateTime(timezone=True),
+            nullable=True
+        )
+    )
+
+
+def downgrade():
+
+    op.drop_column("system_settings", "backup_next_run")
+    op.drop_column("system_settings", "backup_last_run")
+    op.drop_column("system_settings", "backup_enabled")
+    op.drop_column("system_settings", "backup_retention_days")
+    op.drop_column("system_settings", "backup_frequency")
+
 ```
 
 ---
@@ -1590,6 +1907,140 @@ def downgrade() -> None:
 
 ---
 
+### .\backend\alembic\versions\a5fb39b05ac8_category_active_and_product_station_.py
+
+**Funciones (2):**
+- upgrade
+- downgrade
+
+**Clases (0):**
+
+**Imports (5):**
+- typing.Sequence
+- typing.Union
+- alembic.op
+- sqlalchemy
+- sqlalchemy.dialects.postgresql
+
+```python
+"""category active and product station constraints(2)
+
+Revision ID: a5fb39b05ac8
+Revises: ca4a5b4c9e74
+Create Date: 2026-08-12 02:20:46.787954
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
+
+# revision identifiers, used by Alembic.
+revision: str = 'a5fb39b05ac8'
+down_revision: Union[str, Sequence[str], None] = 'ca4a5b4c9e74'
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    """Upgrade schema."""
+
+    # -------------------------------------------------------------------------
+    # Agrega baja lógica a categorías.
+    # Las categorías existentes se consideran activas.
+    # -------------------------------------------------------------------------
+    op.add_column(
+        "categories",
+        sa.Column(
+            "active",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.true()
+        )
+    )
+
+    # El default se utiliza únicamente para migrar las filas existentes.
+    op.alter_column(
+        "categories",
+        "active",
+        server_default=None
+    )
+
+    # -------------------------------------------------------------------------
+    # Las estaciones siempre deben tener un estado activo/inactivo definido.
+    # -------------------------------------------------------------------------
+    op.alter_column(
+        "production_stations",
+        "active",
+        existing_type=sa.BOOLEAN(),
+        nullable=False
+    )
+
+    # -------------------------------------------------------------------------
+    # Los productos siempre deben tener estado, categoría y estación.
+    # -------------------------------------------------------------------------
+    op.alter_column(
+        "products",
+        "active",
+        existing_type=sa.BOOLEAN(),
+        nullable=False
+    )
+
+    op.alter_column(
+        "products",
+        "station_id",
+        existing_type=sa.INTEGER(),
+        nullable=False
+    )
+
+    op.alter_column(
+        "products",
+        "category_id",
+        existing_type=sa.INTEGER(),
+        nullable=False
+    )
+
+
+def downgrade() -> None:
+    """Downgrade schema."""
+
+    op.alter_column(
+        "products",
+        "category_id",
+        existing_type=sa.INTEGER(),
+        nullable=True
+    )
+
+    op.alter_column(
+        "products",
+        "station_id",
+        existing_type=sa.INTEGER(),
+        nullable=True
+    )
+
+    op.alter_column(
+        "products",
+        "active",
+        existing_type=sa.BOOLEAN(),
+        nullable=True
+    )
+
+    op.alter_column(
+        "production_stations",
+        "active",
+        existing_type=sa.BOOLEAN(),
+        nullable=True
+    )
+
+    op.drop_column(
+        "categories",
+        "active"
+    )
+```
+
+---
+
 ### .\backend\alembic\versions\b30663f913d9_add_cash_register_audit_fields.py
 
 **Funciones (2):**
@@ -1686,6 +2137,91 @@ def downgrade() -> None:
 
 ---
 
+### .\backend\alembic\versions\ca4a5b4c9e74_eliminar_retention_days_y_agregar_.py
+
+**Funciones (2):**
+- upgrade
+- downgrade
+
+**Clases (0):**
+
+**Imports (4):**
+- typing.Sequence
+- typing.Union
+- alembic.op
+- sqlalchemy
+
+```python
+"""eliminar retention days y agregar retention daily, weekly y monthly en system_settings
+
+Revision ID: ca4a5b4c9e74
+Revises: fdb697085b8d
+Create Date: 2026-07-18 17:04:07.755058
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+
+
+# revision identifiers, used by Alembic.
+revision: str = 'ca4a5b4c9e74'
+down_revision: Union[str, Sequence[str], None] = 'fdb697085b8d'
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    op.add_column(
+        "system_settings",
+        sa.Column(
+            "backup_retention_daily",
+            sa.Integer(),
+            nullable=False,
+            server_default="30"
+        )
+    )
+    op.add_column(
+        "system_settings",
+        sa.Column(
+            "backup_retention_weekly",
+            sa.Integer(),
+            nullable=False,
+            server_default="12"
+        )
+    )
+    op.add_column(
+        "system_settings",
+        sa.Column(
+            "backup_retention_monthly",
+            sa.Integer(),
+            nullable=False,
+            server_default="24"
+        )
+    )
+
+    op.drop_column("system_settings", "backup_retention_days")
+
+def downgrade() -> None:
+    op.add_column(
+        "system_settings",
+        sa.Column(
+            "backup_retention_days",
+            sa.Integer(),
+            nullable=False,
+            server_default="30"
+        )
+    )
+
+    op.drop_column("system_settings", "backup_retention_daily")
+    op.drop_column("system_settings", "backup_retention_weekly")
+    op.drop_column("system_settings", "backup_retention_monthly")
+
+```
+
+---
+
 ### .\backend\alembic\versions\e2398672eb07_agregar_índice_a_tabla_de_eventos_por_.py
 
 **Funciones (2):**
@@ -1735,6 +2271,91 @@ def downgrade() -> None:
         "idx_domain_events_restaurant",
         table_name="domain_events"
     )
+
+```
+
+---
+
+### .\backend\alembic\versions\f2b920bbec2b_align_remaining_backend_model.py
+
+**Funciones (2):**
+- upgrade
+- downgrade
+
+**Clases (0):**
+
+**Imports (5):**
+- typing.Sequence
+- typing.Union
+- alembic.op
+- sqlalchemy
+- sqlalchemy.dialects.postgresql
+
+```python
+"""align remaining backend model
+
+Revision ID: f2b920bbec2b
+Revises: 789ad8c3f1b5
+Create Date: 2026-08-12 04:07:15.221597
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
+
+# revision identifiers, used by Alembic.
+revision: str = 'f2b920bbec2b'
+down_revision: Union[str, Sequence[str], None] = '789ad8c3f1b5'
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    """Upgrade schema."""
+    # ### commands auto generated by Alembic - please adjust! ###
+    op.alter_column('cash_registers', 'opened_by_id',
+               existing_type=sa.INTEGER(),
+               nullable=False)
+    op.alter_column('cash_registers', 'opened_at',
+               existing_type=postgresql.TIMESTAMP(timezone=True),
+               nullable=False,
+               existing_server_default=sa.text('now()'))
+    op.drop_index(op.f('ix_restaurants_id'), table_name='restaurants')
+    op.alter_column('tables', 'shape',
+               existing_type=sa.VARCHAR(),
+               nullable=False)
+    op.drop_index(op.f('ix_tables_id'), table_name='tables')
+    op.alter_column('users', 'active',
+               existing_type=sa.BOOLEAN(),
+               nullable=False)
+    op.create_index(op.f('ix_users_restaurant_id'), 'users', ['restaurant_id'], unique=False)
+    op.create_unique_constraint('uq_user_username_per_restaurant', 'users', ['restaurant_id', 'username'])
+    # ### end Alembic commands ###
+
+
+def downgrade() -> None:
+    """Downgrade schema."""
+    # ### commands auto generated by Alembic - please adjust! ###
+    op.drop_constraint('uq_user_username_per_restaurant', 'users', type_='unique')
+    op.drop_index(op.f('ix_users_restaurant_id'), table_name='users')
+    op.alter_column('users', 'active',
+               existing_type=sa.BOOLEAN(),
+               nullable=True)
+    op.create_index(op.f('ix_tables_id'), 'tables', ['id'], unique=False)
+    op.alter_column('tables', 'shape',
+               existing_type=sa.VARCHAR(),
+               nullable=True)
+    op.create_index(op.f('ix_restaurants_id'), 'restaurants', ['id'], unique=False)
+    op.alter_column('cash_registers', 'opened_at',
+               existing_type=postgresql.TIMESTAMP(timezone=True),
+               nullable=True,
+               existing_server_default=sa.text('now()'))
+    op.alter_column('cash_registers', 'opened_by_id',
+               existing_type=sa.INTEGER(),
+               nullable=True)
+    # ### end Alembic commands ###
 
 ```
 
@@ -1804,6 +2425,137 @@ def downgrade() -> None:
 
 ---
 
+### .\backend\alembic\versions\fdb697085b8d_add_more_and_more_and_more_backup_.py
+
+**Funciones (2):**
+- upgrade
+- downgrade
+
+**Clases (0):**
+
+**Imports (4):**
+- typing.Sequence
+- typing.Union
+- alembic.op
+- sqlalchemy
+
+```python
+"""add more and more and more backup settings
+
+Revision ID: fdb697085b8d
+Revises: 27cc3e563d72
+Create Date: 2026-07-11 23:06:30.821779
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+
+
+# revision identifiers, used by Alembic.
+revision: str = 'fdb697085b8d'
+down_revision: Union[str, Sequence[str], None] = '27cc3e563d72'
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade():
+
+    op.add_column(
+        "system_settings",
+        sa.Column(
+            "backup_time",
+            sa.Time(),
+            nullable=False,
+            server_default="03:00:00",
+        ),
+    )
+
+    op.add_column(
+        "system_settings",
+        sa.Column(
+            "backup_weekday",
+            sa.Integer(),
+            nullable=True,
+        ),
+    )
+
+    op.add_column(
+        "system_settings",
+        sa.Column(
+            "backup_monthday",
+            sa.Integer(),
+            nullable=True,
+        ),
+    )
+
+    op.add_column(
+        "system_settings",
+        sa.Column(
+            "backup_keep_local",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.true(),
+        ),
+    )
+
+    op.add_column(
+        "system_settings",
+        sa.Column(
+            "backup_send_email",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.false(),
+        ),
+    )
+
+    op.add_column(
+        "system_settings",
+        sa.Column(
+            "backup_timezone",
+            sa.String(),
+            nullable=False,
+            server_default="America/Montevideo",
+        ),
+    )
+
+
+def downgrade():
+
+    op.drop_column(
+        "system_settings",
+        "backup_keep_local",
+    )
+
+    op.drop_column(
+        "system_settings",
+        "backup_monthday",
+    )
+
+    op.drop_column(
+        "system_settings",
+        "backup_weekday",
+    )
+
+    op.drop_column(
+        "system_settings",
+        "backup_time",
+    )
+
+    op.drop_column(
+        "system_settings",
+        "backup_send_email",
+    )
+
+    op.drop_column(
+        "system_settings",
+        "backup_timezone",
+    )   
+```
+
+---
+
 ### .\backend\app\main.py
 
 **Funciones (5):**
@@ -1815,69 +2567,82 @@ def downgrade() -> None:
 
 **Clases (0):**
 
-**Imports (28):**
+**Imports (33):**
+- collections.abc.AsyncGenerator
+- contextlib.asynccontextmanager
 - fastapi.FastAPI
 - fastapi.Request
 - fastapi.responses.JSONResponse
 - fastapi.middleware.cors.CORSMiddleware
-- contextlib.asynccontextmanager
+- fastapi.staticfiles.StaticFiles
 - asyncio
 - logging
+- pathlib.Path
 - app.models
 - app.services.event_worker.EventWorker
 - app.services.event_cleanup.EventCleanup
 - app.events.redis_listener.redis_event_listener
+- app.scheduler.scheduler.scheduler
+- app.scheduler.backup_jobs.register_jobs
 - app.routers.tables
 - app.routers.orders
 - app.routers.products
 - app.routers.cash_register
 - app.routers.category
 - app.routers.order_items
+- app.routers.layout
+- app.routers.system_settings
 - app.routers.stations
 - app.routers.auth
 - app.routers.users
 - app.routers.kitchen
 - app.routers.reports
 - app.routers.backups
-- app.routers.layout
-- app.routers.system_settings
 - app.domain.errors.base.DomainError
 - app.websocket.ws
 - app.core.config.CORS_ORIGINS
 
 ```python
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
-from contextlib import asynccontextmanager
 import asyncio
 import logging
+from pathlib import Path
 
 from app import models
 from app.services.event_worker import EventWorker
 from app.services.event_cleanup import EventCleanup
 from app.events.redis_listener import redis_event_listener
 
+from app.scheduler.scheduler import scheduler
+from app.scheduler.backup_jobs import register_jobs
+
 # routers
-from app.routers import tables, orders, products, cash_register, category, order_items, stations, auth, users, kitchen, reports, backups
-from app.routers import layout, system_settings
+from app.routers import tables, orders, products, cash_register, category, order_items
+from app.routers import layout, system_settings, stations, auth, users, kitchen, reports, backups
 
 from app.domain.errors.base import DomainError
 from app.websocket import ws
 from app.core.config import CORS_ORIGINS
-
-
-logger = logging.getLogger("app.main")
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
+logger = logging.getLogger("app.main")
 
+# --------------------------------------------------------------------------------------
+# Configuración del ciclo de vida de la aplicación.
+# --------------------------------------------------------------------------------------
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Backend arrancando...")
 
     # Event worker
@@ -1894,35 +2659,50 @@ async def lifespan(app: FastAPI):
     cleanup_task = asyncio.create_task(cleanup.run())
     logger.info("Event cleanup iniciado")
 
-    yield
+    # Scheduler
+    logger.info("Iniciando scheduler...")
+    register_jobs()
+    scheduler.start()
+    logger.info("Scheduler iniciado")
 
-    logger.info("Backend apagándose...")
-
-    # Cancelar redis
-    redis_task.cancel()
     try:
-        await redis_task
-    except asyncio.CancelledError:
+        yield
+    finally:
+        logger.info("Backend apagándose...")
+
+        # Detener scheduler
+        scheduler.shutdown(wait=False)
+        logger.info("Scheduler detenido")
+
+        redis_task.cancel()
+        worker_task.cancel()
+        cleanup_task.cancel()
+
+        await asyncio.gather(
+            redis_task,
+            worker_task,
+            cleanup_task,
+            return_exceptions=True,
+        )
         logger.info("Redis listener detenido")
-
-    # Cancelar worker
-    worker_task.cancel()
-    try:
-        await worker_task
-    except asyncio.CancelledError:
         logger.info("Event worker detenido")
-
-    # Cancelar cleanup
-    cleanup_task.cancel()
-    try:
-        await cleanup_task
-    except asyncio.CancelledError:
         logger.info("Event cleanup detenido")
 
-
+# --------------------------------------------------------------------------------------
+# Aplicación FastAPI.
+# --------------------------------------------------------------------------------------
 app = FastAPI(lifespan=lifespan, redirect_slashes=False)
 
-# CORS
+# --------------------------------------------------------------------------------------
+# Configuración de archivos estáticos.
+# --------------------------------------------------------------------------------------
+uploads_dir = Path(__file__).resolve().parent.parent / "uploads"
+uploads_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
+
+# --------------------------------------------------------------------------------------
+# Configuración CORS.
+# --------------------------------------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
@@ -1931,7 +2711,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# routers
+# --------------------------------------------------------------------------------------
+# Registro de routers.
+# --------------------------------------------------------------------------------------
 app.include_router(auth.router, prefix="/api")
 app.include_router(backups.router, prefix="/api")
 app.include_router(cash_register.router, prefix="/api")
@@ -1948,24 +2730,29 @@ app.include_router(ws.router)
 app.include_router(layout.router, prefix="/api")
 app.include_router(system_settings.router, prefix="/api")
 
-
+# --------------------------------------------------------------------------------------
+# Endpoints del sistema.
+# --------------------------------------------------------------------------------------
 @app.get("/")
-def root():
+def root() -> dict[str, str]:
     return {"status": "running"}
 
 
 @app.get("/health")
-def health():
+@app.get("/api/health")
+def health() -> dict[str, str]:
     return {
         "status": "ok",
         "service": "restaurant-pos",
         "version": "1.0.0"
     }
 
-
+# --------------------------------------------------------------------------------------
+# Manejadores globales de excepciones.
+# --------------------------------------------------------------------------------------
 @app.exception_handler(DomainError)
-async def domain_error_handler(request: Request, exc: DomainError):
-    logger.warning(f"{exc.code}: {exc.message}")
+async def domain_error_handler(request: Request, exc: DomainError) -> JSONResponse:
+    logger.warning("%s: %s", exc.code, exc.message,)
     return JSONResponse(
         status_code=400,
         content={
@@ -1976,7 +2763,7 @@ async def domain_error_handler(request: Request, exc: DomainError):
     )
 
 @app.exception_handler(Exception)
-async def unexpected_error_handler(request: Request, exc: Exception):
+async def unexpected_error_handler(request: Request, exc: Exception) -> JSONResponse:
     logger.exception("Unexpected server error")
     return JSONResponse(
         status_code=500,
@@ -1990,308 +2777,156 @@ async def unexpected_error_handler(request: Request, exc: Exception):
 
 ---
 
-### .\backend\app\seed.py
+### .\backend\app\restore_pending.py
 
-**Funciones (2):**
-- seed_tables
-- run
-
-**Clases (0):**
-
-**Imports (7):**
-- sqlalchemy.orm.Session
-- app.db.session.SessionLocal
-- app.models.table.Table
-- app.seed_restaurant.seed_restaurant
-- app.seed_products.seed_products
-- app.seed_stations.seed_stations
-- app.seed_users.seed_users
-
-```python
-from sqlalchemy.orm import Session
-from app.db.session import SessionLocal
-from app.models.table import Table
-from app.seed_restaurant import seed_restaurant
-from app.seed_products import seed_products
-from app.seed_stations import seed_stations
-from app.seed_users import seed_users
-
-
-def seed_tables(db: Session):
-
-    restaurant = seed_restaurant(db)
-
-    if db.query(Table).first():
-        print("Seed ya ejecutado. No se crean mesas.")
-        return
-
-    print("Creando mesas iniciales...")
-
-    tables = [
-        Table(number=i, restaurant_id=restaurant.id)
-        for i in range(1, 21)
-    ]
-
-    db.add_all(tables)
-    db.commit()
-
-    print("Mesas creadas.")
-
-def run():
-    db = SessionLocal()
-    try:
-        seed_users(db)
-    finally:
-        db.close()
-
-
-if __name__ == "__main__":
-    run()
-
-```
-
----
-
-### .\backend\app\seed_products.py
-
-**Funciones (1):**
-- seed_products
-
-**Clases (0):**
-
-**Imports (4):**
-- sqlalchemy.orm.Session
-- app.models.product.Product
-- app.models.category.Category
-- app.seed_restaurant.seed_restaurant
-
-```python
-from sqlalchemy.orm import Session
-from app.models.product import Product
-from app.models.category import Category
-from app.seed_restaurant import seed_restaurant
-
-
-def seed_products(db: Session):
-
-    restaurant = seed_restaurant(db)
-
-    existing_products = db.query(Product).count()
-    if existing_products > 0:
-        print("Seed productos ya ejecutado.")
-        return
-
-    print("Creando categorías iniciales...")
-
-    # Crear categorías
-    bebidas = Category(name="Bebidas", restaurant_id=restaurant.id)
-    cocina = Category(name="Cocina", restaurant_id=restaurant.id)
-
-    db.add_all([bebidas, cocina])
-    db.commit()
-
-    db.refresh(bebidas)
-    db.refresh(cocina)
-
-    print("Creando productos iniciales...")
-
-    products = [
-        # BEBIDAS → estación 2 (barra)
-        Product(
-            name="Coca Cola",
-            price=120,
-            restaurant_id=restaurant.id,
-            station_id=2,
-            category_id=bebidas.id
-        ),
-        Product(
-            name="Agua",
-            price=90,
-            restaurant_id=restaurant.id,
-            station_id=2,
-            category_id=bebidas.id
-        ),
-        Product(
-            name="Cerveza",
-            price=180,
-            restaurant_id=restaurant.id,
-            station_id=2,
-            category_id=bebidas.id
-        ),
-
-        # COCINA → estación 1
-        Product(
-            name="Hamburguesa",
-            price=450,
-            restaurant_id=restaurant.id,
-            station_id=1,
-            category_id=cocina.id
-        ),
-        Product(
-            name="Pizza Muzza",
-            price=520,
-            restaurant_id=restaurant.id,
-            station_id=1,
-            category_id=cocina.id
-        ),
-        Product(
-            name="Papas Fritas",
-            price=250,
-            restaurant_id=restaurant.id,
-            station_id=1,
-            category_id=cocina.id
-        ),
-    ]
-
-    db.add_all(products)
-    db.commit()
-
-    print("Productos creados con categorías.")
-
-```
-
----
-
-### .\backend\app\seed_restaurant.py
-
-**Funciones (1):**
-- seed_restaurant
+**Funciones (0):**
 
 **Clases (0):**
 
 **Imports (2):**
-- sqlalchemy.orm.Session
-- app.models.restaurant.Restaurant
+- pathlib.Path
+- app.domain.backup.restore_executor.RestoreExecutor
 
 ```python
+from pathlib import Path
+
+from app.domain.backup.restore_executor import RestoreExecutor
+
+
+# --------------------------------------------------------------------------------------
+# Archivo utilizado para indicar que existe una restauración pendiente.
+# --------------------------------------------------------------------------------------
+PENDING = Path("/backups/restore.pending")
+
+
+# --------------------------------------------------------------------------------------
+# Si existe un archivo de restauración pendiente, ejecutar el restore antes de iniciar
+# la aplicación y eliminar el archivo de control.
+# --------------------------------------------------------------------------------------
+if PENDING.exists():
+    backup = Path(PENDING.read_text().strip())
+
+    print(
+        f"restore_pending. Restaurando base de datos desde backup: {backup}"
+    )
+
+    RestoreExecutor.restore(backup)
+
+    PENDING.unlink()
+```
+
+---
+
+### .\backend\app\seed.py
+
+**Funciones (3):**
+- seed_restaurant
+- seed_admin
+- run
+
+**Clases (0):**
+
+**Imports (8):**
+- logging
+- os
+- sqlalchemy.orm.Session
+- app.core.security.get_password_hash
+- app.db.session.SessionLocal
+- app.models.restaurant.Restaurant
+- app.models.user.User
+- app.models.user.UserRole
+
+```python
+import logging
+import os
+
 from sqlalchemy.orm import Session
+
+from app.core.security import get_password_hash
+from app.db.session import SessionLocal
 from app.models.restaurant import Restaurant
+from app.models.user import User, UserRole
+
+logger = logging.getLogger("app.seed")
 
 
-def seed_restaurant(db: Session):
-
+# --------------------------------------------------------------------------------------
+# Crea el restaurante por defecto si aún no existe.
+# --------------------------------------------------------------------------------------
+def seed_restaurant(db: Session) -> Restaurant:
     restaurant = db.query(Restaurant).first()
-
     if restaurant:
-        print("Restaurant ya existe.")
+        logger.info("Default restaurant already exists.")
         return restaurant
-
-    print("Creando restaurant default...")
-    restaurant = Restaurant(name="Resto Demo")
-
+    logger.info("Creating default restaurant.")
+    restaurant = Restaurant(
+        name="Resto Demo"
+    )
     db.add(restaurant)
     db.commit()
     db.refresh(restaurant)
-
     return restaurant
 
-```
-
----
-
-### .\backend\app\seed_stations.py
-
-**Funciones (1):**
-- seed_stations
-
-**Clases (0):**
-
-**Imports (3):**
-- sqlalchemy.orm.Session
-- app.models.production_station.ProductionStation
-- app.seed_restaurant.seed_restaurant
-
-```python
-from sqlalchemy.orm import Session
-from app.models.production_station import ProductionStation
-from app.seed_restaurant import seed_restaurant
-
-def seed_stations(db: Session):
-
-    restaurant = seed_restaurant(db)
-
-    existing_stations = db.query(ProductionStation).count()
-
-    if existing_stations > 0:
-        print("Seed estaciones ya ejecutado.")
+# --------------------------------------------------------------------------------------
+# Crea el usuario administrador por defecto si aún no existe.
+# --------------------------------------------------------------------------------------
+def seed_admin(db: Session, restaurant: Restaurant,) -> None:
+    admin = (
+        db.query(User)
+        .filter(
+            User.restaurant_id == restaurant.id,
+            User.username == "admin",
+        )
+        .first()
+    )
+    if admin:
+        logger.info("Admin user already exists.")
         return
-
-    print("Creando estaciones iniciales...")
-
-    products = [
-        ProductionStation(name="Cocina", restaurant_id=restaurant.id),
-        ProductionStation(name="Barra", restaurant_id=restaurant.id),
-    ]
-
-    db.add_all(products)
-    db.commit()
-
-    print("Estaciones creadas.")
-
-```
-
----
-
-### .\backend\app\seed_users.py
-
-**Funciones (1):**
-- seed_users
-
-**Clases (0):**
-
-**Imports (5):**
-- sqlalchemy.orm.Session
-- app.models.user.User
-- app.seed_restaurant.seed_restaurant
-- app.core.security.get_password_hash
-- os
-
-```python
-from sqlalchemy.orm import Session
-from app.models.user import User
-from app.seed_restaurant import seed_restaurant
-from app.core.security import get_password_hash
-import os
-
-def seed_users(db: Session):
-
-    restaurant = seed_restaurant(db)
-
-    existing_users = db.query(User).count()
-
-    if existing_users > 0:
-        print("Seed usuarios ya ejecutado.")
-        return
-
-    print("Creando usuario admin...")
-
     admin_password = os.getenv("ADMIN_SEED_PASSWORD")
-
     if not admin_password:
-        raise ValueError("ADMIN_SEED_PASSWORD debe estar configurado")
-    
-    pass_hash = get_password_hash(admin_password)
-
-    users = [
-        User(username="admin", role="ADMIN", password_hash = pass_hash, restaurant_id=restaurant.id)
-        #User(username="waiter", role="WAITER", password_hash = pass_hash, restaurant_id=restaurant.id),
-        #User(username="kitchen", role="KITCHEN", password_hash = pass_hash, restaurant_id=restaurant.id),
-        #User(username="cashier", role="CASHIER", password_hash = pass_hash, restaurant_id=restaurant.id),
-    ]
-
-    db.add_all(users)
+        raise RuntimeError(
+            "ADMIN_SEED_PASSWORD must be configured."
+        )
+    logger.info("Creating admin user.")
+    db.add(
+        User(
+            username="admin",
+            role=UserRole.ADMIN,
+            password_hash=get_password_hash(admin_password),
+            restaurant_id=restaurant.id,
+            active=True,
+        )
+    )
     db.commit()
+    logger.info("Admin user created successfully.")
 
-    print("Usuario Admin creado.")
+# --------------------------------------------------------------------------------------
+# Ejecuta el proceso completo de inicialización de datos.
+# --------------------------------------------------------------------------------------
+def run() -> None:
+    db: Session = SessionLocal()
+    try:
+        restaurant = seed_restaurant(db)
+        seed_admin(db, restaurant,)
+    finally:
 
+        db.close()
+
+# --------------------------------------------------------------------------------------
+# Punto de entrada del proceso de inicialización.
+# --------------------------------------------------------------------------------------
+if __name__ == "__main__":
+    run()
 ```
 
 ---
 
 ### .\backend\app\core\config.py
 
-**Funciones (1):**
+**Funciones (3):**
 - _get_csv_env
+- _get_int_env
+- _get_required_env
 
 **Clases (0):**
 
@@ -2304,24 +2939,60 @@ import os
 
 from dotenv import load_dotenv
 
-
 load_dotenv()
 
-
-def _get_csv_env(name: str, default: str) -> list[str]:
+# --------------------------------------------------------------------------------------
+# Obtiene una variable de entorno separada por comas como lista de strings.
+# --------------------------------------------------------------------------------------
+def _get_csv_env(
+    name: str,
+    default: str
+) -> list[str]:
     value = os.getenv(name, default)
-    return [item.strip() for item in value.split(",") if item.strip()]
+    return [
+        item.strip()
+        for item in value.split(",")
+        if item.strip()
+    ]
+
+# --------------------------------------------------------------------------------------
+# Obtiene una variable de entorno como entero.
+# --------------------------------------------------------------------------------------
+def _get_int_env(
+    name: str,
+    default: int
+) -> int:
+    return int(
+        os.getenv(name, str(default))
+    )
+
+# --------------------------------------------------------------------------------------
+# Obtiene una variable de entorno obligatoria.
+# Lanza RuntimeError si no está definida.
+# --------------------------------------------------------------------------------------
+def _get_required_env(name: str) -> str:
+    value = os.getenv(name)
+    if not value:
+        raise RuntimeError(
+            f"{name} no está configurada. Defínela en el archivo .env"
+        )
+    return value
 
 
-SECRET_KEY = os.getenv("SECRET_KEY")
-if not SECRET_KEY:
-    raise RuntimeError("SECRET_KEY no está configurada. Defínela en el archivo .env")
+SECRET_KEY = _get_required_env("SECRET_KEY")
+
 ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
-CORS_ORIGINS = _get_csv_env("CORS_ORIGINS", "")
+DATABASE_URL = _get_required_env("DATABASE_URL")
+
+ACCESS_TOKEN_EXPIRE_MINUTES = _get_int_env("ACCESS_TOKEN_EXPIRE_MINUTES",60)
+
+CORS_ORIGINS = _get_csv_env("CORS_ORIGINS","")
+
 if not CORS_ORIGINS:
-    raise RuntimeError("CORS_ORIGINS debe configurarse explícitamente")
+    raise RuntimeError(
+        "CORS_ORIGINS debe configurarse explícitamente"
+    )
 
 ```
 
@@ -2334,18 +3005,19 @@ if not CORS_ORIGINS:
 **Clases (0):**
 
 **Imports (2):**
-- redis.asyncio
 - os
+- redis.asyncio
 
 ```python
-import redis.asyncio as redis
 import os
 
-redis_client = redis.Redis(
+import redis.asyncio as redis
+
+redis_client: redis.Redis = redis.Redis(
     host=os.getenv("REDIS_HOST", "localhost"),
-    port=int(os.getenv("REDIS_PORT", 6379)),
+    port=int(os.getenv("REDIS_PORT", "6379")),
     decode_responses=True,
-    socket_keepalive=True
+    socket_keepalive=True,
 )
 ```
 
@@ -2369,79 +3041,79 @@ redis_client = redis.Redis(
 - jose.JWTError
 - jose.jwt
 - passlib.context.CryptContext
-- app.core.config.SECRET_KEY
-- app.core.config.ALGORITHM
 - app.core.config.ACCESS_TOKEN_EXPIRE_MINUTES
+- app.core.config.ALGORITHM
+- app.core.config.SECRET_KEY
 
 ```python
+"""
+Funciones de seguridad del sistema.
+
+Responsabilidades:
+- Generar hashes BCrypt.
+- Verificar contraseñas.
+- Crear tokens JWT.
+- Validar y decodificar tokens JWT.
+"""
+
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-from app.core.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
-
-
-pwd_context = CryptContext(
-    schemes=["bcrypt"],
-    deprecated="auto"
+from app.core.config import (
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    ALGORITHM,
+    SECRET_KEY,
 )
 
+# --------------------------------------------------------------------------------------
+# Contexto utilizado para el hash y verificación de contraseñas
+# --------------------------------------------------------------------------------------
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# 🔐 Hash password
-def get_password_hash(password: str):
+# --------------------------------------------------------------------------------------
+# Genera el hash BCrypt de una contraseña
+# --------------------------------------------------------------------------------------
+def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
-
-# 🔎 Verify password
-def verify_password(plain_password: str, hashed_password: str):
+# --------------------------------------------------------------------------------------
+# Verifica una contraseña contra su hash BCrypt
+# --------------------------------------------------------------------------------------
+def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
-
-# 🎟 Create JWT
-def create_access_token(data: dict):
-
-    to_encode = data.copy()
-
+# --------------------------------------------------------------------------------------
+# Crea un JWT firmado con la información suministrada
+# --------------------------------------------------------------------------------------
+def create_access_token(data: dict[str, object]) -> str:
     now = datetime.now(timezone.utc)
-
-    expire = now + timedelta(
-        minutes=ACCESS_TOKEN_EXPIRE_MINUTES
-    )
-
-    to_encode.update({
-        "exp": expire,
+    payload = {
+        **data,
         "iat": now,
-        "jti": str(uuid4())
-    })
-
+        "exp": now + timedelta(
+            minutes=ACCESS_TOKEN_EXPIRE_MINUTES
+        ),
+        "jti": str(uuid4()) # Identificador único del token
+    }
     return jwt.encode(
-        to_encode,
+        payload,
         SECRET_KEY,
         algorithm=ALGORITHM
     )
 
-
-# 🔓 Decode JWT
-def decode_access_token(token: str):
-
+# --------------------------------------------------------------------------------------
+# Decodifica un JWT y devuelve su payload si es válido
+# --------------------------------------------------------------------------------------
+def decode_access_token(token: str) -> dict[str, object] | None:
     try:
-
-        payload = jwt.decode(
+        return jwt.decode(
             token,
             SECRET_KEY,
             algorithms=[ALGORITHM]
         )
-
-        exp = payload.get("exp")
-
-        if exp:
-            if datetime.fromtimestamp(exp, tz=timezone.utc) < datetime.now(timezone.utc):
-                return None
-
-        return payload
-
     except JWTError:
         return None
 ```
@@ -2456,19 +3128,32 @@ def decode_access_token(token: str):
 
 **Clases (0):**
 
-**Imports (1):**
+**Imports (2):**
 - decimal.Decimal
+- typing.Any
 
 ```python
 from decimal import Decimal
+from typing import Any
 
-def decimal_to_float(value):
+
+# --------------------------------------------------------------------------------------
+# Convierte un Decimal a float. Si el valor no es Decimal, lo devuelve sin cambios.
+# --------------------------------------------------------------------------------------
+def decimal_to_float(value: Any) -> Any:
     if isinstance(value, Decimal):
         return float(value)
     return value
 
-def decimal_dict_to_float(data: dict):
-    return {k: decimal_to_float(v) for k, v in data.items()}
+
+# --------------------------------------------------------------------------------------
+# Convierte todos los valores Decimal de un diccionario a float.
+# --------------------------------------------------------------------------------------
+def decimal_dict_to_float(data: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: decimal_to_float(value)
+        for key, value in data.items()
+    }
 ```
 
 ---
@@ -2498,40 +3183,51 @@ Base = declarative_base()
 **Clases (0):**
 
 **Imports (5):**
+- collections.abc.Generator
 - sqlalchemy.create_engine
+- sqlalchemy.orm.Session
 - sqlalchemy.orm.sessionmaker
-- sqlalchemy.orm.declarative_base
-- dotenv.load_dotenv
-- os
+- app.core.config.DATABASE_URL
 
 ```python
+from collections.abc import Generator
+
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
-from dotenv import load_dotenv
-import os
+from sqlalchemy.orm import Session, sessionmaker
 
-load_dotenv()
+from app.core.config import DATABASE_URL
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-
+# --------------------------------------------------------------------------------------
+# Motor principal de SQLAlchemy
+# --------------------------------------------------------------------------------------
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True
 )
 
+
+# --------------------------------------------------------------------------------------
+# Fábrica de sesiones de base de datos
+# --------------------------------------------------------------------------------------
 SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
     bind=engine
 )
 
-def get_db():
+
+# --------------------------------------------------------------------------------------
+# Dependency de FastAPI que proporciona una sesión de base de datos.
+# La sesión se cierra automáticamente al finalizar la petición.
+# --------------------------------------------------------------------------------------
+def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
+
     try:
         yield db
+
     finally:
         db.close()
-
 ```
 
 ---
@@ -2559,64 +3255,70 @@ def tenant_query(db: Session, model, user: User):
 
 ### .\backend\app\dependencies\auth.py
 
-**Funciones (3):**
+**Funciones (2):**
 - authenticate_token
 - get_current_user
-- __init__
 
-**Clases (2):**
-- AuthError
-- AuthUser
+**Clases (0):**
 
-**Imports (8):**
+**Imports (9):**
 - fastapi.Depends
-- fastapi.HTTPException
 - fastapi.security.OAuth2PasswordBearer
 - sqlalchemy.orm.Session
+- app.core.security.decode_access_token
 - app.db.session.get_db
+- app.domain.errors.base.DomainError
+- app.domain.errors.error_codes.ErrorCode
 - app.models.user.User
 - app.models.user.UserRole
-- app.core.security.decode_access_token
 
 ```python
-from fastapi import Depends, HTTPException
+from fastapi import Depends
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
-from app.db.session import get_db
-from app.models.user import User, UserRole
 from app.core.security import decode_access_token
+
+from app.db.session import get_db
+
+from app.domain.errors.base import DomainError
+from app.domain.errors.error_codes import ErrorCode
+
+from app.models.user import (
+    User,
+    UserRole
+)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 
-class AuthError(Exception):
-    pass
-
-
-class AuthUser:
-
-    def __init__(self, user: User):
-
-        self.user = user
-        self.id = user.id
-        self.role = user.role
-        self.restaurant_id = user.restaurant_id
-
-
-def authenticate_token(db: Session, token: str) -> AuthUser:
+# ---------------------------------------------------------------------------------------------
+# Autentica un token y devuelve el usuario correspondiente.
+# Lanza DomainError si el token es inválido, el usuario no existe o no puede autenticarse.
+# ---------------------------------------------------------------------------------------------
+def authenticate_token(
+    db: Session,
+    token: str
+) -> User:
 
     payload = decode_access_token(token)
 
     if not payload:
-        raise AuthError("invalid token")
+        raise DomainError(
+            "Invalid token",
+            ErrorCode.INVALID_TOKEN
+        )
 
     try:
-        user_id = int(payload.get("sub"))
-        restaurant_id = int(payload.get("restaurant_id"))
-        role = UserRole(payload.get("role"))
-    except (TypeError, ValueError):
-        raise AuthError("invalid token payload")
+        user_id = int(payload["sub"])
+        restaurant_id = int(payload["restaurant_id"])
+        role = UserRole(payload["role"])
+
+    except (KeyError, TypeError, ValueError):
+        raise DomainError(
+            "Invalid token payload",
+            ErrorCode.INVALID_TOKEN_PAYLOAD
+        )
 
     user = (
         db.query(User)
@@ -2628,37 +3330,39 @@ def authenticate_token(db: Session, token: str) -> AuthUser:
     )
 
     if not user:
-        raise AuthError("user not found")
+        raise DomainError(
+            "User not found",
+            ErrorCode.USER_NOT_FOUND
+        )
 
     if not user.active:
-        raise AuthError("inactive user")
+        raise DomainError(
+            "Inactive user",
+            ErrorCode.USER_INACTIVE
+        )
 
     if user.role != role:
-        raise AuthError("role mismatch")
+        raise DomainError(
+            "Role mismatch",
+            ErrorCode.ROLE_MISMATCH
+        )
 
-    return AuthUser(user)
+    return user
 
 
+# ---------------------------------------------------------------------------------------------
+# Obtiene el usuario autenticado a partir del token de acceso.
+# Lanza DomainError si el token es inválido o el usuario no puede autenticarse.
+# ---------------------------------------------------------------------------------------------
 def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
-):
+) -> User:
 
-    try:
-        auth_user = authenticate_token(db, token)
-    except AuthError as exc:
-        if str(exc) == "inactive user":
-            raise HTTPException(
-                status_code=403,
-                detail="Usuario inactivo"
-            )
-        raise HTTPException(
-            status_code=401,
-            detail="Token inválido"
-        )
-
-    return auth_user.user
-
+    return authenticate_token(
+        db=db,
+        token=token
+    )
 ```
 
 ---
@@ -2673,34 +3377,45 @@ def get_current_user(
 
 **Imports (6):**
 - fastapi.Depends
+- app.dependencies.auth.get_current_user
 - app.domain.errors.base.DomainError
 - app.domain.errors.error_codes.ErrorCode
-- app.models.user.UserRole
 - app.models.user.User
-- app.dependencies.auth.get_current_user
+- app.models.user.UserRole
 
 ```python
 from fastapi import Depends
-from app.domain.errors.base import DomainError
-from app.domain.errors.error_codes import ErrorCode
-from app.models.user import UserRole
-from app.models.user import User
+
 from app.dependencies.auth import get_current_user
 
+from app.domain.errors.base import DomainError
+from app.domain.errors.error_codes import ErrorCode
 
+from app.models.user import User, UserRole
+
+# --------------------------------------------------------------------------------------
+# Crea una dependencia que restringe el acceso a uno o más roles.
+#
+# Uso:
+#   admin_only = require_roles(UserRole.ADMIN)
+#   admin_or_cashier = require_roles(UserRole.ADMIN, UserRole.CASHIER)
+# --------------------------------------------------------------------------------------
 def require_roles(*roles: UserRole):
+
+    # ----------------------------------------------------------------------------------
+    # Verifica que el usuario autenticado tenga alguno de los roles permitidos.
+    # ----------------------------------------------------------------------------------
     def role_checker(user: User = Depends(get_current_user)) -> User:
         if user.role not in roles:
             raise DomainError(
-                "No tienes permisos para realizar esta acción",
+                "Permission denied",
                 ErrorCode.PERMISSION_DENIED,
                 context={
-                    "required_roles": [r.value for r in roles],
+                    "required_roles": [role.value for role in roles],
                     "user_role": user.role.value
                 }
             )
         return user
-
     return role_checker
 ```
 
@@ -2713,88 +3428,185 @@ def require_roles(*roles: UserRole):
 **Clases (0):**
 
 **Imports (2):**
-- app.models.user.UserRole
 - app.dependencies.permissions.require_roles
+- app.models.user.UserRole
 
 ```python
-from app.models.user import UserRole
 from app.dependencies.permissions import require_roles
 
+from app.models.user import UserRole
+
+# --------------------------------------------------------------------------------------
+# Dependencias reutilizables para autorización basada en roles.
+# --------------------------------------------------------------------------------------
+
 admin_only = require_roles(UserRole.ADMIN)
-waiter_or_admin = require_roles(UserRole.ADMIN, UserRole.WAITER)
-cashier_or_admin = require_roles(UserRole.ADMIN, UserRole.CASHIER)
-kitchen_or_admin = require_roles(UserRole.ADMIN, UserRole.KITCHEN)
-waiter_kitchen_or_admin = require_roles(UserRole.ADMIN, UserRole.WAITER, UserRole.KITCHEN)
-waiter_cashier_or_admin = require_roles(UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER)
-all_staff = require_roles(UserRole.ADMIN, UserRole.WAITER, UserRole.KITCHEN, UserRole.CASHIER)
+
+waiter_or_admin = require_roles(
+    UserRole.ADMIN,
+    UserRole.WAITER
+)
+
+cashier_or_admin = require_roles(
+    UserRole.ADMIN,
+    UserRole.CASHIER
+)
+
+kitchen_or_admin = require_roles(
+    UserRole.ADMIN,
+    UserRole.KITCHEN
+)
+
+waiter_cashier_or_admin = require_roles(
+    UserRole.ADMIN,
+    UserRole.WAITER,
+    UserRole.CASHIER
+)
+
+waiter_kitchen_or_admin = require_roles(
+    UserRole.ADMIN,
+    UserRole.WAITER,
+    UserRole.KITCHEN
+)
+
+all_staff = require_roles(
+    UserRole.ADMIN,
+    UserRole.WAITER,
+    UserRole.CASHIER,
+    UserRole.KITCHEN
+)
 ```
 
 ---
 
 ### .\backend\app\domain\backup\backup_service.py
 
-**Funciones (14):**
+**Funciones (29):**
 - __init__
 - _get_settings
-- status
-- create_backup
-- create_and_email_backup
-- _backup_path
+- _create_backup
+- _backup_before_restore
+- _cleanup_before_restore
+- _backup_info
+- _find_backup
+- _build_backup_path
+- _backup_database
 - _backup_sqlite
 - _backup_postgres
 - _send_backup_email
 - _email_enabled
-- _read_metadata
-- _write_metadata
 - _resolve_backup_dir
 - _latest_backup_file
+- _restaurant_backup_directory
+- _apply_retention_policy
+- _calculate_next_run
+- _create_restore_pending
+- status
+- create_backup
+- create_automatic_backup
+- create_and_email_backup
+- download_backup
+- list_backups
+- delete_backup
+- restore_backup
+- run_pending_backups
+- run_scheduled_backup
 
 **Clases (1):**
 - BackupService
 
-**Imports (15):**
-- json
+**Imports (28):**
 - os
 - shutil
 - smtplib
+- socket
 - subprocess
+- logging
 - datetime.datetime
+- datetime.timedelta
 - datetime.timezone
+- datetime.time
+- calendar
+- zoneinfo.ZoneInfo
 - email.message.EmailMessage
 - pathlib.Path
 - urllib.parse.unquote
 - urllib.parse.urlparse
-- app.models.system_settings.SystemSettings
+- fastapi.responses.FileResponse
 - app.domain.errors.base.DomainError
 - app.domain.errors.error_codes.ErrorCode
 - app.db.session.DATABASE_URL
+- app.infraestructure.restart.restart_manager.RestartManager
+- app.models.system_settings.SystemSettings
+- app.schemas.backup.BackupStatusOut
+- app.schemas.backup.BackupInfoOut
+- app.schemas.backup.BackupFileOut
+- app.schemas.backup.BackupEmailOut
+- app.schemas.backup.BackupDeleteOut
+- app.schemas.backup.BackupRestoreOut
 
 ```python
-import json
 import os
 import shutil
 import smtplib
+import socket
 import subprocess
-from datetime import datetime, timezone
+import logging
+from datetime import (
+    datetime,
+    timedelta,
+    timezone,
+    time
+)
+import calendar
+from zoneinfo import ZoneInfo
 from email.message import EmailMessage
 from pathlib import Path
 from urllib.parse import unquote, urlparse
-from app.models.system_settings import SystemSettings
+
+from fastapi.responses import FileResponse
+
 from app.domain.errors.base import DomainError
 from app.domain.errors.error_codes import ErrorCode
 
 from app.db.session import DATABASE_URL
 
+from app.infraestructure.restart.restart_manager import RestartManager
+
+from app.models.system_settings import SystemSettings
+
+from app.schemas.backup import (
+    BackupStatusOut,
+    BackupInfoOut,
+    BackupFileOut,
+    BackupEmailOut,
+    BackupDeleteOut,
+    BackupRestoreOut
+)
+
+BEFORE_RESTORE_MAX = 10
+logger = logging.getLogger("app.domain.backup")
 
 class BackupService:
-    def __init__(self, db):
+
+    """
+    Servicio encargado de la lógica de negocio relacionada con los backups.
+
+    Responsabilidades:
+    - Gestionar la lógica de negocio de los backups.
+    - Validar las reglas de negocio.
+    - Acceder a la base de datos mediante SQLAlchemy.
+    - Lanzar DomainError cuando una operación no pueda completarse.
+    """
+
+    def __init__(self, db) -> None:
         self.db = db
         self.backup_dir = self._resolve_backup_dir()
-        self.metadata_path = (
-            self.backup_dir / "metadata.json"
-        )
 
-    def _get_settings(self,restaurant_id: int):
+#-------------------------------------------------------------------
+# DEVOLVER CONFIGURACIÓN DEL RESTAURANTE
+#-------------------------------------------------------------------
+    def _get_settings(self,restaurant_id: int) -> SystemSettings | None:
         return (
             self.db.query(SystemSettings)
             .filter(
@@ -2804,79 +3616,167 @@ class BackupService:
             .first()
         )
 
-    def status(self, restaurant_id: int):
-        settings = self._get_settings(restaurant_id)
-        self.backup_dir.mkdir(parents=True, exist_ok=True)
-        metadata = self._read_metadata()
-        latest_backup = self._latest_backup_file()
+#-------------------------------------------------------------------
+# CREAR BACKUP (MANUAL, AUTOMÁTICO O ANTES DE RESTAURAR)
+#-------------------------------------------------------------------
+    def _create_backup(
+        self,
+        restaurant_id: int,
+        backup_type: str
+    ):
+        backup_path = self._build_backup_path(
+            restaurant_id,
+            backup_type,
+            datetime.now(timezone.utc)
+        )
+        self._backup_database(
+            backup_path
+        )
+        return self._backup_info(
+            backup_path
+        )
+
+#-------------------------------------------------------------------
+# CREAR BACKUP ANTES DE RESTAURAR
+#-------------------------------------------------------------------
+    def _backup_before_restore(self, restaurant_id) -> BackupInfoOut:
+        self._create_backup(
+            restaurant_id,
+            "before_restore"
+        )
+        self._cleanup_before_restore(restaurant_id)
+
+#-------------------------------------------------------------------
+# MANTENER SOLO LOS ÚLTIMOS BACKUPS ANTES DE RESTAURAR
+#-------------------------------------------------------------------
+    def _cleanup_before_restore(self, restaurant_id: int):
+        directory = (
+            self._restaurant_backup_directory(restaurant_id)
+            / "before_restore"
+        )
+
+        if not directory.exists():
+            return
+
+        backups = sorted(
+            (
+                path
+                for path in directory.iterdir()
+                if path.is_file()
+            ),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True
+        )
+
+        for backup in backups[BEFORE_RESTORE_MAX:]:
+            backup.unlink()
+
+#-------------------------------------------------------------------
+# DEVOLVER INFORMACIÓN DEL BACKUP
+#-------------------------------------------------------------------
+    def _backup_info(self, backup_path: Path):
+        stat = backup_path.stat()
 
         return {
-            "last_backup_at": latest_backup["modified_at"] if latest_backup else metadata.get("last_backup_at"),
-            "last_backup_file": latest_backup["name"] if latest_backup else metadata.get("last_backup_file"),
-            "last_backup_size": latest_backup["size"] if latest_backup else metadata.get("last_backup_size"),
-            "last_backup_source": latest_backup["source"] if latest_backup else "manual",
-            "email_enabled": self._email_enabled(restaurant_id),
-            "email_from": (settings.smtp_from if settings else None)
-        }
-
-    def create_backup(self, restaurant_id: int):
-        self.backup_dir.mkdir(parents=True, exist_ok=True)
-        created_at = datetime.now(timezone.utc)
-        backup_path = self._backup_path(created_at)
-
-        if DATABASE_URL.startswith("sqlite"):
-            self._backup_sqlite(backup_path)
-        elif DATABASE_URL.startswith("postgresql"):
-            self._backup_postgres(backup_path)
-        else:
-            raise RuntimeError("Motor de base de datos no soportado para backup")
-
-        metadata = {
-            "last_backup_at": created_at.isoformat(),
+            "last_backup_at": datetime.fromtimestamp(
+                stat.st_mtime,
+                tz=timezone.utc
+            ),
             "last_backup_file": str(
                 backup_path.relative_to(self.backup_dir)
             ),
-            "last_backup_size": backup_path.stat().st_size
+            "last_backup_size": stat.st_size,
+            "type": backup_path.parent.name
         }
-        self._write_metadata(metadata)
 
-        return metadata
-
-    def create_and_email_backup(self, recipient_email: str, restaurant_id: int):
-        if not self._email_enabled(restaurant_id):
+#-------------------------------------------------------------------
+# DEVOLVER EL PATH DEL BACKUP SI EXISTE, O LANZAR ERROR SI NO EXISTE
+#-------------------------------------------------------------------
+    def _find_backup(
+        self,
+        restaurant_id: int,
+        filename: str
+    ) -> Path:
+        restaurant_dir = self._restaurant_backup_directory(
+            restaurant_id
+        )
+        path = (restaurant_dir / filename).resolve()
+        if not path.exists() or not path.is_file():
             raise DomainError(
-                code=ErrorCode.SMTP_NOT_CONFIGURED,
-                detail="SMTP no esta configurado"
+                "Backup not found",
+                ErrorCode.BACKUP_NOT_FOUND,
+                context={"filename": filename})
+        # Evita que intenten acceder fuera del directorio
+        if restaurant_dir.resolve() not in path.parents:
+            raise DomainError(
+                "Invalid backup path",
+                ErrorCode.BACKUP_INVALID_PATH,
+                context={"filename": filename}
+            )
+        return path
+
+#-------------------------------------------------------------------
+# CONSTRUIR EL PATH DEL BACKUP
+#-------------------------------------------------------------------
+    def _build_backup_path(
+        self,
+        restaurant_id: int,
+        backup_type: str,
+        created_at: datetime,
+    ):
+        suffix = (
+            ".sqlite3"
+            if DATABASE_URL.startswith("sqlite")
+            else ".dump"
+        )
+        directory = self._restaurant_backup_directory(restaurant_id)
+        return (
+            directory /
+            f"backup-{created_at:%Y%m%d-%H%M%S}{suffix}"
+        )
+    '''
+#-------------------------------------------------------------------
+# DEVOLVER EL DIRECTORIO DE BACKUPS DEL RESTAURANTE
+#-------------------------------------------------------------------
+    def _restaurant_backup_directory(self, restaurant_id: int) -> Path:
+        return self._restaurant_backup_directory(restaurant_id)
+    '''
+
+#-------------------------------------------------------------------
+# BACKUP BASE DE DATOS DE ACUERDO AL MOTOR DE BASE DE DATOS
+#-------------------------------------------------------------------
+    def _backup_database(self, backup_path: Path):
+        if DATABASE_URL.startswith("sqlite"):
+            self._backup_sqlite(backup_path)
+
+        elif DATABASE_URL.startswith("postgresql"):
+            self._backup_postgres(backup_path)
+
+        else:
+            raise DomainError(
+                "Not supported database engine for backup",
+                ErrorCode.BACKUP_ENGINE_NOT_SUPPORTED
             )
 
-        backup = self.create_backup()
-        backup_path = self.backup_dir / backup["last_backup_file"]
-        self._send_backup_email(recipient_email, backup_path, backup["last_backup_at"], restaurant_id)
-
-        return {
-            **backup,
-            "sent_to": recipient_email
-        }
-
-    def _backup_path(self, created_at: datetime):
-        suffix = ".sqlite3" if DATABASE_URL.startswith("sqlite") else ".dump"
-        manual_dir = self.backup_dir / "manual"
-        manual_dir.mkdir(parents=True, exist_ok=True)
-        return manual_dir / f"backup-{created_at.strftime('%Y%m%d-%H%M%S')}{suffix}"
-
+#-------------------------------------------------------------------
+# BACKUP EN SQLITE
+#-------------------------------------------------------------------
     def _backup_sqlite(self, backup_path: Path):
         parsed = urlparse(DATABASE_URL)
         database_path = unquote(parsed.path)
-
         if os.name == "nt" and database_path.startswith("/"):
             database_path = database_path[1:]
-
         source = Path(database_path)
         if not source.exists():
-            raise RuntimeError("No se encontro el archivo de base de datos SQLite")
-
+            raise DomainError(
+                "Database file not found for backup",
+                ErrorCode.BACKUP_DATABASE_NOT_FOUND
+            )
         shutil.copy2(source, backup_path)
 
+#-------------------------------------------------------------------
+# BACKUP EN POSTGRES
+#-------------------------------------------------------------------
     def _backup_postgres(self, backup_path: Path):
         parsed = urlparse(
             DATABASE_URL.replace(
@@ -2884,35 +3784,43 @@ class BackupService:
                 "postgresql://"
             )
         )
-
-        os.environ["PGPASSWORD"] = parsed.password
-
+        env = os.environ.copy()
+        env["PGPASSWORD"] = parsed.password
         command = [
             "pg_dump",
             "-h", parsed.hostname,
             "-p", str(parsed.port or 5432),
             "-U", parsed.username,
             "-d", parsed.path.lstrip("/"),
+
             "--format=custom",
+            "--clean",
+            "--if-exists",
+            "--no-owner",
+            
             "--file", str(backup_path)
         ]
-        result = subprocess.run(command, capture_output=True, text=True)
-
+        result = subprocess.run(command, capture_output=True, text=True, env=env)
         if result.returncode != 0:
             detail = result.stderr.strip() or "No se pudo ejecutar pg_dump"
-            raise RuntimeError(detail)
+            raise DomainError(
+                "Error creating backup with pg_dump",
+                ErrorCode.BACKUP_FAILED,
+                context={"detail": detail}
+            )
 
+#-------------------------------------------------------------------
+# ENVIAR BACKUP POR EMAIL
+#-------------------------------------------------------------------
     def _send_backup_email(self, recipient_email: str, backup_path: Path, created_at: str, restaurant_id: int):
         settings = self._get_settings(
             restaurant_id
         )
-
         if not settings:
             raise DomainError(
                 code=ErrorCode.SMTP_NOT_CONFIGURED,
-                detail="SMTP no configurado"
+                detail="SMTP does not configured for this restaurant"
             )
-
         smtp_host = settings.smtp_host
         smtp_port = settings.smtp_port or 587
         smtp_user = settings.smtp_user or ""
@@ -2922,7 +3830,6 @@ class BackupService:
             or smtp_user
         )
         smtp_use_tls = settings.smtp_use_tls
-
         message = EmailMessage()
         message["Subject"] = "Backup del sistema restaurant"
         message["From"] = smtp_from
@@ -2931,21 +3838,24 @@ class BackupService:
             f"Adjunto backup generado el {created_at}.\n\n"
             "Este correo fue generado automaticamente por el sistema."
         )
-
         message.add_attachment(
             backup_path.read_bytes(),
             maintype="application",
             subtype="octet-stream",
             filename=backup_path.name
         )
-
         with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as smtp:
             if smtp_use_tls:
+                smtp.ehlo()
                 smtp.starttls()
+                smtp.ehlo()
             if smtp_user:
                 smtp.login(smtp_user, smtp_password)
             smtp.send_message(message)
 
+#-------------------------------------------------------------------
+# DEVOLVER TRUE o FALSE SI EL EMAIL ESTA CONFIGURADO PARA ESTE RESTAURANTE
+#-------------------------------------------------------------------
     def _email_enabled(self, restaurant_id: int):
         settings = self._get_settings(restaurant_id)
         if not settings:
@@ -2958,44 +3868,33 @@ class BackupService:
             )
         )
 
-    def _read_metadata(self):
-        if not self.metadata_path.exists():
-            return {}
-
-        try:
-            return json.loads(self.metadata_path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            return {}
-
-    def _write_metadata(self, metadata: dict):
-        self.metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
-
+#-------------------------------------------------------------------
+# DEVOLVER EL DIRECTORIO DE BACKUPS
+#-------------------------------------------------------------------
     def _resolve_backup_dir(self):
         configured_dir = os.getenv("BACKUP_DIR")
         if configured_dir:
             return Path(configured_dir)
-
         mounted_dir = Path("/backups")
         if mounted_dir.exists():
             return mounted_dir
-
         return Path("backups")
 
-    def _latest_backup_file(self):
-        if not self.backup_dir.exists():
+#-------------------------------------------------------------------
+# OBTENER ÚLTIMO BACKUP
+#-------------------------------------------------------------------
+    def _latest_backup_file(self, restaurant_id: int):
+        restaurant_dir = self._restaurant_backup_directory(restaurant_id)
+        if not restaurant_dir.exists():
             return None
-
         candidates = [
             path
-            for path in self.backup_dir.rglob("*")
+            for path in restaurant_dir.rglob("*")
             if path.is_file()
-            and path.name != "metadata.json"
             and path.stat().st_size > 0
         ]
-
         if not candidates:
             return None
-
         latest = max(candidates, key=lambda path: path.stat().st_mtime)
         stats = latest.stat()
 
@@ -3003,9 +3902,349 @@ class BackupService:
             "name": str(latest.relative_to(self.backup_dir)),
             "modified_at": datetime.fromtimestamp(stats.st_mtime,tz=timezone.utc).isoformat(),
             "size": stats.st_size,
-            "source": "automatic" if latest.parts[-2] in ("daily", "weekly", "monthly", "last") else "manual"
+            "type": latest.parent.name
         }
 
+#-------------------------------------------------------------------
+# Devolver el directorio de backups del restaurante
+#-------------------------------------------------------------------    
+    def _restaurant_backup_directory(
+        self,
+        restaurant_id: int
+    ) -> Path:
+        directory = (
+            self.backup_dir /
+            f"restaurant_{restaurant_id}"
+        )
+        directory.mkdir(
+            parents=True,
+            exist_ok=True
+        )
+        return directory
+
+#-------------------------------------------------------------------
+# APLICAR POLÍTICA DE RETENCIÓN
+#-------------------------------------------------------------------
+    def _apply_retention_policy(self, settings: SystemSettings):
+        restaurant_dir = (
+            self.backup_dir /
+            f"restaurant_{settings.restaurant_id}"
+        )
+
+        if not restaurant_dir.exists():
+            return
+
+        now = datetime.now(timezone.utc)
+
+        retention = {
+            "daily": settings.backup_retention_daily,
+            "weekly": settings.backup_retention_weekly,
+            "monthly": settings.backup_retention_monthly,
+        }
+
+        for backup_type, days in retention.items():
+
+            if not days:
+                continue
+
+            directory = restaurant_dir / backup_type
+
+            if not directory.exists():
+                continue
+
+            limit = now - timedelta(days=days)
+
+            for backup in directory.rglob("*"):
+
+                if not backup.is_file():
+                    continue
+
+                modified = datetime.fromtimestamp(
+                    backup.stat().st_mtime,
+                    tz=timezone.utc
+                )
+
+                if modified < limit:
+                    backup.unlink()
+
+#-------------------------------------------------------------------
+# CALCULAR PRÓXIMO BACKUP PROGRAMADO
+#-------------------------------------------------------------------
+    def _calculate_next_run(
+        self,
+        settings: SystemSettings
+    ):
+        tz = ZoneInfo(settings.backup_timezone)
+        now = datetime.now(tz)
+        backup_time = settings.backup_time or time(3, 0)
+        candidate = now.replace(
+            hour=backup_time.hour,
+            minute=backup_time.minute,
+            second=0,
+            microsecond=0
+        )
+        frequency = settings.backup_frequency.value
+        if frequency == "daily":
+            if candidate <= now:
+                candidate += timedelta(days=1)
+            return candidate
+        if frequency == "weekly":
+            weekday = settings.backup_weekday or 0
+            days = weekday - candidate.weekday()
+            if days < 0:
+                days += 7
+            candidate += timedelta(days=days)
+            if candidate <= now:
+                candidate += timedelta(days=7)
+            return candidate
+        if frequency == "monthly":
+            monthday = settings.backup_monthday or 1
+            year = now.year
+            month = now.month
+            last_day = calendar.monthrange(year, month)[1]
+            day = min(monthday, last_day)
+            candidate = candidate.replace(day=day)
+            if candidate <= now:
+                if month == 12:
+                    year += 1
+                    month = 1
+                else:
+                    month += 1
+                last_day = calendar.monthrange(year, month)[1]
+                day = min(monthday, last_day)
+                candidate = candidate.replace(
+                    year=year,
+                    month=month,
+                    day=day
+                )
+            return candidate.astimezone(timezone.utc)
+        return None
+
+#-------------------------------------------------------------------------------
+# Crear archivo restore.pending para indicar que se debe restaurar un backup
+#-------------------------------------------------------------------------------
+    def _create_restore_pending(self, backup: Path):
+        pending = Path(os.getenv("BACKUP_DIR", "/backups")) / "restore.pending"
+        pending.write_text(str(backup), encoding="utf-8")
+
+#-------------------------------------------------------------------
+# DEVOLVER EL ESTADO DEL BACKUP
+#-------------------------------------------------------------------
+    def status(self, restaurant_id: int) -> BackupStatusOut:
+        settings = self._get_settings(restaurant_id)
+        self.backup_dir.mkdir(
+            parents=True,
+            exist_ok=True
+        )
+        latest = self._latest_backup_file(restaurant_id)
+        return BackupStatusOut(
+            last_backup_at=latest["modified_at"] if latest else None,
+            last_backup_file=latest["name"] if latest else None,
+            last_backup_size=latest["size"] if latest else None,
+            last_backup_source=latest["type"] if latest else None,
+            email_enabled=self._email_enabled(restaurant_id),
+            email_from=settings.smtp_from if settings else None,
+            last_automatic_backup_at=settings.last_automatic_backup_at
+            if settings and settings.last_automatic_backup_at
+            else None,
+            next_automatic_backup_at=settings.next_automatic_backup_at
+                if settings and settings.next_automatic_backup_at
+                else None,
+            last_backup_result=settings.last_backup_result
+                if settings else None
+        )
+
+#-------------------------------------------------------------------
+# CREAR BACKUP
+#-------------------------------------------------------------------
+    def create_backup(self, restaurant_id) -> BackupInfoOut:
+        return self._create_backup(
+            restaurant_id,
+            "manual"
+        )
+
+#-------------------------------------------------------------------
+# CREAR BACKUP AUTOMÁTICO
+#-------------------------------------------------------------------
+    def create_automatic_backup(self, restaurant_id, frequency) -> BackupInfoOut:
+        return self._create_backup(
+            restaurant_id,
+            frequency
+        )
+
+#-------------------------------------------------------------------
+# CREAR BACKUP Y ENVIAR POR EMAIL
+#-------------------------------------------------------------------
+    def create_and_email_backup(self, recipient_email: str, restaurant_id: int) -> BackupEmailOut:
+        if not self._email_enabled(restaurant_id):
+            raise DomainError(
+                code=ErrorCode.SMTP_NOT_CONFIGURED,
+                detail="SMTP is not configured for this restaurant"
+            )
+        backup = self.create_backup(restaurant_id)
+        backup_path = self.backup_dir / backup.last_backup_file
+        try:
+            self._send_backup_email(
+                recipient_email=recipient_email,
+                backup_path=backup_path,
+                created_at=backup.last_backup_at,
+                restaurant_id=restaurant_id
+            )
+
+        except (
+            smtplib.SMTPException,
+            ConnectionError,
+            TimeoutError,
+            socket.timeout,
+            OSError
+        ) as ex:
+            raise DomainError(
+                "Error sending backup email",
+                ErrorCode.EMAIL_SEND_FAILURE,
+                context={
+                    "recipient": recipient_email,
+                    "detail": str(ex)
+                }
+            ) from ex
+
+        return BackupEmailOut(
+            **backup.model_dump(),
+            sent_to=recipient_email
+        )
+
+#-------------------------------------------------------------------
+# DESCARGAR BACKUP
+#-------------------------------------------------------------------
+    def download_backup(self, restaurant_id: int, filename: str ):
+        path = self._find_backup(
+            restaurant_id,
+            filename
+        )
+        return FileResponse(
+            path=path,
+            filename=path.name,
+            media_type="application/octet-stream"
+        )
+
+#-------------------------------------------------------------------
+# LISTAR BACKUPS
+#-------------------------------------------------------------------
+    def list_backups(self, restaurant_id: int) -> list[BackupFileOut]:
+        directory = self._restaurant_backup_directory(
+            restaurant_id
+        )
+        files = [
+            path
+            for path in directory.rglob("*")
+            if path.is_file()
+        ]
+        files.sort(
+            key=lambda p: p.stat().st_mtime,
+            reverse=True
+        )
+        return [
+            BackupFileOut(
+                filename=str(path.relative_to(directory)),
+                created_at=datetime.fromtimestamp(
+                    path.stat().st_mtime,
+                    tz=timezone.utc
+                ),
+                size=path.stat().st_size,
+                type=(
+                    "manual"
+                    if path.parent == directory
+                    else path.parent.name
+                )
+            )
+            for path in files
+        ]
+
+#-------------------------------------------------------------------
+# ELIMINAR BACKUP
+#-------------------------------------------------------------------    
+    def delete_backup(self, restaurant_id: int, filename: str) -> BackupDeleteOut:
+        path = self._find_backup(
+            restaurant_id,
+            filename
+        )
+        path.unlink()
+        return BackupDeleteOut(success=True)
+
+#-------------------------------------------------------------------
+# RESTORE BACKUP
+#-------------------------------------------------------------------
+    def restore_backup(self, restaurant_id: int, filename: str) -> BackupRestoreOut:
+        print(">>> 1")
+
+        backup = self._find_backup(
+            restaurant_id,
+            filename
+        )
+        self._backup_before_restore(restaurant_id)
+        self._create_restore_pending(backup)
+        RestartManager.request_restart()
+        return BackupRestoreOut(
+            success=True,
+            restart_required=True
+        )
+
+#-------------------------------------------------------------------
+# CORRER BACKUPS PENDIENTES
+#-------------------------------------------------------------------
+    def run_pending_backups(self):
+        now = datetime.now(timezone.utc)
+        restaurants = (
+            self.db.query(SystemSettings)
+            .filter(
+                SystemSettings.backup_enabled.is_(True),
+                SystemSettings.next_automatic_backup_at <= now
+            )
+            .all()
+        )
+        for settings in restaurants:
+            try:
+                self.run_scheduled_backup(
+                    settings.restaurant_id
+                )
+            except Exception:
+                logger.exception(
+                    f"Error running scheduled backup for restaurant {settings.restaurant_id}"
+                )
+                self.db.rollback()
+
+#-------------------------------------------------------------------
+# CORRER BACKUP PROGRAMADO
+#-------------------------------------------------------------------
+    def run_scheduled_backup(self, restaurant_id: int):
+        settings = self._get_settings(restaurant_id)
+        try:
+            backup = self.create_automatic_backup(
+                restaurant_id,
+                settings.backup_frequency.value
+            )
+
+            self._apply_retention_policy(settings)
+            
+            if settings.backup_send_email and settings.backup_email:
+                backup_path = (
+                    self.backup_dir /
+                    backup["last_backup_file"]
+                )
+                self._send_backup_email(
+                    settings.backup_email,
+                    backup_path,
+                    backup["last_backup_at"],
+                    restaurant_id
+                )
+            settings.last_backup_result = "OK"
+        except Exception as ex:
+            logger.exception(
+                f"Error running scheduled backup for restaurant {settings.restaurant_id}"
+            )
+            settings.last_backup_result = str(ex)
+        settings.last_automatic_backup_at = datetime.now(timezone.utc)
+        settings.next_automatic_backup_at = self._calculate_next_run(settings)
+        self.db.commit()
 ```
 
 ---
@@ -3039,260 +4278,326 @@ def get_backup_service(
 
 ---
 
-### .\backend\app\domain\backups\backup_service.py
+### .\backend\app\domain\backup\restore_executor.py
 
-**Funciones (11):**
-- __init__
-- status
-- create_backup
-- create_and_email_backup
-- _backup_path
-- _backup_sqlite
-- _backup_postgres
-- _send_backup_email
-- _email_enabled
-- _read_metadata
-- _write_metadata
+**Funciones (3):**
+- restore
+- _restore_sqlite
+- _restore_postgres
 
 **Clases (1):**
-- BackupService
+- RestoreExecutor
 
-**Imports (11):**
-- json
+**Imports (7):**
 - os
 - shutil
-- smtplib
 - subprocess
-- datetime.datetime
-- email.message.EmailMessage
 - pathlib.Path
 - urllib.parse.unquote
 - urllib.parse.urlparse
 - app.db.session.DATABASE_URL
 
 ```python
-import json
 import os
 import shutil
-import smtplib
 import subprocess
-from datetime import datetime
-from email.message import EmailMessage
 from pathlib import Path
+
 from urllib.parse import unquote, urlparse
 
 from app.db.session import DATABASE_URL
 
+class RestoreExecutor:
 
-class BackupService:
-    def __init__(self):
-        self.backup_dir = Path(os.getenv("BACKUP_DIR", "backups"))
-        self.metadata_path = self.backup_dir / "metadata.json"
-
-    def status(self):
-        self.backup_dir.mkdir(parents=True, exist_ok=True)
-        metadata = self._read_metadata()
-
-        return {
-            "last_backup_at": metadata.get("last_backup_at"),
-            "last_backup_file": metadata.get("last_backup_file"),
-            "last_backup_size": metadata.get("last_backup_size"),
-            "email_enabled": self._email_enabled(),
-            "email_from": os.getenv("SMTP_FROM", os.getenv("SMTP_USER", "")) or None
-        }
-
-    def create_backup(self):
-        self.backup_dir.mkdir(parents=True, exist_ok=True)
-        created_at = datetime.now()
-        backup_path = self._backup_path(created_at)
-
+#--------------------------------------------------------------------------------------
+# RESTAURA LA BASE DE DATOS DE ACUERDO AL MOTOR DE BASE DE DATOS
+#--------------------------------------------------------------------------------------
+    @staticmethod
+    def restore(backup: Path) -> None:
         if DATABASE_URL.startswith("sqlite"):
-            self._backup_sqlite(backup_path)
+            RestoreExecutor._restore_sqlite(backup)
         elif DATABASE_URL.startswith("postgresql"):
-            self._backup_postgres(backup_path)
+            RestoreExecutor._restore_postgres(backup)
         else:
-            raise RuntimeError("Motor de base de datos no soportado para backup")
+            raise RuntimeError(
+                f"Unsupported database engine: {DATABASE_URL}"
+            )
 
-        metadata = {
-            "last_backup_at": created_at.isoformat(),
-            "last_backup_file": backup_path.name,
-            "last_backup_size": backup_path.stat().st_size
-        }
-        self._write_metadata(metadata)
-
-        return metadata
-
-    def create_and_email_backup(self, recipient_email: str):
-        if not self._email_enabled():
-            raise RuntimeError("SMTP no esta configurado")
-
-        backup = self.create_backup()
-        backup_path = self.backup_dir / backup["last_backup_file"]
-        self._send_backup_email(recipient_email, backup_path, backup["last_backup_at"])
-
-        return {
-            **backup,
-            "sent_to": recipient_email
-        }
-
-    def _backup_path(self, created_at: datetime):
-        suffix = ".sqlite3" if DATABASE_URL.startswith("sqlite") else ".dump"
-        return self.backup_dir / f"backup-{created_at.strftime('%Y%m%d-%H%M%S')}{suffix}"
-
-    def _backup_sqlite(self, backup_path: Path):
+#-------------------------------------------------------------------
+# RESTORE SQLITE
+#-------------------------------------------------------------------
+    @staticmethod
+    def _restore_sqlite(backup: Path) -> None:
         parsed = urlparse(DATABASE_URL)
         database_path = unquote(parsed.path)
-
         if os.name == "nt" and database_path.startswith("/"):
             database_path = database_path[1:]
+        destination = Path(database_path)
+        shutil.copy2(backup, destination)
 
-        source = Path(database_path)
-        if not source.exists():
-            raise RuntimeError("No se encontro el archivo de base de datos SQLite")
-
-        shutil.copy2(source, backup_path)
-
-    def _backup_postgres(self, backup_path: Path):
-        command = ["pg_dump", "--format=custom", "--file", str(backup_path), DATABASE_URL]
-        result = subprocess.run(command, capture_output=True, text=True)
-
+#-------------------------------------------------------------------
+# RESTORE POSTGRES
+#-------------------------------------------------------------------
+    @staticmethod
+    def _restore_postgres(backup: Path) -> None:
+        parsed = urlparse(
+            DATABASE_URL.replace(
+                "postgresql+psycopg2://",
+                "postgresql://"
+            )
+        )
+        env = os.environ.copy()
+        env["PGPASSWORD"] = parsed.password
+        command = [
+            "pg_restore",
+            "-h", parsed.hostname,
+            "-p", str(parsed.port or 5432),
+            "-U", parsed.username,
+            "-d", parsed.path.lstrip("/"),
+            "--clean",
+            "--if-exists",
+            "--no-owner",
+            "--exit-on-error",
+            "--verbose",
+            str(backup)
+        ]
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            env=env
+        )
         if result.returncode != 0:
-            detail = result.stderr.strip() or "No se pudo ejecutar pg_dump"
-            raise RuntimeError(detail)
+            raise RuntimeError(
+                result.stderr.strip()
+            )
+```
 
-    def _send_backup_email(self, recipient_email: str, backup_path: Path, created_at: str):
-        smtp_host = os.getenv("SMTP_HOST", "")
-        smtp_port = int(os.getenv("SMTP_PORT", "587"))
-        smtp_user = os.getenv("SMTP_USER", "")
-        smtp_password = os.getenv("SMTP_PASSWORD", "")
-        smtp_from = os.getenv("SMTP_FROM", smtp_user)
-        smtp_use_tls = os.getenv("SMTP_USE_TLS", "true").lower() in ("1", "true", "yes", "on")
+---
 
-        message = EmailMessage()
-        message["Subject"] = "Backup del sistema restaurant"
-        message["From"] = smtp_from
-        message["To"] = recipient_email
-        message.set_content(
-            f"Adjunto backup generado el {created_at}.\n\n"
-            "Este correo fue generado automaticamente por el sistema."
-        )
+### .\backend\app\domain\backup\schedule_utils.py
 
-        message.add_attachment(
-            backup_path.read_bytes(),
-            maintype="application",
-            subtype="octet-stream",
-            filename=backup_path.name
-        )
+**Funciones (2):**
+- _resolve_timezone
+- calculate_next_backup
 
-        with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as smtp:
-            if smtp_use_tls:
-                smtp.starttls()
-            if smtp_user:
-                smtp.login(smtp_user, smtp_password)
-            smtp.send_message(message)
+**Clases (0):**
 
-    def _email_enabled(self):
-        return bool(
-            os.getenv("SMTP_HOST")
-            and os.getenv("SMTP_FROM", os.getenv("SMTP_USER", ""))
-        )
+**Imports (10):**
+- calendar
+- datetime.datetime
+- datetime.time
+- datetime.timedelta
+- datetime.timezone
+- datetime.tzinfo
+- zoneinfo.ZoneInfo
+- zoneinfo.ZoneInfoNotFoundError
+- app.models.system_settings.SystemSettings
+- app.models.enums.BackupFrequency
 
-    def _read_metadata(self):
-        if not self.metadata_path.exists():
-            return {}
+```python
+import calendar
 
-        try:
-            return json.loads(self.metadata_path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            return {}
+from datetime import datetime, time, timedelta, timezone, tzinfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-    def _write_metadata(self, metadata: dict):
-        self.metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+from app.models.system_settings import SystemSettings
+from app.models.enums import BackupFrequency
 
+#----------------------------------------------------------------------------------
+# Resuelve la zona horaria a partir del nombre de la zona horaria.
+# Si la zona horaria no es válida, se devuelve UTC.
+#----------------------------------------------------------------------------------
+def _resolve_timezone(timezone_name: str) -> tzinfo:
+    try:
+        return ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError:
+        if timezone_name == "America/Montevideo":
+            return timezone(timedelta(hours=-3))
+        return timezone.utc
+
+#------------------------------------------------------------------------------------------
+# Devuelve el próximo instante programado en UTC según la configuración del restaurante.
+#------------------------------------------------------------------------------------------
+def calculate_next_backup(
+    settings: SystemSettings,
+    reference: datetime | None = None,
+) -> datetime | None:
+    if reference is None:
+        reference = datetime.now(timezone.utc)
+
+    if reference.tzinfo is None:
+        reference = reference.replace(tzinfo=timezone.utc)
+
+    tz = _resolve_timezone(settings.backup_timezone or "UTC")
+    now = reference.astimezone(tz)
+    backup_time = settings.backup_time or time(3, 0)
+
+    candidate = now.replace(
+        hour=backup_time.hour,
+        minute=backup_time.minute,
+        second=0,
+        microsecond=0
+    )
+
+    frequency = settings.backup_frequency
+
+    if frequency == BackupFrequency.DAILY:
+        if candidate <= now:
+            candidate += timedelta(days=1)
+        return candidate.astimezone(timezone.utc)
+
+    if frequency == BackupFrequency.WEEKLY:
+        weekday = settings.backup_weekday or 0
+        days = weekday - candidate.weekday()
+        days = (weekday - candidate.weekday()) % 7
+        candidate += timedelta(days=days)
+        if candidate <= now:
+            candidate += timedelta(days=7)
+        return candidate.astimezone(timezone.utc)
+
+    if frequency == BackupFrequency.MONTHLY:
+        monthday = settings.backup_monthday or 1
+        year = now.year
+        month = now.month
+        last_day = calendar.monthrange(year, month)[1]
+        day = min(monthday, last_day)
+        candidate = candidate.replace(day=day)
+        if candidate <= now:
+            if month == 12:
+                year += 1
+                month = 1
+            else:
+                month += 1
+            last_day = calendar.monthrange(year, month)[1]
+            day = min(monthday, last_day)
+            candidate = candidate.replace(
+                year=year,
+                month=month,
+                day=day
+            )
+        return candidate.astimezone(timezone.utc)
+
+    return None
 ```
 
 ---
 
 ### .\backend\app\domain\cash_register\cash_movement_service.py
 
-**Funciones (3):**
+**Funciones (4):**
 - __init__
+- _get_cash_movement
 - create_cash_movement
 - delete_cash_movement
 
 **Clases (1):**
 - CashMovementService
 
-**Imports (8):**
+**Imports (11):**
 - sqlalchemy.orm.Session
-- app.models.cash_movement.CashMovement
-- app.models.cash_register.CashRegister
 - app.domain.errors.base.DomainError
 - app.domain.errors.error_codes.ErrorCode
-- app.models.user.UserRole
+- app.domain.cash_register.cash_register_service.CashRegisterService
+- app.domain.events.websocket.WSEvent
 - app.services.event_service.EventService
 - app.utils.money.money
+- app.models.cash_movement.CashMovement
+- app.models.cash_register.CashRegister
+- app.models.user.UserRole
+- app.schemas.cash_register.CashMovementCreate
 
 ```python
 from sqlalchemy.orm import Session
-from app.models.cash_movement import CashMovement
-from app.models.cash_register import CashRegister
+
 from app.domain.errors.base import DomainError
 from app.domain.errors.error_codes import ErrorCode
-from app.models.user import UserRole
+
+from app.domain.cash_register.cash_register_service import CashRegisterService
+from app.domain.events.websocket import WSEvent
 from app.services.event_service import EventService
+
 from app.utils.money import money
+
+from app.models.cash_movement import CashMovement
+from app.models.cash_register import CashRegister
+from app.models.user import UserRole
+from app.schemas.cash_register import CashMovementCreate
 
 
 class CashMovementService:
 
-    def __init__(self, db: Session):
+    """
+    Servicio encargado de la lógica de negocio relacionada con los movimientos de la caja registradora.
+
+    Responsabilidades:
+    - Gestionar la lógica de negocio de los movimientos de la caja registradora.
+    - Validar las reglas de negocio.
+    - Acceder a la base de datos mediante SQLAlchemy.
+    - Lanzar DomainError cuando una operación no pueda completarse.
+    """
+
+    def __init__(self, db: Session) -> None:
         self.db = db
         self.events = EventService(db)
 
+    # --------------------------------------------------------
+    # Obtener movimiento de caja
+    # --------------------------------------------------------
+    def _get_cash_movement(
+        self,
+        restaurant_id: int,
+        movement_id: int
+    ) -> CashMovement:
+        movement = (
+            self.db.query(CashMovement)
+            .join(
+                CashRegister,
+                CashMovement.cash_register_id == CashRegister.id
+            )
+            .filter(
+                CashMovement.id == movement_id,
+                CashRegister.restaurant_id == restaurant_id
+            )
+            .first()
+        )
+        if not movement:
+            raise DomainError(
+                "Movement not found",
+                ErrorCode.CASH_MOVEMENT_NOT_FOUND
+            )
+        return movement
 
     # -------------------------
     # Crear movimiento de caja
     # -------------------------
-
     def create_cash_movement(
         self,
-        restaurant_id,
-        user_id,
-        movement_type,
-        amount,
-        reason
-    ):
-        cash_register = (
-            self.db.query(CashRegister)
-            .filter(
-                CashRegister.restaurant_id == restaurant_id,
-                CashRegister.is_open == True
-            )
-            .with_for_update()
-            .first()
+        restaurant_id: int,
+        user_id: int,
+        data: CashMovementCreate
+    ) -> CashMovement:
+        cash_register = CashRegisterService(self.db).get_open_cash_register(
+            restaurant_id,
+            for_update=True
         )
-        if not cash_register:
-            raise DomainError(
-                "cash register not open",
-                ErrorCode.CASH_REGISTER_NOT_OPEN
-            )
         movement = CashMovement(
             cash_register_id=cash_register.id,
             user_id=user_id,
-            type=movement_type,
-            amount=amount,
-            reason=reason
+            type=data.type,
+            amount=data.amount,
+            reason=data.reason
         )
         self.db.add(movement)
         self.db.flush()
+        self.db.refresh(movement)
         self.events.emit(
             restaurant_id=restaurant_id,
-            event_type="CASH_MOVEMENT_ADDED",
+            event_type=WSEvent.CASH_MOVEMENT_ADDED,
             payload={
                 "movement": {
                     "id": movement.id,
-                    "type": movement.type,
+                    "type": movement.type.value,
                     "amount": money(movement.amount),
                     "reason": movement.reason,
                     "created_at": movement.created_at.isoformat()
@@ -3302,76 +4607,62 @@ class CashMovementService:
             target_id=UserRole.CASHIER.value
         )
         self.db.commit()
-        self.db.refresh(movement)
-
         return movement
 
-    # -------------------------
+    # ---------------------------------------------------------
     # Eliminar movimiento de caja
-    # -------------------------
-
+    # ---------------------------------------------------------
     def delete_cash_movement(
         self,
-        restaurant_id,
-        movement_id
-    ):
-        movement = self.db.query(CashMovement).join(
-            CashRegister,
-            CashMovement.cash_register_id == CashRegister.id
-        ).filter(
-            CashMovement.id == movement_id,
-            CashRegister.restaurant_id == restaurant_id
-        ).first()
-
-        if not movement:
-            raise DomainError(
-                "Movement not found",
-                ErrorCode.CASH_MOVEMENT_NOT_FOUND
-            )
-
+        restaurant_id: int,
+        movement_id: int
+    ) -> None:
+        movement = self._get_cash_movement(restaurant_id, movement_id)
         amount = movement.amount
         movement_type = movement.type
-
+        payload={
+            "movement_id": movement_id,
+            "amount": money(amount),
+            "movement_type": movement_type.value
+        }
         self.db.delete(movement)
         self.events.emit(
             restaurant_id=restaurant_id,
-            event_type="CASH_MOVEMENT_DELETED",
-            payload={
-                "movement_id": movement_id,
-                "amount": money(amount),
-                "movement_type": movement_type
-            },
+            event_type=WSEvent.CASH_MOVEMENT_DELETED,
+            payload=payload,
             target="role",
             target_id=UserRole.CASHIER.value
         )
         self.db.commit()
-        return {"ok": True}
 ```
 
 ---
 
 ### .\backend\app\domain\cash_register\cash_register_service.py
 
-**Funciones (10):**
+**Funciones (9):**
 - __init__
-- _get_open_cash_register
 - _calculate_sales
 - _calculate_payment_breakdown
 - _calculate_cash_movements
 - open_cash_register
+- get_open_cash_register
 - close_cash_register
 - get_current_cash_register
-- require_open_cash_register
 - get_dashboard
 
 **Clases (1):**
 - CashRegisterService
 
-**Imports (15):**
+**Imports (19):**
+- logging
 - decimal.Decimal
 - sqlalchemy.orm.Session
 - sqlalchemy.func
-- logging
+- app.domain.errors.base.DomainError
+- app.domain.errors.error_codes.ErrorCode
+- app.core.serialization.decimal_dict_to_float
+- app.utils.money.money
 - app.models.cash_register.CashRegister
 - app.models.payment.Payment
 - app.models.cash_movement.CashMovement
@@ -3379,16 +4670,24 @@ class CashMovementService:
 - app.models.order.OrderStatus
 - app.models.payment.PaymentMethod
 - app.models.cash_movement.CashMovementType
-- app.domain.errors.base.DomainError
-- app.domain.errors.error_codes.ErrorCode
-- app.core.serialization.decimal_dict_to_float
-- app.utils.money.money
+- app.schemas.cash_register.CashRegisterClose
+- app.schemas.cash_register.CashRegisterCloseOut
+- app.schemas.cash_register.CashRegisterSummary
+- app.schemas.cash_register.CashRegisterDashboard
 
 ```python
+import logging
+
 from decimal import Decimal
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-import logging
+
+from app.domain.errors.base import DomainError
+from app.domain.errors.error_codes import ErrorCode
+
+from app.core.serialization import decimal_dict_to_float
+
+from app.utils.money import money
 
 from app.models.cash_register import CashRegister
 from app.models.payment import Payment
@@ -3397,40 +4696,39 @@ from app.models.order import Order, OrderStatus
 from app.models.payment import PaymentMethod
 from app.models.cash_movement import CashMovementType
 
-from app.domain.errors.base import DomainError
-from app.domain.errors.error_codes import ErrorCode
-from app.core.serialization import decimal_dict_to_float
-from app.utils.money import money
+from app.schemas.cash_register import (
+    CashRegisterClose,
+    CashRegisterCloseOut,
+    CashRegisterSummary,
+    CashRegisterDashboard
+)
 
 logger = logging.getLogger("app.domain.cash_register")
 
 class CashRegisterService:
 
-    def __init__(self, db: Session):
+    """
+    Servicio encargado de la lógica de negocio relacionada con la caja registradora.
+
+    Responsabilidades:
+    - Gestionar la lógica de negocio de la caja registradora.
+    - Validar las reglas de negocio.
+    - Acceder a la base de datos mediante SQLAlchemy.
+    - Lanzar DomainError cuando una operación no pueda completarse.
+    """
+
+    def __init__(self, db: Session) -> None:
         self.db = db
 
-
-    def _get_open_cash_register(
-        self,
-        restaurant_id: int,
-        for_update: bool = False
-    ):
-        query = self.db.query(CashRegister).filter(
-            CashRegister.restaurant_id == restaurant_id,
-            CashRegister.is_open == True
-        )
-        if for_update:
-            query = query.with_for_update()
-        cash_register = query.first()
-        if not cash_register:
-            raise DomainError(
-                "cash register not open",
-                ErrorCode.CASH_REGISTER_NOT_OPEN
-            )
-        return cash_register
-
-
-    def _calculate_sales(self, cash_register_id: int):
+    # --------------------------------------------------------------------------------
+    # Método de cálculo de ventas realizadas por caja registradora
+    # --------------------------------------------------------------------------------
+    def _calculate_sales(self, cash_register_id: int) -> tuple[
+        Decimal,
+        int,
+        int,
+        Decimal
+    ]:
         total_sales = self.db.query(
             func.coalesce(func.sum(Payment.amount), 0)
         ).filter(
@@ -3453,8 +4751,10 @@ class CashRegisterService:
         )
         return total_sales, transactions_count, orders_count, average_ticket
 
-
-    def _calculate_payment_breakdown(self, cash_register_id: int):
+    # --------------------------------------------------------------------------------
+    # Sumar pagos por método de pago
+    # --------------------------------------------------------------------------------
+    def _calculate_payment_breakdown(self, cash_register_id: int) -> dict[str, Decimal]:
         breakdown = {
             method.value: Decimal("0")
             for method in PaymentMethod
@@ -3471,8 +4771,10 @@ class CashRegisterService:
             breakdown[method.value] = total or Decimal("0")
         return breakdown
 
-
-    def _calculate_cash_movements(self, cash_register_id: int):
+    # --------------------------------------------------------------------------------
+    # Calcular movimientos de caja agrupados por entradas y salidas
+    # --------------------------------------------------------------------------------
+    def _calculate_cash_movements(self, cash_register_id: int) -> tuple[Decimal, Decimal]:
         rows = self.db.query(
             CashMovement.type,
             func.sum(CashMovement.amount)
@@ -3490,20 +4792,21 @@ class CashRegisterService:
                 cash_out += total or Decimal("0")
         return cash_in, cash_out
 
-
+    # --------------------------------------------------------------------------------
+    # Abrir Caja
+    # --------------------------------------------------------------------------------
     def open_cash_register(
         self,
         restaurant_id: int,
         user_id: int,
         opening_amount: Decimal
-    ):
+    ) -> CashRegister:
         if opening_amount < Decimal("0"):
             raise DomainError(
                 "opening amount must be greater than or equal to zero",
                 ErrorCode.INVALID_OPERATION,
                 context={"opening_amount": money(opening_amount)}
             )
-
         existing = self.db.query(CashRegister).filter(
             CashRegister.restaurant_id == restaurant_id,
             CashRegister.is_open == True
@@ -3525,60 +4828,75 @@ class CashRegisterService:
         self.db.refresh(cash_register)
         return cash_register
 
-
+    # --------------------------------------------------------------------------------
+    # Obtener una caja registradora abierta o lanzar DomainError si no existe
+    # --------------------------------------------------------------------------------
+    def get_open_cash_register(
+        self,
+        restaurant_id: int,
+        for_update: bool = False
+    ) -> CashRegister:
+        query = self.db.query(CashRegister).filter(
+            CashRegister.restaurant_id == restaurant_id,
+            CashRegister.is_open == True
+        )
+        if for_update:
+            query = query.with_for_update()
+        cash_register = query.first()
+        if not cash_register:
+            raise DomainError(
+                "cash register not open",
+                ErrorCode.CASH_REGISTER_NOT_OPEN
+            )
+        return cash_register
+    
+    # --------------------------------------------------------------------------------
+    # Cerrar caja
+    # --------------------------------------------------------------------------------
     def close_cash_register(
         self,
         restaurant_id: int,
         user_id: int,
-        counted_cash: Decimal
-    ):
-        if counted_cash < Decimal("0"):
+        data: CashRegisterClose
+    ) -> CashRegisterCloseOut:
+        if data.counted_cash < Decimal("0"):
             raise DomainError(
                 "counted cash must be greater than or equal to zero",
                 ErrorCode.CASH_REGISTER_INVALID_COUNT,
-                context={"counted_cash": money(counted_cash)}
+                context={"counted_cash": money(data.counted_cash)}
             )
-
-        cash_register = self._get_open_cash_register(
+        cash_register = self.get_open_cash_register(
             restaurant_id,
             for_update=True
         )
-
         open_orders = self.db.query(Order).filter(
             Order.restaurant_id == restaurant_id,
             Order.status.notin_([OrderStatus.CLOSED, OrderStatus.CANCELLED, OrderStatus.DRAFT])
         ).count()
-
         if open_orders > 0:
             raise DomainError(
                 "cannot close cash register: there are open orders",
                 ErrorCode.CASH_REGISTER_PENDING_ORDERS
             )
-
         total_sales, transactions_count, orders_count, average_ticket = self._calculate_sales(
             cash_register.id
         )
-
         payment_breakdown = self._calculate_payment_breakdown(
             cash_register.id
         )
-
         cash_sales = payment_breakdown.get(
             PaymentMethod.CASH.value,
             Decimal("0")
         )
-
         cash_in, cash_out = self._calculate_cash_movements(
             cash_register.id
         )
-
         expected_cash = (
             cash_register.opening_amount
             + cash_sales
             + cash_in
             - cash_out
         )
-
         closing_amount = (
             cash_register.opening_amount
             + total_sales
@@ -3586,7 +4904,7 @@ class CashRegisterService:
             - cash_out
         )
 
-        difference = counted_cash - expected_cash
+        difference = data.counted_cash - expected_cash
 
         cash_register.closed_at = func.now()
         cash_register.closed_by_id = user_id
@@ -3594,58 +4912,53 @@ class CashRegisterService:
         cash_register.total_sales = total_sales
         cash_register.closing_amount = closing_amount
         cash_register.expected_cash = expected_cash
-        cash_register.counted_cash = counted_cash
+        cash_register.counted_cash = data.counted_cash
         cash_register.difference = difference
         cash_register.payments_snapshot = decimal_dict_to_float(payment_breakdown)
         logger.info("Caja cerrada r=%s user=%s difference=%s", restaurant_id, user_id, difference)
         self.db.commit()
+        return CashRegisterCloseOut(
+            message="Caja cerrada",
+            opening_amount=cash_register.opening_amount,
+            closing_amount=cash_register.closing_amount,
+            total_sales=total_sales,
+            orders_count=orders_count,
+            transactions_count=transactions_count,
+            average_ticket=average_ticket,
+            by_method=payment_breakdown,
+            cash_in=cash_in,
+            cash_out=cash_out,
+            expected_cash=expected_cash,
+            counted_cash=data.counted_cash,
+            difference=difference
+        )
 
-        return {
-            "message": "Caja cerrada",
-            "opening_amount": cash_register.opening_amount,
-            "closing_amount": cash_register.closing_amount,
-            "total_sales": total_sales,
-            "orders_count": orders_count,
-            "transactions_count": transactions_count,
-            "average_ticket": average_ticket,
-            "by_method": payment_breakdown,
-            "cash_in": cash_in,
-            "cash_out": cash_out,
-            "expected_cash": expected_cash,
-            "counted_cash": counted_cash,
-            "difference": difference
-        }
-
-
-    def get_current_cash_register(self, restaurant_id: int):
-        cash_register = self._get_open_cash_register(restaurant_id)
-        if not cash_register:
-            return None
+    # --------------------------------------------------------------------------------
+    # Devolver caja registradora actual
+    # --------------------------------------------------------------------------------
+    def get_current_cash_register(self, restaurant_id: int) -> CashRegisterSummary:
+        cash_register = self.get_open_cash_register(restaurant_id)
         total_sales, transactions_count, orders_count, average_ticket = self._calculate_sales(
             cash_register.id
         )
         by_method = self._calculate_payment_breakdown(
             cash_register.id
         )
-        return {
-            "cash_register_id": cash_register.id,
-            "opened_at": cash_register.opened_at,
-            "total_sales": total_sales,
-            "orders_count": orders_count,
-            "transactions_count": transactions_count,
-            "average_ticket": average_ticket,
-            "by_method": by_method
-        }
+        return CashRegisterSummary(
+            cash_register_id=cash_register.id,
+            opened_at=cash_register.opened_at,
+            total_sales=total_sales,
+            orders_count=orders_count,
+            transactions_count=transactions_count,
+            average_ticket=average_ticket,
+            by_method=by_method
+        )
 
-
-    def require_open_cash_register(self, restaurant_id: int):
-        return self._get_open_cash_register(restaurant_id)
-
-
-    def get_dashboard(self, restaurant_id: int):
-        cash_register = self._get_open_cash_register(restaurant_id)
-        if not cash_register:
-            return None
+    # --------------------------------------------------------------------------------
+    # Devolver dashboard
+    # --------------------------------------------------------------------------------
+    def get_dashboard(self, restaurant_id: int) -> CashRegisterDashboard:
+        cash_register = self.get_open_cash_register(restaurant_id)
         logger.debug("get_dashboard cash_register_id=%s", cash_register.id)
         total_sales, transactions_count, orders_count, average_ticket = self._calculate_sales(
             cash_register.id
@@ -3688,19 +5001,18 @@ class CashRegisterService:
             total_sales,
             orders_count
         )
-        return {
-            "cash_register_id": cash_register.id,
-            "opened_at": cash_register.opened_at,
-            "opening_amount": cash_register.opening_amount,
-            "total_sales": total_sales,
-            "orders_count": orders_count,
-            "transactions_count": transactions_count,
-            "average_ticket": average_ticket,
-            "by_method": by_method,
-            "cash_movements": movements_list,
-            "expected_cash": expected_cash
-        }
-
+        return CashRegisterDashboard(
+            cash_register_id=cash_register.id,
+            opened_at=cash_register.opened_at,
+            opening_amount=cash_register.opening_amount,
+            total_sales=total_sales,
+            orders_count=orders_count,
+            transactions_count=transactions_count,
+            average_ticket=average_ticket,
+            by_method=by_method,
+            cash_movements=movements_list,
+            expected_cash=expected_cash
+        )
 ```
 
 ---
@@ -3744,41 +5056,73 @@ def get_cash_movement_service(
 
 ### .\backend\app\domain\category\category_service.py
 
-**Funciones (7):**
+**Funciones (8):**
 - __init__
 - _get_category
+- _category_name_exists
 - list_categories
 - create_category
 - update_category
-- delete_category
+- toggle_category
 - list_categories_with_products
 
 **Clases (1):**
 - CategoryService
 
-**Imports (5):**
+**Imports (10):**
+- logging
 - sqlalchemy.orm.Session
 - sqlalchemy.orm.joinedload
-- app.models.category.Category
 - app.domain.errors.base.DomainError
 - app.domain.errors.error_codes.ErrorCode
+- app.models.category.Category
+- app.schemas.category.CategoryCreate
+- app.schemas.category.CategoryUpdate
+- app.schemas.category.CategoryWithProducts
+- app.schemas.category.ProductRef
 
 ```python
+import logging
+
 from sqlalchemy.orm import Session, joinedload
-from app.models.category import Category
+
 from app.domain.errors.base import DomainError
 from app.domain.errors.error_codes import ErrorCode
 
+from app.models.category import Category
+
+from app.schemas.category import (
+    CategoryCreate,
+    CategoryUpdate,
+    CategoryWithProducts
+)
+from app.schemas.category import ProductRef
+
+logger = logging.getLogger("app.domain.category")
+
 class CategoryService:
 
-    def __init__(self, db: Session):
+    """
+    Servicio encargado de la lógica de negocio relacionada con las categorías.
+
+    Responsabilidades:
+    - Gestionar el CRUD de categorías.
+    - Validar las reglas de negocio.
+    - Acceder a la base de datos mediante SQLAlchemy.
+    - Lanzar DomainError cuando una operación no pueda completarse.
+    """
+
+    def __init__(self, db: Session) -> None:
         self.db = db
 
-    # -------------------------
-    # Devolver una categoría, lanzar error si no existe o no pertenece al restaurante
-    # -------------------------
-
-    def _get_category(self, restaurant_id: int, category_id: int):
+    # --------------------------------------------------------------------------------
+    # Obtener una categoría del restaurante o lanzar DomainError si no existe
+    # --------------------------------------------------------------------------------
+    def _get_category(
+        self,
+        restaurant_id: int,
+        category_id: int
+    ) -> Category:
         category = (
             self.db.query(Category)
             .filter(
@@ -3794,23 +5138,62 @@ class CategoryService:
             )
         return category
 
+    # --------------------------------------------------------------------------------
+    # Encontrar categoría por nombre
+    # --------------------------------------------------------------------------------
+    def _category_name_exists(
+        self,
+        restaurant_id: int,
+        name: str,
+        exclude_id: int | None = None
+    ) -> bool:
+        query = (
+            self.db.query(Category)
+            .filter(
+                Category.restaurant_id == restaurant_id,
+                Category.name == name
+            )
+        )
+        if exclude_id is not None:
+            query = query.filter(Category.id != exclude_id)
+        return query.first() is not None
+    
     # -------------------------
     # Listar categorías
     # -------------------------
-
-    def list_categories(self, restaurant_id: int):
-        return (
+    def list_categories(
+        self,
+        restaurant_id: int,
+        active: bool | None = True
+    ) -> list[Category]:
+        query = (
             self.db.query(Category)
             .filter(Category.restaurant_id == restaurant_id)
-            .order_by(Category.name)
-            .all()
         )
+        if active is not None:
+            query = query.filter(Category.active == active)
+        return query.order_by(Category.name).all()
 
     # -------------------------
     # Crear categoría
     # -------------------------
-
-    def create_category(self, restaurant_id: int, name: str):
+    def create_category(
+        self,
+        restaurant_id: int,
+        data: CategoryCreate
+    ) -> Category:
+        name = data.name.strip()
+        if not name:
+            raise DomainError(
+                "Category name cannot be empty",
+                ErrorCode.INVALID_CATEGORY_NAME
+            )
+        existing = self._category_name_exists(restaurant_id, name)
+        if existing:
+            raise DomainError(
+                "Category already exists",
+                ErrorCode.CATEGORY_ALREADY_EXISTS
+            )
         category = Category(
             name=name,
             restaurant_id=restaurant_id
@@ -3819,57 +5202,86 @@ class CategoryService:
         self.db.commit()
         self.db.refresh(category)
         return category
-
+        
     # -------------------------
     # Actualizar categoría
     # -------------------------
-
-    def update_category(self, restaurant_id: int, category_id: int, name: str):
+    def update_category(
+        self,
+        restaurant_id: int,
+        category_id: int,
+        data: CategoryUpdate
+    ) -> Category:
+        name = data.name.strip()
+        if not name:
+            raise DomainError(
+                "Category name cannot be empty",
+                ErrorCode.INVALID_CATEGORY_NAME
+            )
+        existing = self._category_name_exists(restaurant_id, name, exclude_id=category_id)
+        if existing:
+            raise DomainError(
+                "Category already exists",
+                ErrorCode.CATEGORY_ALREADY_EXISTS
+            )
         category = self._get_category(restaurant_id, category_id)
         category.name = name
         self.db.commit()
         self.db.refresh(category)
         return category
 
-    # -------------------------
-    # Eliminar categoría
-    # -------------------------
-
-    def delete_category(self, restaurant_id: int, category_id: int):
+    # --------------------------------------------
+    # Activar o desactivar categoría
+    # --------------------------------------------
+    def toggle_category(
+        self,
+        restaurant_id: int,
+        category_id: int
+    ) -> Category:
         category = self._get_category(restaurant_id, category_id)
-        self.db.delete(category)
+        category.active = not category.active
         self.db.commit()
-        return True
+        self.db.refresh(category)
+        logger.info(
+            "Categoría alternada r=%s category_id=%s active=%s",
+            restaurant_id,
+            category.id,
+            category.active
+        )
+        return category
 
-    # -------------------------
+    # --------------------------------------------
     # Listar categorías con productos activos
-    # -------------------------
-
-    def list_categories_with_products(self, restaurant_id: int):
+    # --------------------------------------------
+    def list_categories_with_products(
+        self,
+        restaurant_id: int
+    ) -> list[CategoryWithProducts]:
         categories = (
             self.db.query(Category)
             .options(joinedload(Category.products))
             .filter(Category.restaurant_id == restaurant_id)
+            .filter(Category.active.is_(True))
             .order_by(Category.name)
             .all()
         )
-        result = []
-        for category in categories:
-            active_products = [
-                {
-                    "id": p.id,
-                    "name": p.name,
-                    "price": p.price
-                }
-                for p in category.products
-                if p.active
-            ]
-            result.append({
-                "id": category.id,
-                "name": category.name,
-                "products": active_products
-            })
-        return result
+        return [
+            CategoryWithProducts(
+                id=c.id,
+                name=c.name,
+                active=c.active,
+                products=[
+                    ProductRef(
+                        id=p.id,
+                        name=p.name,
+                        price=p.price
+                    )
+                    for p in c.products
+                    if p.active
+                ]
+            )
+            for c in categories
+        ]
 ```
 
 ---
@@ -3911,17 +5323,25 @@ def get_category_service(
 **Clases (1):**
 - DomainError
 
-**Imports (0):**
+**Imports (1):**
+- typing.Any
 
 ```python
+from typing import Any
+
 class DomainError(Exception):
+
+    message: str
+    code: str
+    context: dict[str, Any]
 
     def __init__(
         self,
         message: str,
         code: str = "domain_error",
-        context: dict | None = None
-    ):
+        *,
+        context: dict[str, Any] | None = None,
+    ) -> None:
         self.message = message
         self.code = code
         self.context = context or {}
@@ -3961,7 +5381,7 @@ class ErrorCode(str, Enum):
     # ORDER ITEMS
     ITEM_NOT_FOUND = "item_not_found"
     ITEM_NOT_IN_ORDER = "item_not_in_order"
-    ITEM_ALREADY_SEND = "item_already_send"
+    ITEM_ALREADY_SENT = "item_already_sent"
     NOT_PENDING_ITEMS_TO_SEND = "not_pending_items_to_send"
     ITEM_STATUS_ROLE_FORBIDDEN = "item_status_role_forbidden"
     ITEM_INVALID_TRANSITION = "item_invalid_transition"
@@ -3986,28 +5406,115 @@ class ErrorCode(str, Enum):
 
     # PRODUCTS
     PRODUCT_NOT_FOUND = "product_not_found"
+    PRODUCT_ALREADY_EXISTS = "product_already_exists"
+    INVALID_PRODUCT_NAME = "invalid_product_name"
 
     # USERS
     USER_NOT_FOUND = "user_not_found"
     USERNAME_ALREADY_EXISTS = "username_already_exists"
+    USER_CANNOT_DEACTIVATE_SELF = "user_cannot_deactivate_self"
 
     # CATEGORIES
     CATEGORY_NOT_FOUND = "category_not_found"
+    CATEGORY_ALREADY_EXISTS = "category_already_exists"
+    INVALID_CATEGORY_NAME = "invalid_category_name"
 
     # STATIONS
     STATION_NOT_FOUND = "station_not_found"
     STATION_NAME_ALREADY_EXISTS = "station_name_already_exists"
+    INVALID_STATION_NAME = "invalid_station_name"
+
+    # LAYOUT
+    LAYOUT_BACKGROUND_INVALID_FORMAT = "layout_background_invalid_format"
+    LAYOUT_BACKGROUND_TOO_LARGE = "layout_background_too_large"
 
     # PERMISSIONS
     PERMISSION_DENIED = "permission_denied"
 
-    # EMAIL
+    # EMAIL Y BACKUP
+    INVALID_BACKUP_CONFIGURATION = "invalid_backup_configuration"
     EMAIL_NOT_CONFIGURED = "email_not_configured"
     SMTP_NOT_CONFIGURED = "smtp_not_configured"
     SMTP_HOST_NOT_CONFIGURED = "smtp_host_not_configured"
     BACKUP_EMAIL_NOT_CONFIGURED = "backup_email_not_configured"
     EMAIL_SEND_FAILURE = "email_send_failure"
+    BACKUP_NOT_FOUND = "backup_not_found"
+    BACKUP_INVALID_PATH = "backup_invalid_path"
+    BACKUP_DATABASE_NOT_FOUND = "backup_database_not_found"
+    BACKUP_ENGINE_NOT_SUPPORTED = "backup_engine_not_supported"
+    BACKUP_FAILED = "backup_failed"
 
+    # REPORTS
+    REPORT_INVALID_DATE_RANGE = "report_invalid_date_range"
+
+    #SETTINGS
+    BACKUP_DESTINATION_REQUIRED = "backup_destination_required"
+    BACKUP_WEEKDAY_REQUIRED = "backup_weekday_required"
+    BACKUP_MONTHDAY_REQUIRED = "backup_monthday_required"
+
+    # AUTH
+    INVALID_TOKEN = "invalid_token"
+    INVALID_TOKEN_PAYLOAD = "invalid_token_payload"
+    USER_INACTIVE = "user_inactive"
+    ROLE_MISMATCH = "role_mismatch"
+```
+
+---
+
+### .\backend\app\domain\events\websocket.py
+
+**Funciones (0):**
+
+**Clases (1):**
+- WSEvent
+
+**Imports (1):**
+- enum.StrEnum
+
+```python
+from enum import StrEnum
+
+class WSEvent(StrEnum):
+    # -------------------------------------------------------------------------
+    # Caja
+    # -------------------------------------------------------------------------
+    CASH_REGISTER_UPDATED = "CASH_REGISTER_UPDATED"
+    CASH_MOVEMENT_ADDED = "CASH_MOVEMENT_ADDED"
+    CASH_MOVEMENT_DELETED = "CASH_MOVEMENT_DELETED"
+
+    # -------------------------------------------------------------------------
+    # Órdenes
+    # -------------------------------------------------------------------------
+    ORDER_UPDATED = "ORDER_UPDATED"
+    ORDER_STATUS_CHANGED = "ORDER_STATUS_CHANGED"
+    ORDER_CLOSED = "ORDER_CLOSED"
+
+    # -------------------------------------------------------------------------
+    # Items
+    # -------------------------------------------------------------------------
+    ITEM_STATUS_CHANGED = "ITEM_STATUS_CHANGED"
+    NEW_ITEM = "NEW_ITEM"
+    ITEM_READY = "ITEM_READY"
+
+    # -------------------------------------------------------------------------
+    # Pagos
+    # -------------------------------------------------------------------------
+    PAYMENT_ADDED = "PAYMENT_ADDED"
+    PAYMENT_DELETED = "PAYMENT_DELETED"
+
+    # -------------------------------------------------------------------------
+    # Mesas
+    # -------------------------------------------------------------------------
+    TABLE_CREATED = "TABLE_CREATED"
+    TABLE_UPDATED = "TABLE_UPDATED"
+    TABLE_POSITION_UPDATED = "TABLE_POSITION_UPDATED"
+    TABLE_ACTIVATED = "TABLE_ACTIVATED"
+    TABLE_DEACTIVATED = "TABLE_DEACTIVATED"
+
+    # -------------------------------------------------------------------------
+    # Layout
+    # -------------------------------------------------------------------------
+    LAYOUT_UPDATED = "LAYOUT_UPDATED"
 ```
 
 ---
@@ -4043,15 +5550,14 @@ def get_kitchen_service(
 
 ### .\backend\app\domain\kitchen\kitchen_service.py
 
-**Funciones (3):**
+**Funciones (2):**
 - __init__
 - get_station_items
-- update_item_status
 
 **Clases (1):**
 - KitchenService
 
-**Imports (8):**
+**Imports (7):**
 - sqlalchemy.orm.Session
 - app.models.user.User
 - app.models.order_item.OrderItem
@@ -4059,7 +5565,6 @@ def get_kitchen_service(
 - app.models.product.Product
 - app.models.order.Order
 - app.schemas.order.kitchen.KitchenItemOut
-- app.domain.order_item.order_item_service.OrderItemService
 
 ```python
 from sqlalchemy.orm import Session
@@ -4071,19 +5576,21 @@ from app.models.order import Order
 
 from app.schemas.order.kitchen import KitchenItemOut
 
-from app.domain.order_item.order_item_service import OrderItemService
-
-
 class KitchenService:
+    """
+    Servicio encargado de la lógica de negocio relacionada con la cocina.
 
-    def __init__(self, db: Session):
+    Responsabilidades:
+    - Devolver items a pedido
+    - Acceder a la base de datos mediante SQLAlchemy.
+    """
+
+    def __init__(self, db: Session) -> None:
         self.db = db
-        self.item_service = OrderItemService(db)
 
-    # -------------------------
+    # -------------------------------------------------------------------------
     # Obtener los items de una estación, filtrando por estado y restaurante
-    # -------------------------
-
+    # -------------------------------------------------------------------------
     def get_station_items(
         self,
         station_id: int,
@@ -4092,7 +5599,6 @@ class KitchenService:
         items = (
             self.db.query(OrderItem)
             .join(OrderItem.product)
-            .join(Product.station)
             .join(OrderItem.order)
             .join(Order.table)
             .filter(
@@ -4103,40 +5609,20 @@ class KitchenService:
                     OrderItemStatus.IN_PROGRESS
                 ])
             )
+            .order_by(Order.created_at, OrderItem.id)
             .all()
         )
-
-        result = []
-
-        for item in items:
-            result.append(
-                KitchenItemOut(
-                    item_id=item.id,
-                    product_name=item.product.name,
-                    quantity=item.quantity,
-                    status=item.status,
-                    table_number=item.order.table.number,
-                    order_id=item.order.id
-                )
+        return [
+            KitchenItemOut(
+                item_id=item.id,
+                product_name=item.product.name,
+                quantity=item.quantity,
+                status=item.status,
+                table_number=item.order.table.number,
+                order_id=item.order.id
             )
-
-        return result
-
-    # -------------------------
-    # Actualizar el estado de un item, validando que el usuario tenga permisos para hacerlo
-    # -------------------------
-
-    def update_item_status(
-        self,
-        item_id: int,
-        status: OrderItemStatus,
-        user: User
-    ):
-        return OrderItemService.update_status(
-            item_id=item_id,
-            new_status=status,
-            user=user
-        )
+            for item in items
+        ]
 ```
 
 ---
@@ -4170,48 +5656,137 @@ def get_layout_service(db: Session = Depends(get_db)):
 
 ### .\backend\app\domain\layout\layout_service.py
 
-**Funciones (3):**
+**Funciones (6):**
 - __init__
+- _validate_background_image
+- _save_background_image
 - get_layout
 - update_layout
+- update_background_image
 
 **Clases (1):**
 - LayoutService
 
-**Imports (5):**
+**Imports (11):**
+- logging
+- pathlib.Path
+- uuid.uuid4
+- fastapi.UploadFile
 - sqlalchemy.orm.Session
+- app.domain.errors.base.DomainError
+- app.domain.errors.error_codes.ErrorCode
+- app.domain.events.websocket.WSEvent
+- app.services.event_service.EventService
 - app.models.restaurant_layout.RestaurantLayout
 - app.schemas.layout.LayoutUpdate
-- app.services.event_service.EventService
-- logging
 
 ```python
-from sqlalchemy.orm import Session
-from app.models.restaurant_layout import RestaurantLayout
-from app.schemas.layout import LayoutUpdate
-from app.services.event_service import EventService
 import logging
+
+from pathlib import Path
+from uuid import uuid4
+
+from fastapi import UploadFile
+from sqlalchemy.orm import Session
+
+from app.domain.errors.base import DomainError
+from app.domain.errors.error_codes import ErrorCode
+from app.domain.events.websocket import WSEvent
+
+from app.services.event_service import EventService
+
+from app.models.restaurant_layout import RestaurantLayout
+
+from app.schemas.layout import LayoutUpdate
 
 logger = logging.getLogger("app.domain.layout")
 
-
 class LayoutService:
 
-    def __init__(self, db: Session):
+    """
+    Servicio encargado de la lógica de negocio relacionada con el diseño del restaurante.
+
+    Responsabilidades:
+    - Gestionar la lógica de negocio del diseño del restaurante.
+    - Validar las reglas de negocio.
+    - Acceder a la base de datos mediante SQLAlchemy.
+    - Lanzar DomainError cuando una operación no pueda completarse.
+    """
+
+    def __init__(self, db: Session) -> None:
         self.db = db
         self.events = EventService(db)
 
+    # --------------------------------------------------------------------------------------
+    # Validar imagen de fondo
+    # --------------------------------------------------------------------------------------
+    async def _validate_background_image(
+        self,
+        file: UploadFile
+    ) -> tuple[bytes, str]:
+        allowed_types = {
+            "image/jpeg": ".jpg",
+            "image/png": ".png",
+            "image/webp": ".webp",
+            "image/gif": ".gif"
+        }
+        extension = allowed_types.get(file.content_type or "")
+        if not extension:
+            raise DomainError(
+                "Invalid image format. Allowed formats: JPEG, PNG, WEBP, GIF.",
+                ErrorCode.LAYOUT_BACKGROUND_INVALID_FORMAT
+            )
+        content = await file.read()
+        max_size = 8 * 1024 * 1024
+        if len(content) > max_size:
+            raise DomainError(
+                "The image cannot exceed 8 MB.",
+                ErrorCode.LAYOUT_BACKGROUND_TOO_LARGE
+            )
+        return content, extension
 
-    def get_layout(self, restaurant_id: int):
+    # --------------------------------------------------------------------------------------
+    # Guardar imagen de fondo
+    # --------------------------------------------------------------------------------------
+    def _save_background_image(
+        self,
+        restaurant_id: int,
+        content: bytes,
+        extension: str
+    ) -> str:
+        upload_root = (
+            Path(__file__).resolve().parents[3]
+            / "uploads"
+            / "layouts"
+        )
+        restaurant_dir = upload_root / str(restaurant_id)
+        restaurant_dir.mkdir(
+            parents=True,
+            exist_ok=True
+        )
+        filename = f"{uuid4().hex}{extension}"
+        destination = restaurant_dir / filename
+        try:
+            destination.write_bytes(content)
+        except OSError:
+            logger.exception(
+                "No se pudo guardar la imagen de fondo del layout. "
+                "restaurant_id=%s",
+                restaurant_id
+            )
+            raise
+        return f"/uploads/layouts/{restaurant_id}/{filename}"
 
+    # --------------------------------------------------------------------------------------
+    # Devuelve el diseño del restaurante, si no existe lo crea con valores por defecto
+    # --------------------------------------------------------------------------------------
+    def get_layout(self, restaurant_id: int) -> RestaurantLayout:
         layout = (
             self.db.query(RestaurantLayout)
             .filter(RestaurantLayout.restaurant_id == restaurant_id)
             .first()
         )
-
         if not layout:
-
             layout = RestaurantLayout(
                 restaurant_id=restaurant_id,
                 width=900,
@@ -4219,33 +5794,62 @@ class LayoutService:
                 grid_size=40,
                 snap_to_grid=True
             )
-
             self.db.add(layout)
             self.db.commit()
             self.db.refresh(layout)
-
         return layout
 
-
-    def update_layout(self, restaurant_id: int, data: LayoutUpdate):
+    # --------------------------------------------------------------------------------------
+    # Actualiza el diseño del restaurante
+    # --------------------------------------------------------------------------------------
+    def update_layout(self, restaurant_id: int, data: LayoutUpdate) -> RestaurantLayout:
         logger.info("Layout actualizado r=%s", restaurant_id)
         layout = self.get_layout(restaurant_id)
-
         layout.width = data.width
         layout.height = data.height
         layout.grid_size = data.grid_size
         layout.snap_to_grid = data.snap_to_grid
+        if data.background_image is not None:
+            layout.background_image = data.background_image
+        self.db.refresh(layout)
+        self.events.emit(
+                restaurant_id=restaurant_id,
+                event_type=WSEvent.LAYOUT_UPDATED,
+                payload={"restaurant_id": restaurant_id}
+            )
+        self.db.commit()
+        return layout
 
+    # --------------------------------------------------------------------------------------
+    # Actualiza la imagen de fondo del diseño del restaurante
+    # --------------------------------------------------------------------------------------
+    async def update_background_image(
+        self,
+        restaurant_id: int,
+        file: UploadFile
+    ) -> RestaurantLayout:
+        logger.info(
+            "Background del layout actualizado r=%s",
+            restaurant_id
+        )
+        content, extension = await self._validate_background_image(file)
+        background_image = self._save_background_image(
+            restaurant_id,
+            content,
+            extension
+        )
+        layout = self.get_layout(restaurant_id)
+        layout.background_image = background_image
         self.events.emit(
             restaurant_id=restaurant_id,
-            event_type="LAYOUT_UPDATED",
-            payload={"restaurant_id": restaurant_id}
+            event_type=WSEvent.LAYOUT_UPDATED,
+            payload={
+                "restaurant_id": restaurant_id
+            }
         )
         self.db.commit()
         self.db.refresh(layout)
-
         return layout
-
 ```
 
 ---
@@ -4303,22 +5907,23 @@ def get_order_service(
 
 ### .\backend\app\domain\order\order_service.py
 
-**Funciones (18):**
+**Funciones (19):**
 - __init__
+- _get_active_orders
+- _get_active_order
+- _calculate_totals
+- _calculate_order_status
+- _set_status
 - get_order
-- get_active_orders
-- get_active_order
-- serialize_order
-- serialize_orders
-- calculate_totals
+- to_order_response
+- to_order_response_list
 - apply_discount
 - add_item
-- add_product_to_table
+- add_product_to_order
 - update_status
-- recalculate_order_status
 - send_to_kitchen
 - add_payment
-- cancel_payment
+- delete_payment
 - close_order
 - delete_order_item
 - update_item_quantity
@@ -4326,13 +5931,20 @@ def get_order_service(
 **Clases (1):**
 - OrderService
 
-**Imports (21):**
+**Imports (27):**
+- logging
+- decimal.Decimal
+- decimal.ROUND_HALF_UP
 - sqlalchemy.orm.Session
 - sqlalchemy.orm.joinedload
 - sqlalchemy.func
-- decimal.Decimal
-- decimal.ROUND_HALF_UP
-- logging
+- app.domain.order.order_transitions.is_valid_order_transition
+- app.domain.order.constants.ACTIVE_ORDER_STATUSES
+- app.domain.errors.base.DomainError
+- app.domain.errors.error_codes.ErrorCode
+- app.domain.events.websocket.WSEvent
+- app.services.event_service.EventService
+- app.utils.money.money
 - app.models.order.Order
 - app.models.order.OrderStatus
 - app.models.order_item.OrderItem
@@ -4341,19 +5953,30 @@ def get_order_service(
 - app.models.user.UserRole
 - app.models.payment.Payment
 - app.models.table.Table
-- app.services.event_service.EventService
-- app.domain.order.order_transitions.is_valid_order_transition
-- app.domain.order.constants.ACTIVE_ORDER_STATUSES
-- app.domain.errors.base.DomainError
-- app.domain.errors.error_codes.ErrorCode
-- app.utils.money.money
+- app.schemas.order.order.OrderResponse
+- app.schemas.order.order_item.OrderItemCreate
+- app.schemas.order.order_item.OrderItemOut
+- app.schemas.order.payment.PaymentCreate
+- app.schemas.order.payment.PaymentOut
 - app.domain.cash_register.cash_register_service.CashRegisterService
 
 ```python
+import logging
+
+from decimal import Decimal, ROUND_HALF_UP
+
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
-from decimal import Decimal, ROUND_HALF_UP
-import logging
+
+from app.domain.order.order_transitions import is_valid_order_transition
+from app.domain.order.constants import ACTIVE_ORDER_STATUSES
+from app.domain.errors.base import DomainError
+from app.domain.errors.error_codes import ErrorCode
+from app.domain.events.websocket import WSEvent
+
+from app.services.event_service import EventService
+
+from app.utils.money import money
 
 from app.models.order import Order, OrderStatus
 from app.models.order_item import OrderItem, OrderItemStatus
@@ -4362,51 +5985,38 @@ from app.models.user import UserRole
 from app.models.payment import Payment
 from app.models.table import Table
 
-from app.services.event_service import EventService
-from app.domain.order.order_transitions import is_valid_order_transition
-from app.domain.order.constants import ACTIVE_ORDER_STATUSES
-from app.domain.errors.base import DomainError
-from app.domain.errors.error_codes import ErrorCode
-from app.utils.money import money
+from app.schemas.order.order import OrderResponse
+from app.schemas.order.order_item import (
+    OrderItemCreate,
+    OrderItemOut
+)
+from app.schemas.order.payment import (
+    PaymentCreate,
+    PaymentOut
+)
 
 logger = logging.getLogger("app.domain.order")
 
 class OrderService:
 
-    def __init__(self, db: Session):
+    """
+    Servicio encargado de la lógica de negocio relacionada con las ordenes.
+
+    Responsabilidades:
+    - Gestionar el ciclo de vida de las órdenes.
+    - Validar las reglas de negocio.
+    - Acceder a la base de datos mediante SQLAlchemy.
+    - Lanzar DomainError cuando una operación no pueda completarse.
+    """
+
+    def __init__(self, db: Session) -> None:
         self.db = db
         self.events = EventService(db)
 
     # -------------------------
-    # Getters
-    # -------------------------
-
-    # -------------------------
-    # Obtener orden por id
-    # -------------------------
-    def get_order(self, order_id: int, restaurant_id: int):
-        order = (
-            self.db.query(Order)
-            .options(
-                joinedload(Order.items).joinedload(OrderItem.product),
-                joinedload(Order.payments),
-                joinedload(Order.table)
-            )
-            .filter(Order.id == order_id, Order.restaurant_id == restaurant_id)
-            .first()
-        )
-        if not order:
-            raise DomainError(
-                "Orden no encontrada",
-                ErrorCode.ORDER_NOT_FOUND
-            )
-        subtotal, total, total_paid, remaining = self.calculate_totals(order)
-        return order
-
-    # -------------------------
     # Obtener ordenes activas
     # -------------------------
-    def get_active_orders(self, restaurant_id: int):
+    def _get_active_orders(self, restaurant_id: int) -> list[Order]:
         return (
             self.db.query(Order)
             .options(
@@ -4422,7 +6032,7 @@ class OrderService:
     # -------------------------
     # Obtener orden activa por mesa
     # -------------------------
-    def get_active_order(self, restaurant_id: int, table_id: int):
+    def _get_active_order(self, restaurant_id: int, table_id: int) -> Order:
         return (
             self.db.query(Order)
             .filter(
@@ -4434,85 +6044,9 @@ class OrderService:
         )
 
     # -------------------------
-    # Serialización
-    # -------------------------
-    def serialize_order(self, order: Order):
-        subtotal, total, total_paid, remaining = self.calculate_totals(order)
-        return {
-            "id": order.id,
-            "table_id": order.table_id,
-            "table_number": order.table.number,
-            "status": order.status.value,
-            "created_at": order.created_at,
-            "items": [
-                {
-                    "id": item.id,
-                    "product_name": item.product.name,
-                    "quantity": item.quantity,
-                    "unit_price": money(item.unit_price),
-                    "subtotal": money(item.quantity * item.unit_price),
-                    "status": item.status.value
-                }
-                for item in order.items
-            ],
-            "payments": [
-                {
-                    "id": p.id,
-                    "amount": money(p.amount),
-                    "method": p.method
-                }
-                for p in order.payments
-            ],
-            "total": money(total),
-            "subtotal": money(subtotal),
-            "discount": money(order.discount or 0),
-            "total_paid": money(total_paid),
-            "remaining": money(remaining)
-        }
-
-    # -------------------------
-    # Serializar ordenes activas
-    # -------------------------
-    def serialize_orders(self, restaurant_id: int):
-        orders = self.get_active_orders(restaurant_id)
-
-        result = []
-
-        for order in orders:
-            subtotal, total, total_paid, remaining = self.calculate_totals(order)
-
-            result.append({
-                "id": order.id,
-                "table_id": order.table_id,
-                "table_number": order.table.number,
-                "status": order.status,
-                "created_at": order.created_at,
-                "items": [
-                    {
-                        "id": item.id,
-                        "product_name": item.product.name,
-                        "quantity": item.quantity,
-                        "unit_price": item.unit_price,
-                        "subtotal": item.quantity * item.unit_price,
-                        "status": item.status
-                    }
-                    for item in order.items
-                ],
-                "total": total,
-                "subtotal": subtotal,
-                "discount": money(order.discount or 0),
-                "total_paid": total_paid,
-                "remaining": remaining
-            })
-        return result
-
-    # -------------------------
-    # Totales
-    # -------------------------
-    # -------------------------
     # Calcular totales de la orden
     # -------------------------
-    def calculate_totals(self, order: Order):
+    def _calculate_totals(self, order: Order) -> tuple[Decimal, Decimal, Decimal, Decimal]:
         subtotal = sum((item.quantity * item.unit_price for item in order.items), Decimal("0"))
         discount = order.discount or Decimal("0")
         total = max(subtotal - discount, Decimal("0"))
@@ -4521,12 +6055,128 @@ class OrderService:
         return subtotal, total, total_paid, remaining
 
     # -------------------------
-    # Descuentos
+    # Calcular estado de la orden basado en estados de los items
     # -------------------------
+    def _calculate_order_status(self, order: Order) -> OrderStatus:
+        active_items = [
+            i for i in order.items
+            if i.status != OrderItemStatus.CANCELLED
+        ]
+        if not active_items:
+            if order.status in (OrderStatus.DRAFT, OrderStatus.OPEN):
+                return OrderStatus.CANCELLED
+            return order.status
+        statuses = [i.status for i in active_items]
+        if any(s == OrderItemStatus.IN_PROGRESS for s in statuses):
+            return OrderStatus.IN_PROGRESS
+        if any(s == OrderItemStatus.SENT for s in statuses):
+            return OrderStatus.SENT
+        if any(s == OrderItemStatus.PENDING for s in statuses):
+            return OrderStatus.OPEN
+        if all(
+            s in (OrderItemStatus.READY, OrderItemStatus.DELIVERED)
+            for s in statuses
+        ):
+            return OrderStatus.READY
+        return order.status
+
+    # -------------------------
+    # Cambiar estado de la orden si es diferente al actual
+    # -------------------------
+    def _set_status(self, order: Order, new_status: OrderStatus) -> bool:
+        if order.status == new_status:
+            return False
+        if not is_valid_order_transition(order.status, new_status):
+            raise DomainError(
+                "Invalid order status transition",
+                ErrorCode.INVALID_TRANSITION,
+                context={
+                    "from": order.status.value,
+                    "to": new_status.value,
+                    "order_id": order.id
+                }
+            )
+        order.status = new_status
+        return True
+
+    # -------------------------
+    # Obtener orden por id
+    # -------------------------
+    def get_order(self, order_id: int, restaurant_id: int) -> Order:
+        order = (
+            self.db.query(Order)
+            .options(
+                joinedload(Order.items).joinedload(OrderItem.product),
+                joinedload(Order.payments),
+                joinedload(Order.table)
+            )
+            .filter(Order.id == order_id, Order.restaurant_id == restaurant_id)
+            .first()
+        )
+        if not order:
+            raise DomainError(
+                "Orden no encontrada",
+                ErrorCode.ORDER_NOT_FOUND
+            )
+        return order
+
+    # -------------------------------------------------------------------------------------------------
+    # Devolver orden con items, pagos, subtotal, descuento, totales y remanentes
+    # -------------------------------------------------------------------------------------------------
+    def to_order_response(
+        self,
+        order: Order
+    ) -> OrderResponse:
+        subtotal, total, total_paid, remaining = self._calculate_totals(order)
+        return OrderResponse(
+            id=order.id,
+            table_id=order.table_id,
+            table_number=order.table.number,
+            status=order.status,
+            created_at=order.created_at,
+            items=[
+                OrderItemOut(
+                    id=item.id,
+                    product_name=item.product.name,
+                    quantity=item.quantity,
+                    unit_price=money(item.unit_price),
+                    subtotal=money(item.quantity * item.unit_price),
+                    status=item.status
+                )
+                for item in order.items
+            ],
+            payments=[
+                PaymentOut(
+                    id=payment.id,
+                    amount=money(payment.amount),
+                    method=payment.method
+                )
+                for payment in order.payments
+            ],
+            subtotal=money(subtotal),
+            discount=money(order.discount or 0),
+            total=money(total),
+            total_paid=money(total_paid),
+            remaining=money(remaining)
+        )
+
+    # -------------------------------------------------------------------------------------------------
+    # Devolver lista de órdenes activas con items, pagos, subtotal, descuento, totales y remanentes
+    # -------------------------------------------------------------------------------------------------
+    def to_order_response_list(
+        self,
+        restaurant_id: int
+    ) -> list[OrderResponse]:
+        orders = self._get_active_orders(restaurant_id)
+        return [
+            self.to_order_response(order)
+            for order in orders
+        ]
+
     # -------------------------
     # Aplicar descuento a la orden
     # -------------------------
-    def apply_discount(self, order: Order, discount: Decimal):
+    def apply_discount(self, order: Order, discount: Decimal) -> OrderResponse:
         if order.status == OrderStatus.CLOSED:
             raise DomainError(
                 "Cannot apply discount to closed order",
@@ -4538,7 +6188,7 @@ class OrderService:
                 ErrorCode.INVALID_OPERATION
             )
         discount = discount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        subtotal, _, total_paid, _ = self.calculate_totals(order)
+        subtotal, _, total_paid, _ = self._calculate_totals(order)
         if discount > subtotal:
             raise DomainError(
                 "Discount cannot exceed order subtotal",
@@ -4564,34 +6214,33 @@ class OrderService:
         for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
             self.events.emit(
                 restaurant_id=order.restaurant_id,
-                event_type="ORDER_UPDATED",
+                event_type=WSEvent.ORDER_UPDATED,
                 payload={"order_id": order.id},
                 target="role",
                 target_id=role.value
             )
         self.db.commit()
         self.db.refresh(order)
-        return self.serialize_order(order)
+        return self.to_order_response(order)
 
     # -------------------------
     # Crear / agregar items
     # -------------------------
-    def add_item(self, order: Order, product_id: int, quantity: int) -> OrderItem:
+    def add_item(self, order: Order, data: OrderItemCreate) -> OrderResponse:
         if order.status == OrderStatus.CLOSED:
             raise DomainError(
                 "Cannot add items to closed order",
                 ErrorCode.ORDER_ALREADY_CLOSED
             )
-        if quantity <= 0:
+        if data.quantity <= 0:
             raise DomainError(
                 "Quantity must be greater than zero",
                 ErrorCode.INVALID_OPERATION
             )
-        # Buscar producto en la base
         product = (
             self.db.query(Product)
             .filter(
-                Product.id == product_id,
+                Product.id == data.product_id,
                 Product.restaurant_id == order.restaurant_id,
                 Product.active
             )
@@ -4601,7 +6250,7 @@ class OrderService:
             raise DomainError(
                 "Product not found",
                 ErrorCode.ITEM_NOT_FOUND,
-                context={"product_id": product_id}
+                context={"product_id": data.product_id}
             )
         
         previous_status = order.status
@@ -4616,262 +6265,232 @@ class OrderService:
             .first()
         )
         if existing_item:
-            existing_item.quantity += quantity
+            existing_item.quantity += data.quantity
             item = existing_item
         else:
             item = OrderItem(
                 restaurant_id=order.restaurant_id,
                 order_id=order.id,
                 product_id=product.id,
-                quantity=quantity,
+                quantity=data.quantity,
                 unit_price=product.price,
                 status=OrderItemStatus.PENDING
             )
-            self.db.add(item)
-        
-        self.db.flush()  # Asegura que item.id esté disponible  
-        self.recalculate_order_status(order)      
-        
+            self.db.add(item)        
+        self.db.flush()
+        new_status = self._calculate_order_status(order)
+        self._set_status(order, new_status)
         # =========================
         # 🔔 EVENTOS
         # =========================
         self.events.emit(
             restaurant_id=order.restaurant_id,
-            event_type="NEW_ITEM",
+            event_type=WSEvent.NEW_ITEM,
             payload={"order_id": order.id},
             target="station",
             target_id=str(product.station_id)
         )
-
         if order.status != previous_status:
             for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
                 self.events.emit(
                     restaurant_id=order.restaurant_id,
-                    event_type="ORDER_STATUS_CHANGED",
+                    event_type=WSEvent.ORDER_STATUS_CHANGED,
                     payload={"order_id": order.id, "status": order.status.value},
                     target="role",
                     target_id=role.value
                 )
-
         for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
             logger.debug("ORDER_UPDATED emit order_id=%s", order.id)
             self.events.emit(
                 restaurant_id=order.restaurant_id,
-                event_type="ORDER_UPDATED",
+                event_type=WSEvent.ORDER_UPDATED,
                 payload={"order_id": order.id},
                 target="role",
                 target_id=role.value
             )
-
         self.db.commit()
-        self.db.refresh(item)
         self.db.refresh(order)
-        return item
+        return self.to_order_response(order)
 
     # -------------------------
     # Agregar producto a la mesa (crear orden si no existe)
     # -------------------------
-    def add_product_to_table(self, restaurant_id: int, table_id: int, product_id: int, quantity: int):
+    def add_product_to_order(self, restaurant_id: int, table_id: int, data: OrderItemCreate):
         table = self.db.query(Table).filter(Table.id == table_id, Table.restaurant_id == restaurant_id).first()
         if not table:
             raise DomainError(
                 "Table not found",
                 ErrorCode.TABLE_NOT_FOUND
             )
-
-        order = self.get_active_order(restaurant_id, table_id)
+        order = self._get_active_order(restaurant_id, table_id)
         if not order:
             order = Order(table_id=table_id, restaurant_id=restaurant_id, status=OrderStatus.OPEN)
             self.db.add(order)
             self.db.flush()
-
-        product = self.db.query(Product).filter(Product.id == product_id, Product.restaurant_id == restaurant_id, Product.active).first()
-        if not product:
-            raise DomainError(
-                "Product not found",
-                ErrorCode.ITEM_NOT_FOUND,
-                context={"product_id": product_id}
-            )
-
-        item = self.add_item(order, product.id, quantity)
+        item = self.add_item(order, data)
         return {"order_id": order.id, "item_id": item.id}
 
-
-    # -------------------------
-    # Estados
-    # -------------------------
     # -------------------------
     # Actualizar estado de la orden
     # -------------------------
-    def update_status(self, order: Order, new_status: OrderStatus):
+    def update_status(self, order: Order, new_status: OrderStatus) -> OrderResponse:
         if order.status == new_status:
-            return order
-
-        if not is_valid_order_transition(order.status, new_status):
-            raise DomainError(
-                "Invalid order status transition",
-                ErrorCode.INVALID_TRANSITION,
-                context={
-                    "from": order.status.value,
-                    "to": new_status.value,
-                    "order_id": order.id
-                }
-            )
-
+            return self.to_order_response(order)
         previous_status = order.status
-        order.status = new_status
-
-        logger.info(
-            "Estado de orden actualizado order_id=%s from=%s to=%s",
-            order.id, previous_status.value, new_status.value
-        )
-
-        for role in [UserRole.ADMIN, UserRole.WAITER]:
-            self.events.emit(
-                restaurant_id=order.restaurant_id,
-                event_type="ORDER_STATUS_CHANGED",
-                payload={"order_id": order.id, "status": new_status.value},
-                target="role",
-                target_id=role.value
+        if self._set_status(order, new_status):
+            logger.info(
+                "Estado de orden actualizado order_id=%s from=%s to=%s",
+                order.id, previous_status.value, new_status.value
             )
-
-        self.db.commit()
-        self.db.refresh(order)
-        return order
-
-    # -------------------------
-    # Recalcular estado de la orden basado en estados de los items
-    # -------------------------
-    def recalculate_order_status(self, order: Order):
-        active_items = [
-            i for i in order.items
-            if i.status != OrderItemStatus.CANCELLED
-        ]
-
-        if not active_items:
-            # Si todos los ítems fueron cancelados y la orden
-            # todavía no fue enviada a cocina, se cancela automáticamente.
-            # En estados posteriores (SENT, IN_PROGRESS, etc.) esto
-            # no puede ocurrir porque siempre hay ítems activos.
-            if order.status in [OrderStatus.DRAFT, OrderStatus.OPEN]:
-                self.update_status(order, OrderStatus.CANCELLED)
-            return
-
-        statuses = [i.status for i in active_items]
-
-        if any(s == OrderItemStatus.IN_PROGRESS for s in statuses):
-            self.update_status(order, OrderStatus.IN_PROGRESS)
-        elif any(s == OrderItemStatus.SENT for s in statuses):
-            self.update_status(order, OrderStatus.SENT)
-        elif any(s == OrderItemStatus.PENDING for s in statuses):
-            self.update_status(order, OrderStatus.OPEN)
-        elif all(s in [OrderItemStatus.READY, OrderItemStatus.DELIVERED] for s in statuses):
-            self.update_status(order, OrderStatus.READY)
+            for role in [UserRole.ADMIN, UserRole.WAITER]:
+                self.events.emit(
+                    restaurant_id=order.restaurant_id,
+                    event_type=WSEvent.ORDER_STATUS_CHANGED,
+                    payload={"order_id": order.id, "status": new_status.value},
+                    target="role",
+                    target_id=role.value
+                )
+            self.db.commit()
+            self.db.refresh(order)
+        return self.to_order_response(order)
 
     # -------------------------
     # Enviar a cocina
     # -------------------------
-    def send_to_kitchen(self, order: Order):
+    def send_to_kitchen(
+        self,
+        order: Order
+    ) -> OrderResponse:
+
         if order.status == OrderStatus.CLOSED:
             raise DomainError(
                 "Order is closed",
                 ErrorCode.ORDER_ALREADY_CLOSED
             )
-        pending_items = [i for i in order.items if i.status == OrderItemStatus.PENDING]
+
+        pending_items = [
+            item
+            for item in order.items
+            if item.status == OrderItemStatus.PENDING
+        ]
+
         if not pending_items:
             raise DomainError(
                 "No pending items to send",
                 ErrorCode.NO_PENDING_ITEMS_TO_SEND
             )
+
         previous_status = order.status
+
+        # --------------------------------------------------
+        # Actualizar ítems pendientes
+        # --------------------------------------------------
         for item in pending_items:
             item.status = OrderItemStatus.SENT
-        logger.info("Orden enviada a cocina order_id=%s r=%s", order.id, order.restaurant_id)
-        self.recalculate_order_status(order)
-        # Agrupar por estación y emitir
-        station_ids = {i.product.station_id for i in pending_items}
+
+        new_status = self._calculate_order_status(order)
+        self._set_status(order, new_status)
+
+        logger.info(
+            "Orden enviada a cocina order_id=%s r=%s",
+            order.id,
+            order.restaurant_id
+        )
+
+        # --------------------------------------------------
+        # Notificar a las estaciones involucradas
+        # --------------------------------------------------
+        station_ids = {
+            item.product.station_id
+            for item in pending_items
+        }
+
         for station_id in station_ids:
             self.events.emit(
                 restaurant_id=order.restaurant_id,
-                event_type="ORDER_UPDATED",
-                payload={"order_id": order.id},
+                event_type=WSEvent.ORDER_UPDATED,
+                payload={
+                    "order_id": order.id
+                },
                 target="station",
                 target_id=str(station_id)
             )
+
+        # --------------------------------------------------
+        # Notificar cambio de estado de la orden
+        # --------------------------------------------------
         if order.status != previous_status:
-            for role in [UserRole.ADMIN, UserRole.WAITER]:
+            for role in [
+                UserRole.ADMIN,
+                UserRole.WAITER
+            ]:
                 self.events.emit(
                     restaurant_id=order.restaurant_id,
-                    event_type="ORDER_STATUS_CHANGED",
-                    payload={"order_id": order.id, "status": order.status.value},
+                    event_type=WSEvent.ORDER_STATUS_CHANGED,
+                    payload={
+                        "order_id": order.id,
+                        "status": order.status.value
+                    },
                     target="role",
                     target_id=role.value
                 )
+
+        # --------------------------------------------------
+        # Un único commit:
+        #
+        # - cambios de la orden
+        # - cambios de los ítems
+        # - eventos EventOutbox
+        #
+        # quedan en la misma transacción.
+        # --------------------------------------------------
         self.db.commit()
-        # 🔹 Convertir a JSON serializable
-        result = [
-            {
-                "id": item.id,
-                "product_id": item.product_id,
-                "product_name": item.product.name,
-                "quantity": item.quantity,
-                "unit_price": money(item.unit_price),
-                "status": item.status.value,
-                "subtotal": money(item.quantity * item.unit_price)
-            }
-            for item in pending_items
-        ]
-        return result
+        self.db.refresh(order)
+
+        return self.to_order_response(order)
 
     # -------------------------
-    # Pagos
+    # Agregar pago
     # -------------------------
-
-    def add_payment(self, order: Order, amount: Decimal, method: str):
+    def add_payment(self, order: Order, data: PaymentCreate) -> Payment:
         from app.domain.cash_register.cash_register_service import CashRegisterService
-
         if order.status == OrderStatus.CLOSED:
             raise DomainError(
                 "Order already closed",
                 ErrorCode.ORDER_ALREADY_CLOSED
             )
-
         cash_service = CashRegisterService(self.db)
-        cash_register = cash_service.require_open_cash_register(order.restaurant_id)
-
-        subtotal, total, total_paid, remaining = self.calculate_totals(order)
-        if amount > remaining:
+        cash_register = cash_service.get_open_cash_register(order.restaurant_id)
+        subtotal, total, total_paid, remaining = self._calculate_totals(order)
+        if data.amount > remaining:
             raise DomainError(
                 "Payment exceeds remaining balance",
                 ErrorCode.PAYMENT_EXCEEDS_REMAINING,
                 context={
-                    "amount": money(amount),
+                    "amount": money(data.amount),
                     "remaining": money(remaining)
                 }
             )
-        logger.info("Pago agregado order_id=%s amount=%s method=%s", order.id, amount, method)
+        logger.info("Pago agregado order_id=%s amount=%s method=%s", order.id, data.amount, data.method)
         payment = Payment(
             order_id=order.id,
             restaurant_id=order.restaurant_id,
-            amount=amount,
-            method=method,
+            amount=data.amount,
+            method=data.method,
             cash_register_id=cash_register.id
         )
         self.db.add(payment)
-
-        # Emitir eventos
         for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
             self.events.emit(
                 restaurant_id=order.restaurant_id,
-                event_type="PAYMENT_ADDED",
-                payload={"order_id": order.id, "amount": money(amount), "method": method},
+                event_type=WSEvent.PAYMENT_ADDED,
+                payload={"order_id": order.id, "amount": money(data.amount), "method": data.method},
                 target="role",
                 target_id=role.value
             )
-
         self.events.emit(
             restaurant_id=order.restaurant_id,
-            event_type="CASH_REGISTER_UPDATED",
+            event_type=WSEvent.CASH_REGISTER_UPDATED,
             payload={"order_id": order.id},
             target="role",
             target_id=UserRole.CASHIER.value
@@ -4881,9 +6500,9 @@ class OrderService:
         return payment
 
     # -------------------------
-    # Cancelar pago
+    # Borrar pago
     # -------------------------
-    def cancel_payment(self, restaurant_id: int, payment_id: int):
+    def delete_payment(self, restaurant_id: int, payment_id: int):
         payment = (
             self.db.query(Payment)
             .filter(
@@ -4901,20 +6520,17 @@ class OrderService:
 
         if payment.order.status == OrderStatus.CLOSED:
             raise DomainError(
-                "Cannot cancel payment from closed order",
+                "Cannot delete payment from closed order",
                 ErrorCode.INVALID_OPERATION
             )
-        logger.info("Pago cancelado order_id=%s amount=%s method=%s", payment.order_id, payment.amount, payment.method)
+        logger.info("Pago eliminado order_id=%s amount=%s method=%s", payment.order_id, payment.amount, payment.method)
         order_id = payment.order_id
         amount = payment.amount
         method = payment.method
-
-        self.db.delete(payment)
-
         for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
             self.events.emit(
                 restaurant_id=restaurant_id,
-                event_type="PAYMENT_DELETED",
+                event_type=WSEvent.PAYMENT_DELETED,
                 payload={
                     "order_id": order_id,
                     "amount": money(amount),
@@ -4923,48 +6539,42 @@ class OrderService:
                 target="role",
                 target_id=role.value
             )
-
         self.events.emit(
             restaurant_id=restaurant_id,
-            event_type="CASH_REGISTER_UPDATED",
+            event_type=WSEvent.CASH_REGISTER_UPDATED,
             payload={"order_id": order_id},
             target="role",
             target_id=UserRole.CASHIER.value
         )
+        self.db.delete(payment)
         self.db.commit()
         return {"deleted": payment_id}
 
     # -------------------------
     # Cerrar orden
     # -------------------------
-    def close_order(self, order: Order):
-
+    def close_order(self, order: Order) -> OrderResponse:
         if order.status == OrderStatus.CLOSED:
             raise DomainError(
                 "La orden ya está cerrada",
                 ErrorCode.ORDER_ALREADY_CLOSED
             )
-
-        subtotal, total, total_paid, remaining = self.calculate_totals(order)
-
+        subtotal, total, total_paid, remaining = self._calculate_totals(order)
         if remaining > 0:
             raise DomainError(
                 f"La orden no está paga. Saldo: {remaining:.2f}",
                 ErrorCode.ORDER_HAS_REMAINING_BALANCE,
                 context={"remaining": money(remaining)}
             )
-
         if not order.items:
             raise DomainError(
                 "La orden no tiene items",
                 ErrorCode.ORDER_EMPTY
             )
-
         not_delivered = [
             i for i in order.items
             if i.status not in [OrderItemStatus.DELIVERED, OrderItemStatus.CANCELLED]
         ]
-
         if not_delivered:
             raise DomainError(
                 "No se puede cerrar la orden. Hay items no entregados",
@@ -4972,28 +6582,27 @@ class OrderService:
                 context={"items": [i.id for i in not_delivered]}
             )
         logger.info("Orden cerrada order_id=%s r=%s total=%s", order.id, order.restaurant_id, total)
-        self.update_status(order, OrderStatus.CLOSED)
+        self._set_status(order, OrderStatus.CLOSED)
         order.closed_at = func.now()
-
         # Emitir evento
         for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
             self.events.emit(
                 restaurant_id=order.restaurant_id,
-                event_type="ORDER_CLOSED",
+                event_type=WSEvent.ORDER_CLOSED,
                 payload={"order_id": order.id},
                 target="role",
                 target_id=role.value
             )
-
         self.events.emit(
             restaurant_id=order.restaurant_id,
-            event_type="CASH_REGISTER_UPDATED",
+            event_type=WSEvent.CASH_REGISTER_UPDATED,
             payload={"order_id": order.id},
             target="role",
             target_id=UserRole.CASHIER.value
         )
         self.db.commit()
-        return order
+        self.db.refresh(order)
+        return self.to_order_response(order)
 
     # -------------------------
     # Eliminar item de la orden
@@ -5003,7 +6612,7 @@ class OrderService:
         restaurant_id: int,
         order_id: int,
         item_id: int,
-    ):
+    ) -> None:
         item = (
             self.db.query(OrderItem)
             .filter(
@@ -5033,29 +6642,25 @@ class OrderService:
                 ErrorCode.ITEM_ALREADY_SENT,
                 context={"item": item.id}
             )
-        order = (
-            self.db.query(Order)
-            .filter(
-                Order.id == order_id,
-                Order.restaurant_id == restaurant_id
-            )
-            .first()
-        )
+
+        order = item.order
 
         self.db.delete(item)
-        self.recalculate_order_status(order)
+        new_status = self._calculate_order_status(order)
+        self._set_status(order, new_status)
+        logger.info("Item eliminado order_id=%s item_id=%s", order_id, item_id)
         # 🔔 EVENTO
         for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
             self.events.emit(
                 restaurant_id=restaurant_id,
-                event_type="ORDER_UPDATED",
+                event_type=WSEvent.ORDER_UPDATED,
                 payload={"order_id": order_id},
                 target="role",
                 target_id=role.value
             )
         self.db.commit()
-        return {"message": "Item eliminado"}
-
+        self.db.refresh(order)
+        
     # -------------------------
     # Actualizar cantidad por item de la orden
     # -------------------------
@@ -5064,7 +6669,7 @@ class OrderService:
         restaurant_id: int,
         item_id: int,
         quantity: int
-    ):
+    ) -> OrderResponse:
         item = (
             self.db.query(OrderItem)
             .join(Order)
@@ -5079,11 +6684,11 @@ class OrderService:
                 "order item not found",
                 ErrorCode.ITEM_NOT_FOUND
             )
-
+        order = item.order
         if item.status != OrderItemStatus.PENDING:
             raise DomainError(
                 "cannot modify item already sent to kitchen",
-                ErrorCode.ITEM_ALREADY_SEND
+                ErrorCode.ITEM_ALREADY_SENT
             )
         if quantity <= 0:
             return self.delete_order_item(
@@ -5092,12 +6697,11 @@ class OrderService:
                 item.id
             )
         item.quantity = quantity
+        new_status = self._calculate_order_status(order)
+        self._set_status(order, new_status)
         self.db.commit()
-        return {
-            "id": item.id,
-            "quantity": item.quantity
-        }
-
+        self.db.refresh(order)
+        return self.to_order_response(order)
 ```
 
 ---
@@ -5190,55 +6794,62 @@ def get_order_item_service(
 
 **Funciones (4):**
 - __init__
-- get_item
+- _get_item
+- _process_status_transition
 - update_status
-- change_item_status
 
 **Clases (1):**
 - OrderItemService
 
 **Imports (12):**
-- fastapi.HTTPException
 - sqlalchemy.orm.Session
+- app.domain.order.order_service.OrderService
+- app.domain.order_item.order_item_transitions.can_transition
+- app.domain.errors.base.DomainError
+- app.domain.errors.error_codes.ErrorCode
+- app.domain.events.websocket.WSEvent
+- app.services.event_service.EventService
 - app.models.order_item.OrderItem
 - app.models.order_item.OrderItemStatus
 - app.models.user.User
 - app.models.user.UserRole
 - app.models.order.OrderStatus
-- app.domain.order.order_service.OrderService
-- app.domain.order_item.order_item_transitions.can_transition
-- app.domain.errors.base.DomainError
-- app.domain.errors.error_codes.ErrorCode
-- app.services.event_service.EventService
 
 ```python
-from fastapi import HTTPException
 from sqlalchemy.orm import Session
-
-from app.models.order_item import OrderItem, OrderItemStatus
-from app.models.user import User, UserRole
-from app.models.order import OrderStatus
 
 from app.domain.order.order_service import OrderService
 from app.domain.order_item.order_item_transitions import can_transition
 from app.domain.errors.base import DomainError
 from app.domain.errors.error_codes import ErrorCode
+from app.domain.events.websocket import WSEvent
 
 from app.services.event_service import EventService
 
-
+from app.models.order_item import OrderItem, OrderItemStatus
+from app.models.user import User, UserRole
+from app.models.order import OrderStatus
 
 class OrderItemService:
 
-    def __init__(self, db: Session):
+    """
+    Servicio encargado de la lógica de negocio relacionada con los items de las ordenes.
+
+    Responsabilidades:
+    - Gestionar el ciclo de vida de las items.
+    - Validar las reglas de negocio.
+    - Acceder a la base de datos mediante SQLAlchemy.
+    - Lanzar DomainError cuando una operación no pueda completarse.
+    """
+
+    def __init__(self, db: Session) -> None:
         self.db = db
         self.events = EventService(db)
 
     # -------------------------
     # Obtener item
     # -------------------------
-    
-    def get_item(self, item_id: int, restaurant_id: int):
+    def _get_item(self, item_id: int, restaurant_id: int) -> OrderItem:
         item = (
             self.db.query(OrderItem)
             .filter(
@@ -5251,106 +6862,19 @@ class OrderItemService:
             raise DomainError(
                 "Item no encontrado",
                 ErrorCode.ITEM_NOT_FOUND,
-                context={"Item:": item_id })
+                context={"item_id": item_id})
         return item
 
-    # -------------------------
-    # Actualizar estado
-    # -------------------------
-
-    def update_status(
-        self,
-        item_id: int,
-        new_status: OrderItemStatus,
-        user: User
-    ):
-        item = self.get_item(item_id, user.restaurant_id)
-
-        order = item.order
-        order_service = OrderService(self.db)
-
-        previous_status = self.change_item_status(
-            item,
-            new_status,
-            user,
-            order_service
-        )
-
-        # =========================
-        # EVENTOS
-        # =========================
-
-        payload = {
-            "order_id": order.id,
-            "item_id": item.id,
-            "status": new_status.value,
-            "product": item.product.name,
-            "quantity": item.quantity,
-            "table": order.table.number
-        }
-
-        # cocina
-        self.events.emit(
-            restaurant_id=order.restaurant_id,
-            event_type="ITEM_STATUS_CHANGED",
-            payload=payload,
-            target="station",
-            target_id=str(item.product.station_id)
-        )
-
-        # salón / administración
-        for role in [UserRole.ADMIN, UserRole.WAITER]:
-            self.events.emit(
-                restaurant_id=order.restaurant_id,
-                event_type="ITEM_STATUS_CHANGED",
-                payload=payload,
-                target="role",
-                target_id=role.value
-            )
-
-        # evento READY
-        if new_status == OrderItemStatus.READY:
-            self.events.emit(
-                restaurant_id=order.restaurant_id,
-                event_type="ITEM_READY",
-                payload={
-                    "order_id": order.id,
-                    "table": order.table.number,
-                    "product": item.product.name,
-                    "quantity": item.quantity
-                },
-                target="role",
-                target_id=UserRole.WAITER.value
-            )
-
-        # cambio estado orden
-        if order.status != previous_status:
-            for role in [UserRole.ADMIN, UserRole.WAITER]:
-                self.events.emit(
-                    restaurant_id=order.restaurant_id,
-                    event_type="ORDER_STATUS_CHANGED",
-                    payload={
-                        "order_id": order.id,
-                        "status": order.status.value
-                    },
-                    target="role",
-                    target_id=role.value
-                )
-        self.db.commit()
-        self.db.refresh(item)
-        return item
-    
-    # -------------------------
-    # Cambiar estado
-    # -------------------------
-
-    def change_item_status(
+    # -----------------------------------------------------------------------------
+    # Procesar transición de estado del item y recalcular estado de la orden
+    # -----------------------------------------------------------------------------
+    def _process_status_transition(
         self,
         item: OrderItem,
         new_status: OrderItemStatus,
         user: User,
         order_service: OrderService
-    ):
+    ) -> OrderStatus:
         order = item.order
         if order.status == OrderStatus.CLOSED:
             raise DomainError(
@@ -5358,29 +6882,24 @@ class OrderItemService:
                 ErrorCode.ORDER_ALREADY_CLOSED,
                 context={"order_id": order.id}
             )
-
-        # reglas por rol
         if new_status == OrderItemStatus.IN_PROGRESS and user.role != UserRole.KITCHEN:
             raise DomainError(
                 "Sólo COCINA puede comenzar items",
                 ErrorCode.ITEM_STATUS_ROLE_FORBIDDEN,
                 context={"required_role": "KITCHEN"}
             )
-
         if new_status == OrderItemStatus.READY and user.role != UserRole.KITCHEN:
             raise DomainError(
                 "Sólo COCINA puede marcar items como listos",
                 ErrorCode.ITEM_STATUS_ROLE_FORBIDDEN,
                 context={"required_role": "KITCHEN"}
             )
-
         if new_status == OrderItemStatus.DELIVERED and user.role != UserRole.WAITER:
             raise DomainError(
                 "Sólo MOZO puede entregar items",
                 ErrorCode.ITEM_STATUS_ROLE_FORBIDDEN,
                 context={"required_role": "WAITER"}
             )
-
         if not can_transition(item.status, new_status):
             raise DomainError(
                 f"Transición inválida desde {item.status.value} a {new_status.value}",
@@ -5392,9 +6911,126 @@ class OrderItemService:
             )
         item.status = new_status
         previous_status = order.status
-        order_service.recalculate_order_status(order)
+        new_order_status = order_service._calculate_order_status(order)
+        order_service._set_status(order, new_order_status)
         return previous_status
 
+    # -------------------------
+    # Actualizar estado
+    # -------------------------
+    def update_status(
+        self,
+        item_id: int,
+        new_status: OrderItemStatus,
+        user: User
+    ) -> OrderItem:
+
+        item = self._get_item(
+            item_id,
+            user.restaurant_id
+        )
+
+        order = item.order
+
+        order_service = OrderService(
+            self.db
+        )
+
+        previous_status = (
+            self._process_status_transition(
+                item,
+                new_status,
+                user,
+                order_service
+            )
+        )
+
+        # ==================================================
+        # EVENTOS
+        # ==================================================
+
+        payload = {
+            "order_id": order.id,
+            "item_id": item.id,
+            "status": new_status.value,
+            "product": item.product.name,
+            "quantity": item.quantity,
+            "table": order.table.number
+        }
+
+        # --------------------------------------------------
+        # Cocina
+        # --------------------------------------------------
+        self.events.emit(
+            restaurant_id=order.restaurant_id,
+            event_type=WSEvent.ITEM_STATUS_CHANGED,
+            payload=payload,
+            target="station",
+            target_id=str(
+                item.product.station_id
+            )
+        )
+
+        # --------------------------------------------------
+        # Salón / administración
+        # --------------------------------------------------
+        for role in [
+            UserRole.ADMIN,
+            UserRole.WAITER
+        ]:
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type=WSEvent.ITEM_STATUS_CHANGED,
+                payload=payload,
+                target="role",
+                target_id=role.value
+            )
+
+        # --------------------------------------------------
+        # Ítem listo
+        # --------------------------------------------------
+        if new_status == OrderItemStatus.READY:
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type=WSEvent.ITEM_READY,
+                payload={
+                    "order_id": order.id,
+                    "table": order.table.number,
+                    "product": item.product.name,
+                    "quantity": item.quantity
+                },
+                target="role",
+                target_id=UserRole.WAITER.value
+            )
+
+        # --------------------------------------------------
+        # Cambio de estado general de la orden
+        # --------------------------------------------------
+        if order.status != previous_status:
+            for role in [
+                UserRole.ADMIN,
+                UserRole.WAITER
+            ]:
+                self.events.emit(
+                    restaurant_id=order.restaurant_id,
+                    event_type=WSEvent.ORDER_STATUS_CHANGED,
+                    payload={
+                        "order_id": order.id,
+                        "status": order.status.value
+                    },
+                    target="role",
+                    target_id=role.value
+                )
+
+        # --------------------------------------------------
+        # Commit atómico:
+        #
+        # cambio del dominio + eventos Outbox.
+        # --------------------------------------------------
+        self.db.commit()
+        self.db.refresh(item)
+
+        return item
 ```
 
 ---
@@ -5476,9 +7112,12 @@ def get_product_service(
 
 ### .\backend\app\domain\product\product_service.py
 
-**Funciones (6):**
+**Funciones (9):**
 - __init__
-- get_product
+- _get_product
+- _product_name_exists
+- _get_active_category
+- _get_active_station
 - create_product
 - list_products
 - update_product
@@ -5487,10 +7126,12 @@ def get_product_service(
 **Clases (1):**
 - ProductService
 
-**Imports (7):**
+**Imports (9):**
 - sqlalchemy.orm.Session
 - sqlalchemy.orm.joinedload
 - app.models.product.Product
+- app.models.category.Category
+- app.models.production_station.ProductionStation
 - app.schemas.product.ProductCreate
 - app.schemas.product.ProductUpdate
 - app.domain.errors.base.DomainError
@@ -5500,7 +7141,12 @@ def get_product_service(
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.product import Product
-from app.schemas.product import ProductCreate, ProductUpdate
+from app.models.category import Category
+from app.models.production_station import ProductionStation
+from app.schemas.product import (
+    ProductCreate, 
+    ProductUpdate
+)
 
 from app.domain.errors.base import DomainError
 from app.domain.errors.error_codes import ErrorCode
@@ -5508,14 +7154,23 @@ from app.domain.errors.error_codes import ErrorCode
 
 class ProductService:
 
-    def __init__(self, db: Session):
+    """
+    Servicio encargado de la lógica de negocio relacionada con los productos.
+
+    Responsabilidades:
+    - Gestionar el CRUD de productos.
+    - Validar las reglas de negocio.
+    - Acceder a la base de datos mediante SQLAlchemy.
+    - Lanzar DomainError cuando una operación no pueda completarse.
+    """
+
+    def __init__(self, db: Session) -> None:
         self.db = db
 
     # -------------------------
     # Obtener producto
     # -------------------------
-
-    def get_product(self, product_id: int, restaurant_id: int):
+    def _get_product(self, product_id: int, restaurant_id: int) -> Product:
         product = self.db.query(Product).filter(
             Product.id == product_id,
             Product.restaurant_id == restaurant_id
@@ -5527,57 +7182,229 @@ class ProductService:
                 context={"product_id": product_id})
         return product
 
+    # --------------------------------------------------------------------------------
+    # Encontrar producto por nombre
+    # --------------------------------------------------------------------------------
+    def _product_name_exists(
+        self,
+        restaurant_id: int,
+        name: str,
+        exclude_id: int | None = None
+    ) -> bool:
+        query = (
+            self.db.query(Product)
+            .filter(
+                Product.restaurant_id == restaurant_id,
+                Product.name == name
+            )
+        )
+        if exclude_id is not None:
+            query = query.filter(Product.id != exclude_id)
+        return query.first() is not None
+
+    # --------------------------------------------------------------------------------
+    # Obtener una categoría activa del restaurante o lanzar DomainError si no existe
+    # --------------------------------------------------------------------------------
+    def _get_active_category(
+        self,
+        restaurant_id: int,
+        category_id: int
+    ) -> Category:
+        category = (
+            self.db.query(Category)
+            .filter(
+                Category.id == category_id,
+                Category.restaurant_id == restaurant_id,
+                Category.active.is_(True)
+            )
+            .first()
+        )
+
+        if not category:
+            raise DomainError(
+                "Category not found or inactive",
+                ErrorCode.CATEGORY_NOT_FOUND,
+                context={"category_id": category_id}
+            )
+
+        return category
+
+
+    # --------------------------------------------------------------------------------
+    # Obtener una estación activa del restaurante o lanzar DomainError si no existe
+    # --------------------------------------------------------------------------------
+    def _get_active_station(
+        self,
+        restaurant_id: int,
+        station_id: int
+    ) -> ProductionStation:
+        station = (
+            self.db.query(ProductionStation)
+            .filter(
+                ProductionStation.id == station_id,
+                ProductionStation.restaurant_id == restaurant_id,
+                ProductionStation.active.is_(True)
+            )
+            .first()
+        )
+
+        if not station:
+            raise DomainError(
+                "Station not found or inactive",
+                ErrorCode.STATION_NOT_FOUND,
+                context={"station_id": station_id}
+            )
+
+        return station
+
     # -------------------------
     # Crear producto
     # -------------------------
+    def create_product(
+        self,
+        restaurant_id: int,
+        data: ProductCreate
+    ) -> Product:
 
-    def create_product(self, restaurant_id: int, data: ProductCreate):
+        name = data.name.strip()
+
+        if not name:
+            raise DomainError(
+                "Product name cannot be empty",
+                ErrorCode.INVALID_PRODUCT_NAME
+            )
+
+        if self._product_name_exists(
+            restaurant_id,
+            name
+        ):
+            raise DomainError(
+                "Product already exists",
+                ErrorCode.PRODUCT_ALREADY_EXISTS
+            )
+
+        self._get_active_category(
+            restaurant_id,
+            data.category_id
+        )
+
+        self._get_active_station(
+            restaurant_id,
+            data.station_id
+        )
+
         product = Product(
-            name=data.name,
+            name=name,
             price=data.price,
             category_id=data.category_id,
             station_id=data.station_id,
             restaurant_id=restaurant_id
         )
+
         self.db.add(product)
         self.db.commit()
         self.db.refresh(product)
-        return product
 
+        return product
+    
     # -------------------------
     # Listar productos
     # -------------------------
+    def list_products(
+        self,
+        restaurant_id: int,
+        active: bool | None = True
+    ) -> list[Product]:
 
-    def list_products(self, restaurant_id: int):
-        return (
+        query = (
             self.db.query(Product)
             .options(
                 joinedload(Product.category),
                 joinedload(Product.station)
             )
-            .filter(Product.restaurant_id == restaurant_id)
+            .filter(
+                Product.restaurant_id == restaurant_id
+            )
+        )
+
+        if active is not None:
+            query = query.filter(
+                Product.active == active
+            )
+
+        return (
+            query
+            .order_by(Product.name)
             .all()
         )
 
     # -------------------------
     # Actualizar producto
     # -------------------------
+    def update_product(
+        self,
+        product_id: int,
+        restaurant_id: int,
+        data: ProductUpdate
+    ) -> Product:
 
-    def update_product(self, product_id: int, restaurant_id: int, data: ProductUpdate):
-        product = self.get_product(product_id, restaurant_id)
-        update_data = data.model_dump(exclude_unset=True)
+        product = self._get_product(
+            product_id,
+            restaurant_id
+        )
+
+        if data.name is not None:
+            name = data.name.strip()
+
+            if not name:
+                raise DomainError(
+                    "Product name cannot be empty",
+                    ErrorCode.INVALID_PRODUCT_NAME
+                )
+
+            existing = self._product_name_exists(
+                restaurant_id,
+                name,
+                exclude_id=product.id
+            )
+
+            if existing:
+                raise DomainError(
+                    "Product already exists",
+                    ErrorCode.PRODUCT_ALREADY_EXISTS
+                )
+
+            data.name = name
+
+        if data.category_id is not None:
+            self._get_active_category(
+                restaurant_id,
+                data.category_id
+            )
+
+        if data.station_id is not None:
+            self._get_active_station(
+                restaurant_id,
+                data.station_id
+            )
+
+        update_data = data.model_dump(
+            exclude_unset=True
+        )
+
         for field, value in update_data.items():
             setattr(product, field, value)
+
         self.db.commit()
         self.db.refresh(product)
+
         return product
 
-    # -------------------------
+    # -------------------------------------
     # Cambiar producto - Activo/Inactivo
-    # -------------------------
-
-    def toggle_product(self, product_id: int, restaurant_id: int):
-        product = self.get_product(product_id, restaurant_id)
+    # -------------------------------------
+    def toggle_product(self, product_id: int, restaurant_id: int) -> Product:
+        product = self._get_product(product_id, restaurant_id)
         product.active = not product.active
         self.db.commit()
         self.db.refresh(product)
@@ -5618,194 +7445,102 @@ def get_report_service(
 
 ### .\backend\app\domain\reports\report_service.py
 
-**Funciones (13):**
+**Funciones (14):**
 - __init__
-- get_sales_report
-- get_products_report
-- get_product_evolution_report
-- get_sales_orders_report
 - _closed_orders_query
 - _product_rows
 - _summarize_products
 - _order_total
 - _serialize_sales_order
+- _group_sales_order_items
 - _date_bounds
 - _empty_days
-- _money
+- _validate_date_range
+- get_sales_report
+- get_products_report
+- get_product_evolution_report
+- get_sales_orders_report
 
 **Clases (1):**
 - ReportService
 
-**Imports (12):**
+**Imports (24):**
 - datetime.date
 - datetime.datetime
 - datetime.time
 - datetime.timedelta
 - decimal.Decimal
+- sqlalchemy.orm.Query
 - sqlalchemy.orm.Session
 - sqlalchemy.orm.joinedload
+- app.domain.errors.base.DomainError
+- app.domain.errors.error_codes.ErrorCode
 - app.models.order.Order
 - app.models.order.OrderStatus
 - app.models.order_item.OrderItem
 - app.models.order_item.OrderItemStatus
 - app.models.product.Product
+- app.schemas.reports.SalesOrderOut
+- app.schemas.reports.SalesOrderItemOut
+- app.schemas.reports.SalesOrdersReportOut
+- app.schemas.reports.ProductEvolutionReportOut
+- app.schemas.reports.ProductEvolutionPoint
+- app.schemas.reports.ProductsReportOut
+- app.schemas.reports.ProductSummaryOut
+- app.schemas.reports.SalesReportOut
+- app.schemas.reports.SalesPointOut
 
 ```python
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
+from sqlalchemy.orm import Query
 from sqlalchemy.orm import Session, joinedload
+
+from app.domain.errors.base import DomainError
+from app.domain.errors.error_codes import ErrorCode
 
 from app.models.order import Order, OrderStatus
 from app.models.order_item import OrderItem, OrderItemStatus
 from app.models.product import Product
 
+from app.schemas.reports import (
+    SalesOrderOut,
+    SalesOrderItemOut,
+    SalesOrdersReportOut,
+    ProductEvolutionReportOut,
+    ProductEvolutionPoint,
+    ProductsReportOut,
+    ProductSummaryOut,
+    SalesReportOut,
+    SalesPointOut
+)
 
 class ReportService:
+
+    """
+    Servicio encargado de la lógica de negocio relacionada con los reportes.
+
+    Responsabilidades:
+    - Gestionar la lógica de negocio de los reportes.
+    - Validar las reglas de negocio.
+    - Acceder a la base de datos mediante SQLAlchemy.
+    - Lanzar DomainError cuando una operación no pueda completarse.
+    """
 
     def __init__(self, db: Session):
         self.db = db
 
-    def get_sales_report(
-        self,
-        restaurant_id: int,
-        start_date: date,
-        end_date: date
-    ):
-        totals_by_day = self._empty_days(start_date, end_date)
-
-        for order in self._closed_orders_query(restaurant_id, start_date, end_date):
-            if not order.closed_at:
-                continue
-
-            day = order.closed_at.date().isoformat()
-            totals_by_day[day] += self._order_total(order)
-
-        series = [
-            {"date": day, "total": self._money(total)}
-            for day, total in sorted(totals_by_day.items())
-        ]
-        non_zero_days = [point for point in series if point["total"] > 0]
-
-        return {
-            "series": series,
-            "max_day": max(non_zero_days, key=lambda point: point["total"], default=None),
-            "min_day": min(non_zero_days, key=lambda point: point["total"], default=None)
-        }
-
-    def get_products_report(
-        self,
-        restaurant_id: int,
-        start_date: date,
-        end_date: date,
-        category_id: int | None = None
-    ):
-        start_today = datetime.combine(date.today(), time.min)
-        end_today = datetime.combine(date.today() + timedelta(days=1), time.min)
-        start, end = self._date_bounds(start_date, end_date)
-
-        period_items = self._summarize_products(
-            restaurant_id=restaurant_id,
-            rows=self._product_rows(restaurant_id, start, end, category_id),
-            category_id=category_id
-        )
-        today_items = [
-            item
-            for item in self._summarize_products(
-                restaurant_id=restaurant_id,
-                rows=self._product_rows(restaurant_id, start_today, end_today, category_id),
-                category_id=category_id
-            )
-            if item["quantity"] > 0
-        ]
-
-        top_products = sorted(
-            [item for item in period_items if item["quantity"] > 0],
-            key=lambda item: (item["quantity"], item["total"], item["name"]),
-            reverse=True
-        )[:10]
-        least_products = sorted(
-            period_items,
-            key=lambda item: (item["quantity"], item["total"], item["name"])
-        )[:10]
-
-        return {
-            "today_best_seller": max(
-                today_items,
-                key=lambda item: (item["quantity"], item["total"]),
-                default=None
-            ),
-            "top_products": top_products,
-            "least_products": least_products
-        }
-
-    def get_product_evolution_report(
-        self,
-        restaurant_id: int,
-        product_id: int,
-        start_date: date,
-        end_date: date
-    ):
-        totals_by_day = self._empty_days(start_date, end_date)
-        start, end = self._date_bounds(start_date, end_date)
-
-        rows = (
-            self.db.query(Order.closed_at, OrderItem.quantity, OrderItem.unit_price)
-            .join(OrderItem, OrderItem.order_id == Order.id)
-            .filter(
-                Order.restaurant_id == restaurant_id,
-                Order.status == OrderStatus.CLOSED,
-                Order.closed_at >= start,
-                Order.closed_at < end,
-                OrderItem.product_id == product_id,
-                OrderItem.status != OrderItemStatus.CANCELLED
-            )
-            .all()
-        )
-
-        for closed_at, quantity, unit_price in rows:
-            if closed_at:
-                totals_by_day[closed_at.date().isoformat()] += quantity * unit_price
-
-        return {
-            "series": [
-                {"date": day, "total": self._money(total)}
-                for day, total in sorted(totals_by_day.items())
-            ]
-        }
-
-    def get_sales_orders_report(
-        self,
-        restaurant_id: int,
-        start_date: date,
-        end_date: date
-    ):
-        orders = (
-            self._closed_orders_query(restaurant_id, start_date, end_date)
-            .options(
-                joinedload(Order.items).joinedload(OrderItem.product),
-                joinedload(Order.table)
-            )
-            .order_by(Order.closed_at.desc(), Order.id.desc())
-            .all()
-        )
-
-        return {
-            "orders": [
-                self._serialize_sales_order(order)
-                for order in orders
-                if order.closed_at
-            ]
-        }
-
+    # --------------------------------------------------------------------------------------
+    # Devuelve una consulta de órdenes cerradas para un restaurante en un rango de fechas
+    # --------------------------------------------------------------------------------------
     def _closed_orders_query(
         self,
         restaurant_id: int,
         start_date: date,
         end_date: date
-    ):
+    ) -> Query:
         start, end = self._date_bounds(start_date, end_date)
-
         return (
             self.db.query(Order)
             .options(joinedload(Order.items))
@@ -5816,14 +7551,17 @@ class ReportService:
                 Order.closed_at < end
             )
         )
-
+    
+    # ---------------------------------------------------------------------------------------------------------------------------------
+    # Devuelve una consulta de los productos vendidos para un restaurante en un rango de fechas, opcionalmente filtrando por categoría
+    # ---------------------------------------------------------------------------------------------------------------------------------
     def _product_rows(
         self,
         restaurant_id: int,
         range_start: datetime,
         range_end: datetime,
         category_id: int | None
-    ):
+    ) -> list[tuple[int, str, int | None, int, Decimal]]:
         query = (
             self.db.query(
                 Product.id,
@@ -5842,24 +7580,23 @@ class ReportService:
                 OrderItem.status != OrderItemStatus.CANCELLED
             )
         )
-
         if category_id is not None:
             query = query.filter(Product.category_id == category_id)
-
         return query.all()
 
+    # --------------------------------------------------------------------------------------
+    # Devuelve el total vendido de un producto
+    # --------------------------------------------------------------------------------------
     def _summarize_products(
         self,
         restaurant_id: int,
-        rows,
+        rows: list[tuple[int, str, int | None, int, Decimal]],
         category_id: int | None
-    ):
+    ) -> list[ProductSummaryOut]:
         totals: dict[int, dict] = {}
         products_query = self.db.query(Product).filter(Product.restaurant_id == restaurant_id)
-
         if category_id is not None:
             products_query = products_query.filter(Product.category_id == category_id)
-
         for product in products_query.all():
             totals[product.id] = {
                 "product_id": product.id,
@@ -5868,7 +7605,6 @@ class ReportService:
                 "quantity": 0,
                 "total": Decimal("0")
             }
-
         for product_id, name, product_category_id, quantity, unit_price in rows:
             if product_id not in totals:
                 totals[product_id] = {
@@ -5878,18 +7614,22 @@ class ReportService:
                     "quantity": 0,
                     "total": Decimal("0")
                 }
-
             totals[product_id]["quantity"] += quantity
             totals[product_id]["total"] += quantity * unit_price
-
         return [
-            {
-                **item,
-                "total": self._money(item["total"])
-            }
+            ProductSummaryOut(
+                product_id=item["product_id"],
+                name=item["name"],
+                category_id=item["category_id"],
+                quantity=item["quantity"],
+                total=item["total"]
+            )
             for item in totals.values()
         ]
 
+    # --------------------------------------------------------------------------------------
+    # Devuelve el total de un pedido
+    # --------------------------------------------------------------------------------------
     def _order_total(self, order: Order) -> Decimal:
         subtotal = sum(
             (
@@ -5901,7 +7641,10 @@ class ReportService:
         )
         return max(subtotal - (order.discount or Decimal("0")), Decimal("0"))
 
-    def _serialize_sales_order(self, order: Order):
+    # --------------------------------------------------------------------------------------
+    # Devuelve una representación serializada de un pedido cerrado para el reporte de ventas
+    # --------------------------------------------------------------------------------------
+    def _serialize_sales_order(self, order: Order) -> SalesOrderOut:
         active_items = [
             item
             for item in order.items
@@ -5912,45 +7655,249 @@ class ReportService:
             Decimal("0")
         )
         discount = order.discount or Decimal("0")
+        return SalesOrderOut(
+            order_id=order.id,
+            table_number=order.table.number if order.table else None,
+            closed_at=order.closed_at,
+            items=self._group_sales_order_items(active_items),
+            subtotal=subtotal,
+            discount=discount,
+            total=max(subtotal - discount, Decimal("0"))
+        )
 
-        return {
-            "order_id": order.id,
-            "table_number": order.table.number if order.table else None,
-            "closed_at": order.closed_at.isoformat() if order.closed_at else None,
-            "items": [
-                {
-                    "item_id": item.id,
-                    "product_id": item.product_id,
-                    "product_name": item.product.name if item.product else "Producto eliminado",
-                    "unit_price": self._money(item.unit_price),
-                    "quantity": item.quantity,
-                    "line_total": self._money(item.quantity * item.unit_price)
-                }
-                for item in active_items
-            ],
-            "subtotal": self._money(subtotal),
-            "discount": self._money(discount),
-            "total": self._money(max(subtotal - discount, Decimal("0")))
-        }
+    # --------------------------------------------------------------------------------------
+    # Agrupa los productos para el reporte de ventas
+    # --------------------------------------------------------------------------------------
+    def _group_sales_order_items(self, items: list[OrderItem]) -> list[SalesOrderItemOut]:
+        grouped: dict[tuple[int, Decimal], SalesOrderItemOut] = {}
+        for item in items:
+            key = (
+                item.product_id,
+                item.unit_price
+            )
 
-    def _date_bounds(self, start_date: date, end_date: date):
+            if key in grouped:
+                grouped_item = grouped[key]
+
+                grouped_item.quantity += item.quantity
+                grouped_item.line_total += (
+                    item.quantity *
+                    item.unit_price
+                )
+            else:
+                grouped[key] = SalesOrderItemOut(
+                    item_id=item.id,
+                    product_id=item.product_id,
+                    product_name=(
+                        item.product.name
+                        if item.product
+                        else "Producto eliminado"
+                    ),
+                    unit_price=item.unit_price,
+                    quantity=item.quantity,
+                    line_total=(
+                        item.quantity *
+                        item.unit_price
+                    )
+                )
+
+        return sorted(
+            grouped.values(),
+            key=lambda item:
+                item.product_name.lower()
+        )
+
+    # --------------------------------------------------------------------------------------
+    # Devuelve el rango de fechas como datetime para consultas
+    # --------------------------------------------------------------------------------------
+    def _date_bounds(self, start_date: date, end_date: date) -> tuple[datetime, datetime]:
         start = datetime.combine(start_date, time.min)
         end = datetime.combine(end_date + timedelta(days=1), time.min)
         return start, end
 
-    def _empty_days(self, start_date: date, end_date: date) -> dict[str, Decimal]:
-        days: dict[str, Decimal] = {}
+    # ------------------------------------------------------------------------------------------
+    # Devuelve un diccionario con días vacíos entre start_date y end_date, inicializados en 0
+    # ------------------------------------------------------------------------------------------
+    def _empty_days(self, start_date: date, end_date: date) -> dict[date, Decimal]:
+        days: dict[date, Decimal] = {}
         current = start_date
-
         while current <= end_date:
-            days[current.isoformat()] = Decimal("0")
+            days[current] = Decimal("0")
             current += timedelta(days=1)
-
         return days
 
-    def _money(self, value: Decimal | int | float) -> float:
-        return float(round(Decimal(value), 2))
+    # --------------------------------------------------------------------------------
+    # Valida que el rango de fechas sea correcto (start_date <= end_date)
+    # --------------------------------------------------------------------------------
+    def _validate_date_range(
+        self,
+        start_date: date,
+        end_date: date
+    ) -> None:
+        if start_date > end_date:
+            raise DomainError(
+                "start date must be before or equal to end date",
+                ErrorCode.REPORT_INVALID_DATE_RANGE,
+                context={
+                    "start_date": start_date.isoformat(),
+                    "end_date": end_date.isoformat()
+                }
+            )
 
+    # --------------------------------------------------------------------------------
+    # Obtener reporte de ventas
+    # --------------------------------------------------------------------------------
+    def get_sales_report(
+        self,
+        restaurant_id: int,
+        start_date: date,
+        end_date: date
+    ) -> SalesReportOut:
+        self._validate_date_range(start_date, end_date)
+        totals_by_day = self._empty_days(start_date, end_date)
+        for order in self._closed_orders_query(restaurant_id, start_date, end_date):
+            if not order.closed_at:
+                continue
+            day = order.closed_at.date()
+            totals_by_day[day] += self._order_total(order)
+        series = [
+            SalesPointOut(
+                date=day,
+                total=total
+            )
+            for day, total in sorted(totals_by_day.items())
+        ]
+        non_zero_days = [
+            point
+            for point in series
+            if point.total > 0
+        ]
+        return SalesReportOut(
+            series=series,
+            max_day=max(
+                non_zero_days,
+                key=lambda point: point.total,
+                default=None
+            ),
+            min_day=min(
+                non_zero_days,
+                key=lambda point: point.total,
+                default=None
+            )
+        )
+
+    # --------------------------------------------------------------------------------
+    # Obtener reporte de productos
+    # --------------------------------------------------------------------------------
+    def get_products_report(
+        self,
+        restaurant_id: int,
+        start_date: date,
+        end_date: date,
+        category_id: int | None = None
+    ) -> ProductsReportOut:
+        self._validate_date_range(start_date, end_date)
+        start_today = datetime.combine(date.today(), time.min)
+        end_today = datetime.combine(date.today() + timedelta(days=1), time.min)
+        start, end = self._date_bounds(start_date, end_date)
+        period_items = self._summarize_products(
+            restaurant_id=restaurant_id,
+            rows=self._product_rows(restaurant_id, start, end, category_id),
+            category_id=category_id
+        )
+        today_items = [
+            item
+            for item in self._summarize_products(
+                restaurant_id=restaurant_id,
+                rows=self._product_rows(restaurant_id, start_today, end_today, category_id),
+                category_id=category_id
+            )
+            if item.quantity > 0
+        ]
+        top_products = sorted(
+            [item for item in period_items if item.quantity > 0],
+            key=lambda item: (item.quantity, item.total, item.name),
+            reverse=True
+        )[:10]
+        least_products = sorted(
+            period_items,
+            key=lambda item: (item.quantity, item.total, item.name)
+        )[:10]
+        return ProductsReportOut(
+            today_best_seller=max(
+                today_items,
+                key=lambda item: (item.quantity, item.total),
+                default=None
+            ),
+            top_products=top_products,
+            least_products=least_products
+        )
+
+    # --------------------------------------------------------------------------------
+    # Obtener reporte de evolución de un producto
+    # --------------------------------------------------------------------------------
+    def get_product_evolution_report(
+        self,
+        restaurant_id: int,
+        product_id: int,
+        start_date: date,
+        end_date: date
+    ) -> ProductEvolutionReportOut:
+        self._validate_date_range(start_date, end_date)
+        totals_by_day = self._empty_days(start_date, end_date)
+        start, end = self._date_bounds(start_date, end_date)
+        rows = (
+            self.db.query(Order.closed_at, OrderItem.quantity, OrderItem.unit_price)
+            .join(OrderItem, OrderItem.order_id == Order.id)
+            .filter(
+                Order.restaurant_id == restaurant_id,
+                Order.status == OrderStatus.CLOSED,
+                Order.closed_at >= start,
+                Order.closed_at < end,
+                OrderItem.product_id == product_id,
+                OrderItem.status != OrderItemStatus.CANCELLED
+            )
+            .all()
+        )
+        for closed_at, quantity, unit_price in rows:
+            if closed_at:
+                totals_by_day[closed_at.date()] += quantity * unit_price
+        return ProductEvolutionReportOut(
+            series=[
+                ProductEvolutionPoint(
+                    date=day,
+                    total=total
+                )
+                for day, total in sorted(totals_by_day.items())
+            ]
+        )
+
+    # --------------------------------------------------------------------------------
+    # Obtener reporte de órdenes de venta
+    # --------------------------------------------------------------------------------
+    def get_sales_orders_report(
+        self,
+        restaurant_id: int,
+        start_date: date,
+        end_date: date
+    ) -> SalesOrdersReportOut:
+        self._validate_date_range(start_date, end_date)
+        orders = (
+            self._closed_orders_query(restaurant_id, start_date, end_date)
+            .options(
+                joinedload(Order.items).joinedload(OrderItem.product),
+                joinedload(Order.table)
+            )
+            .order_by(Order.closed_at.desc(), Order.id.desc())
+            .all()
+        )
+        return SalesOrdersReportOut(
+            orders=[
+                self._serialize_sales_order(order)
+                for order in orders
+                if order.closed_at
+            ]
+        )
 ```
 
 ---
@@ -5989,44 +7936,64 @@ def get_settings_service(
 **Funciones (5):**
 - __init__
 - get_settings
-- serialize_settings
+- to_response
 - update_settings
 - send_test_email
 
 **Clases (1):**
 - SettingsService
 
-**Imports (7):**
-- sqlalchemy.orm.Session
-- email.message.EmailMessage
+**Imports (10):**
 - smtplib
-- app.models.system_settings.SystemSettings
-- app.schemas.system_settings.SettingsUpdateRequest
+- email.message.EmailMessage
+- sqlalchemy.orm.Session
+- app.domain.backup.schedule_utils.calculate_next_backup
 - app.domain.errors.base.DomainError
 - app.domain.errors.error_codes.ErrorCode
+- app.models.enums.BackupFrequency
+- app.models.system_settings.SystemSettings
+- app.schemas.system_settings.SettingsUpdateRequest
+- app.schemas.system_settings.SettingsResponse
 
 ```python
+import smtplib
+from email.message import EmailMessage
 from sqlalchemy.orm import Session
 
-from email.message import EmailMessage
-import smtplib
-
-from app.models.system_settings import SystemSettings
-from app.schemas.system_settings import SettingsUpdateRequest
+from app.domain.backup.schedule_utils import calculate_next_backup
 from app.domain.errors.base import DomainError
 from app.domain.errors.error_codes import ErrorCode
 
+from app.models.enums import BackupFrequency
+from app.models.system_settings import SystemSettings
+
+from app.schemas.system_settings import (
+    SettingsUpdateRequest,
+    SettingsResponse
+)
 
 class SettingsService:
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session) -> None:
         self.db = db
 
+    '''
+    Servicio encargado de la lógica de negocio relacionada con la configuración del sistema.
+
+    Responsabilidades:
+    - Gestionar la lógica de negocio de la configuración del sistema.
+    - Validar las reglas de negocio.
+    - Acceder a la base de datos mediante SQLAlchemy.
+    - Lanzar DomainError cuando una operación no pueda completarse.
+    '''
+
+    # --------------------------------------------------------------------------------------
+    # Obtener configuración del sistema para un restaurante
+    # --------------------------------------------------------------------------------------
     def get_settings(
         self,
         restaurant_id: int
     ) -> SystemSettings:
-
         settings = (
             self.db.query(SystemSettings)
             .filter(
@@ -6034,85 +8001,147 @@ class SettingsService:
             )
             .first()
         )
-
         if not settings:
-
             settings = SystemSettings(
                 restaurant_id=restaurant_id,
-                smtp_use_tls=True
+                smtp_use_tls=True,
+                backup_timezone="America/Montevideo"
             )
-
             self.db.add(settings)
             self.db.commit()
             self.db.refresh(settings)
-
         return settings
 
-    def serialize_settings(
+    # --------------------------------------------------------------------------------------
+    # Serializar configuración del sistema para respuesta de API
+    # --------------------------------------------------------------------------------------
+    def to_response(
         self,
         settings: SystemSettings
-    ):
+    ) -> SettingsResponse:
 
-        return {
-            "smtp_host": settings.smtp_host,
-            "smtp_port": settings.smtp_port,
-            "smtp_user": settings.smtp_user,
-            "smtp_from": settings.smtp_from,
-            "smtp_use_tls": settings.smtp_use_tls,
-            "backup_email": settings.backup_email,
+        return SettingsResponse(
+            smtp_host=settings.smtp_host,
+            smtp_port=settings.smtp_port,
+            smtp_user=settings.smtp_user,
+            smtp_from=settings.smtp_from,
+            smtp_use_tls=settings.smtp_use_tls,
 
-            # nunca devolver password
-            "smtp_password_configured": bool(
-                settings.smtp_password
-            )
-        }
+            smtp_password_configured=bool(settings.smtp_password),
 
+            backup_email=settings.backup_email,
+            backup_enabled=settings.backup_enabled,
+            backup_frequency=settings.backup_frequency,
+
+            backup_time=settings.backup_time,
+            backup_weekday=settings.backup_weekday,
+            backup_monthday=settings.backup_monthday,
+
+            backup_retention_daily=settings.backup_retention_daily,
+            backup_retention_weekly=settings.backup_retention_weekly,
+            backup_retention_monthly=settings.backup_retention_monthly,
+
+            backup_keep_local=settings.backup_keep_local,
+            backup_send_email=settings.backup_send_email,
+            backup_timezone=settings.backup_timezone,
+
+            last_automatic_backup_at=settings.last_automatic_backup_at,
+            next_automatic_backup_at=settings.next_automatic_backup_at,
+            last_backup_result=settings.last_backup_result,
+        )
+
+    # --------------------------------------------------------------------------------------
+    # Actualizar configuración del sistema para un restaurante
+    # --------------------------------------------------------------------------------------
     def update_settings(
         self,
         restaurant_id: int,
         data: SettingsUpdateRequest
     ) -> SystemSettings:
-
-        settings = self.get_settings(
-            restaurant_id
-        )
-
+        settings = self.get_settings(restaurant_id)
+        if (
+            data.backup_enabled
+            and not data.backup_keep_local
+            and not data.backup_send_email
+        ):
+            raise DomainError(
+                "Debe conservar el backup localmente o enviarlo por correo.",
+                ErrorCode.BACKUP_DESTINATION_REQUIRED
+            )
+        if (
+            data.backup_frequency == BackupFrequency.WEEKLY
+            and data.backup_weekday is None
+        ):
+            raise DomainError(
+                "Debe indicar el dia de la semana.",
+                ErrorCode.BACKUP_WEEKDAY_REQUIRED
+            )
+        if (
+            data.backup_frequency == BackupFrequency.MONTHLY
+            and data.backup_monthday is None
+        ):
+            raise DomainError(
+                "Debe indicar el dia del mes.",
+                ErrorCode.BACKUP_MONTHDAY_REQUIRED
+            )
+        if data.backup_send_email:
+            if not data.smtp_host:
+                raise DomainError(
+                    "SMTP Host no configurado",
+                    ErrorCode.SMTP_HOST_NOT_CONFIGURED
+                )
+            if not data.backup_email:
+                raise DomainError(
+                    "Correo de backup no configurado",
+                    ErrorCode.BACKUP_EMAIL_NOT_CONFIGURED
+                )
         settings.smtp_host = data.smtp_host
         settings.smtp_port = data.smtp_port
         settings.smtp_user = data.smtp_user
         settings.smtp_from = data.smtp_from
         settings.smtp_use_tls = data.smtp_use_tls
-        settings.backup_email = data.backup_email
 
+        settings.backup_email = data.backup_email
+        settings.backup_enabled = data.backup_enabled
+        settings.backup_frequency = data.backup_frequency
+        settings.backup_time = data.backup_time
+        settings.backup_weekday = data.backup_weekday
+        settings.backup_monthday = data.backup_monthday
+        settings.backup_retention_daily = data.backup_retention_daily
+        settings.backup_retention_weekly = data.backup_retention_weekly
+        settings.backup_retention_monthly = data.backup_retention_monthly
+        settings.backup_keep_local = data.backup_keep_local
+        settings.backup_send_email = data.backup_send_email
+        settings.backup_timezone = data.backup_timezone
+        settings.next_automatic_backup_at = (
+            calculate_next_backup(settings)
+            if settings.backup_enabled
+            else None
+        )
         if data.smtp_password:
             settings.smtp_password = data.smtp_password
-
         self.db.commit()
         self.db.refresh(settings)
-
         return settings
-    
+
+    # --------------------------------------------------------------------------------------
+    # Enviar correo de prueba para verificar configuración SMTP
+    # --------------------------------------------------------------------------------------
     def send_test_email(
         self,
         restaurant_id: int
     ):
-
-        settings = self.get_settings(
-            restaurant_id
-        )
-
+        settings = self.get_settings(restaurant_id)
         if not settings.smtp_host:
             raise DomainError(
                 "SMTP Host no configurado",
                 ErrorCode.SMTP_HOST_NOT_CONFIGURED
             )
-
         if not settings.backup_email:
             raise DomainError(
                 "Correo de backup no configurado",
                 ErrorCode.BACKUP_EMAIL_NOT_CONFIGURED
             )
-
         smtp_host = settings.smtp_host
         smtp_port = settings.smtp_port or 587
         smtp_user = settings.smtp_user or ""
@@ -6127,26 +8156,35 @@ class SettingsService:
         message["To"] = settings.backup_email
 
         message.set_content(
-            "La configuración SMTP del sistema funciona correctamente."
+            "La configuracion SMTP del sistema funciona correctamente."
         )
-
-        with smtplib.SMTP(
-            smtp_host,
-            smtp_port,
-            timeout=30
-        ) as smtp:
-
-            if smtp_use_tls:
-                smtp.starttls()
-
-            if smtp_user:
-                smtp.login(
-                    smtp_user,
-                    smtp_password
-                )
-
-            smtp.send_message(message)
-
+        try:
+            with smtplib.SMTP(
+                smtp_host,
+                smtp_port,
+                timeout=30
+            ) as smtp:
+                if smtp_use_tls:
+                    smtp.ehlo()
+                    smtp.starttls()
+                    smtp.ehlo()
+                if smtp_user:
+                    smtp.login(
+                        smtp_user,
+                        smtp_password
+                    )
+                smtp.send_message(message)
+        except (
+            smtplib.SMTPException,
+            TimeoutError,
+            ConnectionError,
+            OSError
+        ) as ex:
+            raise DomainError(
+                "No fue posible enviar el correo de prueba.",
+                ErrorCode.EMAIL_SEND_FAILURE,
+                context={"detail": str(ex)}
+            ) from ex
         return {
             "success": True,
             "sent_to": settings.backup_email
@@ -6188,106 +8226,79 @@ def get_station_service(
 
 **Funciones (8):**
 - __init__
+- _station_name_exists
+- _get_station
+- get_station
 - create_station
 - list_stations
-- list_active_stations
-- get_station
 - update_station
 - toggle_station
-- get_station_items
 
 **Clases (1):**
 - StationService
 
-**Imports (9):**
+**Imports (6):**
 - sqlalchemy.orm.Session
-- sqlalchemy.orm.joinedload
-- app.models.production_station.ProductionStation
-- app.models.order_item.OrderItem
-- app.models.order_item.OrderItemStatus
-- app.models.product.Product
-- app.models.order.Order
 - app.domain.errors.base.DomainError
 - app.domain.errors.error_codes.ErrorCode
+- app.models.production_station.ProductionStation
+- app.schemas.station.StationCreate
+- app.schemas.station.StationUpdate
 
 ```python
-from sqlalchemy.orm import Session, joinedload
-from app.models.production_station import ProductionStation
-
-from app.models.order_item import OrderItem, OrderItemStatus
-from app.models.product import Product
-from app.models.order import Order
+from sqlalchemy.orm import Session
 
 from app.domain.errors.base import DomainError
 from app.domain.errors.error_codes import ErrorCode
 
+from app.models.production_station import ProductionStation
+
+from app.schemas.station import (
+    StationCreate,
+    StationUpdate
+)
 
 class StationService:
 
-    def __init__(self, db: Session):
+    """
+    Servicio encargado de la lógica de negocio relacionada con las estaciones.
+
+    Responsabilidades:
+    - Gestionar el CRUD de estaciones.
+    - Validar las reglas de negocio.
+    - Acceder a la base de datos mediante SQLAlchemy.
+    - Lanzar DomainError cuando una operación no pueda completarse.
+    """
+
+    def __init__(self, db: Session) -> None:
         self.db = db
 
-    # -------------------------
-    # Crear estación
-    # ------------------------- 
-
-    def create_station(self, restaurant_id: int, name: str):
-        existing = (
+    # -------------------------------------------------------
+    # Comprobar si el nombre de la estación ya existe
+    # -------------------------------------------------------
+    def _station_name_exists(
+        self,
+        restaurant_id: int,
+        name: str,
+        exclude_id: int | None = None
+    ) -> bool:
+        query = (
             self.db.query(ProductionStation)
             .filter(
                 ProductionStation.restaurant_id == restaurant_id,
                 ProductionStation.name == name
             )
-            .first()
         )
-        if existing:
-            raise DomainError(
-                "Station name already exists",
-                code=ErrorCode.STATION_NAME_ALREADY_EXISTS,
-                context={"name": name}
+        if exclude_id is not None:
+            query = query.filter(
+                ProductionStation.id != exclude_id
             )
-        station = ProductionStation(
-            name=name,
-            restaurant_id=restaurant_id,
-            active=True
-        )
-        self.db.add(station)
-        self.db.commit()
-        self.db.refresh(station)
-        return station
-    
-    # -------------------------
-    # Listar estaciones
-    # -------------------------
+        return query.first() is not None
 
-    def list_stations(self, restaurant_id: int):
-        return (
-            self.db.query(ProductionStation)
-            .filter(ProductionStation.restaurant_id == restaurant_id)
-            .order_by(ProductionStation.name)
-            .all()
-        )
-
-    # -------------------------
-    # Listar estaciones activas
-    # -------------------------
-
-    def list_active_stations(self, restaurant_id: int):
-        return (
-            self.db.query(ProductionStation)
-            .filter(
-                ProductionStation.restaurant_id == restaurant_id,
-                ProductionStation.active.is_(True)
-            )
-            .order_by(ProductionStation.name)
-            .all()
-        )
-
-    # -------------------------
-    # Obtener estación
-    # -------------------------
-
-    def get_station(self, restaurant_id: int, station_id: int):
+    # ---------------------------------------
+    # Obtener estación - método privado
+    # ---------------------------------------
+    def _get_station(self, restaurant_id: int, station_id: int) -> ProductionStation:
         station = (
             self.db.query(ProductionStation)
             .filter(
@@ -6304,77 +8315,107 @@ class StationService:
         return station
 
     # -------------------------
-    # Actualizar estación
+    # Obtener estación
     # -------------------------
-
-    def update_station(self, restaurant_id: int, station_id: int, name: str):
-        station = self.get_station(restaurant_id, station_id)
-        existing = (
-            self.db.query(ProductionStation)
-            .filter(
-                ProductionStation.restaurant_id == restaurant_id,
-                ProductionStation.name == name,
-                ProductionStation.id != station_id
-            )
-            .first()
+    def get_station(
+        self,
+        restaurant_id: int,
+        station_id: int
+    ):
+        return self._get_station(
+            restaurant_id,
+            station_id
         )
-        if existing:
+
+    # -------------------------
+    # Crear estación
+    # ------------------------- 
+    def create_station(self, restaurant_id: int, data: StationCreate) -> ProductionStation:
+        name=data.name.strip()
+        if not name:
+            raise DomainError(
+                "Station name cannot be empty",
+                ErrorCode.INVALID_STATION_NAME
+            )
+
+        if self._station_name_exists(restaurant_id, name):
             raise DomainError(
                 "Station name already exists",
-                code=ErrorCode.STATION_NAME_ALREADY_EXISTS
+                ErrorCode.STATION_NAME_ALREADY_EXISTS,
+                context={"name": name}
+            )
+        station = ProductionStation(
+            name=name,
+            restaurant_id=restaurant_id,
+            active=True
+        )
+        self.db.add(station)
+        self.db.commit()
+        self.db.refresh(station)
+        return station
+    
+    # -------------------------
+    # Listar estaciones
+    # -------------------------
+    def list_stations(
+        self,
+        restaurant_id: int,
+        active: bool | None = True
+    ) -> list[ProductionStation]:
+
+        query = (
+            self.db.query(ProductionStation)
+            .filter(
+                ProductionStation.restaurant_id == restaurant_id
+            )
+        )
+
+        if active is not None:
+            query = query.filter(
+                ProductionStation.active == active
+            )
+
+        return (
+            query
+            .order_by(ProductionStation.name)
+            .all()
+        )
+
+    # -------------------------
+    # Actualizar estación
+    # -------------------------
+    def update_station(self, restaurant_id: int, station_id: int, data: StationUpdate) -> ProductionStation:
+        station = self._get_station(restaurant_id, station_id)
+        name = data.name.strip()
+        if not name:
+            raise DomainError(
+                "Station name cannot be empty",
+                ErrorCode.INVALID_STATION_NAME
+            )
+        if self._station_name_exists(
+            restaurant_id,
+            name,
+            exclude_id=station_id
+        ):
+            raise DomainError(
+                "Station name already exists",
+                ErrorCode.STATION_NAME_ALREADY_EXISTS,
+                context={"name": name}
             )
         station.name = name
         self.db.commit()
         self.db.refresh(station)
         return station
 
-    # -------------------------
+    # -----------------------------
     # Activar/desactivar estación
-    # -------------------------
-
-    def toggle_station(self, restaurant_id: int, station_id: int):
-        station = self.get_station(restaurant_id, station_id)
+    # -----------------------------
+    def toggle_station(self, restaurant_id: int, station_id: int) -> ProductionStation:
+        station = self._get_station(restaurant_id, station_id)
         station.active = not station.active
         self.db.commit()
         self.db.refresh(station)
         return station
-
-    # -------------------------
-    # Para cambiar a otro service a la brevedad
-    # -------------------------
-
-    def get_station_items(self, restaurant_id: int, station_id: int):
-        items = (
-            self.db.query(OrderItem)
-            .join(OrderItem.product)
-            .join(Product.station)
-            .join(OrderItem.order)
-            .join(Order.table)
-            .filter(
-                Product.station_id == station_id,
-                OrderItem.restaurant_id == restaurant_id,
-                OrderItem.status.in_([
-                    OrderItemStatus.SENT,
-                    OrderItemStatus.IN_PROGRESS
-                ])
-            )
-            .order_by(Order.created_at)
-            .all()
-        )
-
-        result = []
-
-        for item in items:
-            result.append({
-                "item_id": item.id,
-                "product_name": item.product.name,
-                "quantity": item.quantity,
-                "status": item.status,
-                "table_number": item.order.table.number,
-                "order_id": item.order.id
-            })
-
-        return result
 ```
 
 ---
@@ -6408,11 +8449,12 @@ def get_table_service(db: Session = Depends(get_db)):
 
 ### .\backend\app\domain\table\table_service.py
 
-**Funciones (10):**
+**Funciones (11):**
 - __init__
+- _exists_table_by_number
+- _get_table
 - list_tables
 - list_tables_status
-- _get_table
 - create_table
 - update_table
 - update_position
@@ -6423,64 +8465,113 @@ def get_table_service(db: Session = Depends(get_db)):
 **Clases (1):**
 - TableService
 
-**Imports (11):**
+**Imports (15):**
 - sqlalchemy.orm.Session
-- sqlalchemy.orm.joinedload
 - sqlalchemy.func
-- app.models.Table
-- app.models.order.Order
-- app.schemas.table.TablePositionUpdate
 - app.domain.order.constants.ACTIVE_ORDER_STATUSES
 - app.domain.errors.base.DomainError
 - app.domain.errors.error_codes.ErrorCode
+- app.domain.events.websocket.WSEvent
 - app.services.event_service.EventService
+- app.models.Table
+- app.models.order.Order
+- app.schemas.table.TablePositionUpdate
+- app.schemas.table.TableStatusResponse
+- app.schemas.table.TableCreate
+- app.schemas.table.TableUpdate
+- app.schemas.table.TableTouchResponse
 - logging
 
 ```python
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 from sqlalchemy import func
+
+from app.domain.order.constants import ACTIVE_ORDER_STATUSES
+from app.domain.errors.base import DomainError
+from app.domain.errors.error_codes import ErrorCode
+from app.domain.events.websocket import WSEvent
+
+from app.services.event_service import EventService
 
 from app.models import Table
 from app.models.order import Order
-from app.schemas.table import TablePositionUpdate
 
-from app.domain.order.constants import ACTIVE_ORDER_STATUSES
-
-from app.domain.errors.base import DomainError
-from app.domain.errors.error_codes import ErrorCode
-from app.services.event_service import EventService
+from app.schemas.table import (
+    TablePositionUpdate,
+    TableStatusResponse,
+    TableCreate,
+    TableUpdate,
+    TableTouchResponse
+)
 
 import logging
 
 logger = logging.getLogger("app.domain.table")
 
-
 class TableService:
 
-    def __init__(self, db: Session):
+    """
+    Servicio encargado de la lógica de negocio relacionada con las mesas.
+
+    Responsabilidades:
+    - Gestionar el CRUD de las mesas.
+    - Validar las reglas de negocio.
+    - Acceder a la base de datos mediante SQLAlchemy.
+    - Lanzar DomainError cuando una operación no pueda completarse.
+    """
+
+    def __init__(self, db: Session) -> None:
         self.db = db
         self.events = EventService(db)
+
+    def _exists_table_by_number(
+        self,
+        restaurant_id: int,
+        number: int,
+        exclude_id: int | None = None,
+    ) -> Table | None:
+        query = self.db.query(Table).filter(
+            Table.restaurant_id == restaurant_id,
+            Table.number == number
+        )
+        if exclude_id is not None:
+            query = query.filter(Table.id != exclude_id)
+        return query.first()
+
+    # -------------------------
+    # Devolver mesa
+    # -------------------------        
+    def _get_table(self, restaurant_id: int, table_id: int, active_only: bool = False) -> Table:
+        query = self.db.query(Table).filter(
+            Table.id == table_id,
+            Table.restaurant_id == restaurant_id
+        )
+        if active_only:
+            query = query.filter(Table.active.is_(True))
+        table = query.first()
+        if not table:
+            raise DomainError(
+                "Table not found",
+                code=ErrorCode.TABLE_NOT_FOUND,
+                context={"table_id": table_id}
+            )
+        return table
 
     # -------------------------
     # Listar mesas
     # -------------------------
-
-    def list_tables(self, restaurant_id: int, active: bool | None = True):
+    def list_tables(self, restaurant_id: int, active: bool | None = True) -> list[Table]:
         query = self.db.query(Table).filter(
             Table.restaurant_id == restaurant_id
         )
-
         if active is not None:
             query = query.filter(Table.active == active)
         return query.order_by(Table.number).all()
 
-
-    # -------------------------
+    # ----------------------------
     # Listar status de las mesas
-    # -------------------------
-
-    def list_tables_status(self, restaurant_id: int):
-
+    # ----------------------------
+    def list_tables_status(self, restaurant_id: int) -> list[TableStatusResponse]:
         active_order_subquery = (
             self.db.query(
                 Order.table_id,
@@ -6521,65 +8612,37 @@ class TableService:
             .all()
         )
         return [
-            {
-                "id": row.id,
-                "number": row.number,
-                "x": row.x,
-                "y": row.y,
-                "capacity": row.capacity,
-                "shape": row.shape,
-                "active": row.active,
-                "status": "ocupada" if row.order_id else "libre",
-                "order_id": row.order_id,
-                "order_status": row.order_status
-            }
+            TableStatusResponse(
+                id=row.id,
+                number=row.number,
+                x=row.x,
+                y=row.y,
+                capacity=row.capacity,
+                shape=row.shape,
+                active=row.active,
+                order_id=row.order_id,
+                order_status=row.order_status,
+            )
             for row in rows
         ]
 
     # -------------------------
-    # Devolver mesa
-    # -------------------------        
-
-    def _get_table(self, restaurant_id: int, table_id: int, active_only=False) -> Table:
-        query = self.db.query(Table).filter(
-            Table.id == table_id,
-            Table.restaurant_id == restaurant_id
-        )
-        if active_only:
-            query = query.filter(Table.active.is_(True))
-        table = query.first()
-        if not table:
-            raise DomainError(
-                "Table not found",
-                code=ErrorCode.TABLE_NOT_FOUND,
-                context={"table_id": table_id}
-            )
-        return table
-
-    # -------------------------
     # Crear mesa
     # -------------------------
-
-    def create_table(self, restaurant_id, table_in):
-        new_number = table_in.number
-
+    def create_table(self, restaurant_id, data: TableCreate) -> Table:
+        new_number = data.number
         if new_number is None:
             max_number = self.db.query(func.max(Table.number)).filter(
                 Table.restaurant_id == restaurant_id
             ).scalar()
             new_number = (max_number or 0) + 1
-
         if new_number <= 0:
             raise DomainError(
                 "Table number must be greater than zero",
                 code=ErrorCode.INVALID_OPERATION,
                 context={"number": new_number}
             )
-
-        existing = self.db.query(Table).filter(
-            Table.restaurant_id == restaurant_id,
-            Table.number == new_number
-        ).first()
+        existing = self._exists_table_by_number(restaurant_id, new_number)
         if existing:
             raise DomainError(
                 "Table number already exists",
@@ -6593,16 +8656,16 @@ class TableService:
         table = Table(
             restaurant_id=restaurant_id,
             number=new_number,
-            x=table_in.x,
-            y=table_in.y,
-            capacity=table_in.capacity,
-            shape=table_in.shape
+            x=data.x,
+            y=data.y,
+            capacity=data.capacity,
+            shape=data.shape
         )
         self.db.add(table)
         self.db.flush()
         self.events.emit(
             restaurant_id=restaurant_id,
-            event_type="TABLE_CREATED",
+            event_type=WSEvent.TABLE_CREATED,
             payload={"table_id": table.id}
         )
         self.db.commit()
@@ -6612,11 +8675,9 @@ class TableService:
     # -------------------------
     # Actualizar mesa
     # -------------------------
-
-    def update_table(self, restaurant_id, table_id, table_in):
+    def update_table(self, restaurant_id, table_id, data: TableUpdate) -> Table:
         table = self._get_table(restaurant_id, table_id)
-        update_data = table_in.model_dump(exclude_unset=True)
-
+        update_data = data.model_dump(exclude_unset=True)
         new_number = update_data.get("number")
         if new_number is not None:
             if new_number <= 0:
@@ -6625,11 +8686,7 @@ class TableService:
                     code=ErrorCode.INVALID_OPERATION,
                     context={"number": new_number}
                 )
-            existing = self.db.query(Table).filter(
-                Table.restaurant_id == restaurant_id,
-                Table.number == new_number,
-                Table.id != table_id
-            ).first()
+            existing = self._exists_table_by_number(restaurant_id, new_number, exclude_id=table_id)
             if existing:
                 raise DomainError(
                     "Table number already exists",
@@ -6644,17 +8701,16 @@ class TableService:
             setattr(table, field, value)
         self.events.emit(
             restaurant_id=restaurant_id,
-            event_type="TABLE_UPDATED",
+            event_type=WSEvent.TABLE_UPDATED,
             payload={"table_id": table.id}
         )
         self.db.commit()
         self.db.refresh(table)
         return table
 
-    # -------------------------
+    # --------------------------------
     # Actualizar posición de la mesa
-    # -------------------------
-
+    # --------------------------------
     def update_position(
         self,
         restaurant_id: int,
@@ -6662,13 +8718,11 @@ class TableService:
         data: TablePositionUpdate
     ) -> Table:
         table = self._get_table(restaurant_id, table_id, active_only=True)
-
         table.x = data.x
         table.y = data.y
-
         self.events.emit(
             restaurant_id=restaurant_id,
-            event_type="TABLE_POSITION_UPDATED",
+            event_type=WSEvent.TABLE_POSITION_UPDATED,
             payload={
                 "table_id": table.id,
                 "x": table.x,
@@ -6682,52 +8736,46 @@ class TableService:
     # -------------------------
     # Desactivar mesa
     # -------------------------
-
-    def deactivate_table(self, restaurant_id, table_id):
+    def deactivate_table(self, restaurant_id, table_id) -> None:
         table = self._get_table(restaurant_id, table_id, active_only=True)
         logger.info("Mesa desactivada r=%s table_id=%s", restaurant_id, table_id)
         table.active = False
         self.events.emit(
             restaurant_id=restaurant_id,
-            event_type="TABLE_DEACTIVATED",
+            event_type=WSEvent.TABLE_DEACTIVATED,
             payload={"table_id": table.id}
         )
         self.db.commit()
-        return {"message": "Table deactivated"}
 
     # -------------------------
     # Activar mesa
     # -------------------------
-
-    def activate_table(self, restaurant_id, table_id):
+    def activate_table(self, restaurant_id, table_id) -> None:
         table = self._get_table(restaurant_id, table_id)
         logger.info("Mesa activada r=%s table_id=%s", restaurant_id, table_id)
         table.active = True
         self.events.emit(
             restaurant_id=restaurant_id,
-            event_type="TABLE_ACTIVATED",
+            event_type=WSEvent.TABLE_ACTIVATED,
             payload={"table_id": table.id}
         )
-        self.db.commit()
-        return {"message": "Table activated"}    
-    
+        self.db.commit()  
+
     # -------------------------
     # Tocar mesa
     # -------------------------
-
-    def touch_table(self, restaurant_id: int, table_id: int):
+    def touch_table(self, restaurant_id: int, table_id: int) -> TableTouchResponse:
         table = self._get_table(restaurant_id, table_id, active_only=True)
         order = self.db.query(Order).filter(
             Order.table_id == table_id,
             Order.restaurant_id == restaurant_id,
             Order.status.in_(ACTIVE_ORDER_STATUSES)
         ).first()
-        return {
-            "table_id": table.id,
-            "table_number": table.number,
-            "order_id": order.id if order else None
-        }
-
+        return TableTouchResponse(
+            table_id=table.id,
+            table_number=table.number,
+            order_id=order.id if order else None
+        )
 ```
 
 ---
@@ -6764,8 +8812,9 @@ def get_user_service(
 
 ### .\backend\app\domain\user\user_service.py
 
-**Funciones (6):**
+**Funciones (7):**
 - __init__
+- _username_exists
 - get_user
 - list_users
 - create_user
@@ -6775,36 +8824,56 @@ def get_user_service(
 **Clases (1):**
 - UserService
 
-**Imports (7):**
+**Imports (8):**
+- logging
 - sqlalchemy.orm.Session
+- app.domain.errors.base.DomainError
+- app.domain.errors.error_codes.ErrorCode
+- app.core.security.get_password_hash
 - app.models.user.User
 - app.schemas.user.UserCreate
 - app.schemas.user.UserUpdate
-- app.core.security.get_password_hash
-- app.domain.errors.base.DomainError
-- app.domain.errors.error_codes.ErrorCode
 
 ```python
+import logging
 from sqlalchemy.orm import Session
-
-from app.models.user import User
-from app.schemas.user import UserCreate, UserUpdate
-from app.core.security import get_password_hash
 
 from app.domain.errors.base import DomainError
 from app.domain.errors.error_codes import ErrorCode
 
+from app.core.security import get_password_hash
+
+from app.models.user import User
+from app.schemas.user import UserCreate, UserUpdate
+
+logger = logging.getLogger("app.domain.user")
 
 class UserService:
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session) -> None:
         self.db = db
+
+    # -----------------------------------------------------------------
+    # Verificar si un nombre de usuario ya existe en el restaurante
+    # -----------------------------------------------------------------
+    def _username_exists(
+        self,
+        restaurant_id: int,
+        username: str,
+        exclude_user_id: int | None = None
+    ) -> bool:
+        query = self.db.query(User).filter(
+            User.restaurant_id == restaurant_id,
+            User.username == username
+        )
+        if exclude_user_id is not None:
+            query = query.filter(User.id != exclude_user_id)
+        return query.first() is not None
 
     # -------------------------
     # Obtener usuario
     # -------------------------
-
-    def get_user(self, user_id: int, restaurant_id: int):
+    def get_user(self, user_id: int, restaurant_id: int) -> User:
         user = self.db.query(User).filter(
             User.id == user_id,
             User.restaurant_id == restaurant_id
@@ -6812,16 +8881,14 @@ class UserService:
         if not user:
             raise DomainError(
                 "User not found",
-                code=ErrorCode.USER_NOT_FOUND
+                ErrorCode.USER_NOT_FOUND
             )
         return user
-
 
     # -------------------------
     # Listar usuarios
     # -------------------------
-
-    def list_users(self, restaurant_id: int):
+    def list_users(self, restaurant_id: int) -> list[User]:
         return (
             self.db.query(User)
             .filter(User.restaurant_id == restaurant_id)
@@ -6829,23 +8896,18 @@ class UserService:
             .all()
         )
 
-
     # -------------------------
     # Crear usuario
     # -------------------------
-
-    def create_user(self, restaurant_id: int, data: UserCreate):
-        existing = self.db.query(User).filter(
-            User.restaurant_id == restaurant_id,
-            User.username == data.username
-        ).first()
+    def create_user(self, restaurant_id: int, data: UserCreate) -> User:
+        existing = self._username_exists(restaurant_id, data.username)
         if existing:
             raise DomainError(
                 "User exists",
                 ErrorCode.USERNAME_ALREADY_EXISTS,
                 context={"username": data.username}
             )
-        hashed = get_password_hash(data.password)
+        hashed = get_password_hash(data.password.get_secret_value())
         user = User(
             username=data.username,
             password_hash=hashed,
@@ -6856,21 +8918,21 @@ class UserService:
         self.db.add(user)
         self.db.commit()
         self.db.refresh(user)
+        logger.info(
+            "Usuario creado r=%s username=%s role=%s",
+            restaurant_id,
+            user.username,
+            user.role
+        )
         return user
-
 
     # -------------------------
     # Actualizar usuario
     # -------------------------
-
-    def update_user(self, user_id: int, restaurant_id: int, data: UserUpdate):
+    def update_user(self, user_id: int, restaurant_id: int, data: UserUpdate) -> User:
         user = self.get_user(user_id, restaurant_id)
         if data.username is not None:
-            existing = self.db.query(User).filter(
-                User.restaurant_id == restaurant_id,
-                User.username == data.username,
-                User.id != user_id
-            ).first()
+            existing = self._username_exists(restaurant_id, data.username, exclude_user_id=user_id)
             if existing:
                 raise DomainError(
                     "User exists",
@@ -6881,21 +8943,35 @@ class UserService:
         if data.role is not None:
             user.role = data.role
         if data.password is not None:
-            user.password_hash = get_password_hash(data.password)
+            user.password_hash = get_password_hash(data.password.get_secret_value())
         self.db.commit()
         self.db.refresh(user)
+        logger.info(
+            "Usuario actualizado r=%s id=%s",
+            restaurant_id,
+            user.id
+        )
         return user
 
-
-    # -------------------------
+    # --------------------------------------
     # Activar / Desactivar usuario
-    # -------------------------
-
-    def toggle_user(self, user_id: int, restaurant_id: int):
-        user = self.get_user(user_id, restaurant_id)
+    # --------------------------------------
+    def toggle_user(self, target_user_id: int, current_user_id: int, restaurant_id: int) -> User:
+        if target_user_id == current_user_id:
+            raise DomainError(
+                "You cannot deactivate your own account.",
+                ErrorCode.USER_CANNOT_DEACTIVATE_SELF
+            )
+        user = self.get_user(target_user_id, restaurant_id)
         user.active = not user.active
         self.db.commit()
         self.db.refresh(user)
+        logger.info(
+            "Usuario %s id=%s",
+            "activado" if user.active else "desactivado",
+            restaurant_id,
+            user.id
+        )
         return user
 ```
 
@@ -6909,10 +8985,11 @@ class UserService:
 
 **Clases (0):**
 
-**Imports (7):**
+**Imports (8):**
 - asyncio
 - json
 - logging
+- typing.Any
 - app.core.redis.redis_client
 - app.websocket.manager.manager
 - app.services.event_worker.INSTANCE_ID
@@ -6923,6 +9000,8 @@ import asyncio
 import json
 import logging
 
+from typing import Any
+
 from app.core.redis import redis_client
 from app.websocket.manager import manager
 from app.services.event_worker import INSTANCE_ID
@@ -6932,8 +9011,10 @@ logger = logging.getLogger("app.redis_listener")
 
 CHANNEL = "restaurant_events"
 
-
-async def _process_event(data: dict):
+# --------------------------------------------------------------------------------------
+# Procesa un evento recibido desde Redis y lo distribuye mediante WebSocket.
+# --------------------------------------------------------------------------------------
+async def _process_event(data: dict[str, Any]) -> None:
     try:
 
         # ignorar eventos propios
@@ -6952,20 +9033,16 @@ async def _process_event(data: dict):
             except Exception:
                 logger.warning("Invalid JSON payload: %s", payload)
                 return
-
         if not restaurant_id or not event_type:
             logger.warning("Invalid event received: %s", data)
             return
-
         if not isinstance(payload, dict):
             logger.warning("Invalid payload type: %s", type(payload))
             return
-
         message = {
             "type": event_type,
             "payload": payload
         }
-
         logger.debug(
             "Dispatch WS event: r=%s target=%s type=%s payload=%s",
             restaurant_id,
@@ -6973,29 +9050,22 @@ async def _process_event(data: dict):
             event_type,
             payload
         )
-
         if target == "broadcast":
-
             await manager.broadcast(
                 restaurant_id,
                 message
             )
-
         elif target == "role":
-
             await manager.send_to_role(
                 restaurant_id,
                 UserRole(target_id),
                 message
             )
-
         elif target == "station":
-
             station_payload = {
                 **payload,
                 "station_id": int(target_id)
             }
-
             await manager.send_to_role(
                 restaurant_id,
                 UserRole.KITCHEN,
@@ -7004,56 +9074,42 @@ async def _process_event(data: dict):
                     "payload": station_payload
                 }
             )
-
         else:
-
             logger.warning(
                 "Unknown event target: %s",
                 target
             )
-
     except Exception:
-        logger.exception("Error processing redis event")
+        logger.exception("Error processing redis event: %s", data)
 
-
-async def redis_event_listener():
+# --------------------------------------------------------------------------------------
+# Escucha permanentemente el canal Redis y despacha los eventos recibidos.
+# Reconecta automáticamente ante cualquier fallo.
+# --------------------------------------------------------------------------------------
+async def redis_event_listener() -> None:
 
     while True:
-
         pubsub = None
-
         try:
-
             logger.info("Starting Redis listener")
-
             pubsub = redis_client.pubsub()
-
             await pubsub.subscribe(CHANNEL)
-
             logger.info("Subscribed to %s", CHANNEL)
-
             async for message in pubsub.listen():
-
                 try:
-
                     if message["type"] != "message":
                         continue
-
                     raw = message["data"]
-
                     if not raw:
                         continue
-
-                    # Redis puede enviar bytes
+                    # Redis puede devolver bytes dependiendo de la configuración del cliente.
                     if isinstance(raw, bytes):
                         raw = raw.decode()
 
                     data = json.loads(raw)
 
                     # procesar evento sin bloquear listener
-                    asyncio.create_task(
-                        _process_event(data)
-                    )
+                    asyncio.create_task(_process_event(data))
 
                 except Exception:
                     logger.exception("Error reading redis message")
@@ -7064,25 +9120,82 @@ async def redis_event_listener():
             break
 
         except Exception:
-
-            logger.exception(
-                "Redis listener crashed. Reconnecting in 3 seconds..."
-            )
-
+            logger.exception("Redis listener crashed. Reconnecting in 3 seconds...")
             await asyncio.sleep(3)
-
         finally:
-
             if pubsub:
-
                 try:
                     await pubsub.unsubscribe(CHANNEL)
                     await pubsub.close()
                 except Exception:
-                    pass
-
+                    logger.exception("Error closing Redis pubsub")
             logger.info("Redis listener stopped")
 
+```
+
+---
+
+### .\backend\app\infraestructure\restart\restart_manager.py
+
+**Funciones (2):**
+- request_restart
+- _restart
+
+**Clases (1):**
+- RestartManager
+
+**Imports (3):**
+- os
+- threading
+- time
+
+```python
+import os
+import threading
+import time
+
+
+class RestartManager:
+    """
+    Gestiona el reinicio controlado del proceso de la aplicación.
+
+    Se utiliza principalmente después de solicitar la restauración de un backup,
+    permitiendo que la respuesta HTTP sea enviada antes de finalizar el proceso.
+    """
+
+    _requested: bool = False
+    _lock = threading.Lock()
+
+    # --------------------------------------------------------------------------------------
+    # Solicita el reinicio de la aplicación.
+    # Si ya existe una solicitud pendiente, no hace nada.
+    # --------------------------------------------------------------------------------------
+    @classmethod
+    def request_restart(cls) -> None:
+
+        with cls._lock:
+
+            if cls._requested:
+                return
+
+            cls._requested = True
+
+        threading.Thread(
+            target=cls._restart,
+            daemon=True,
+        ).start()
+
+    # --------------------------------------------------------------------------------------
+    # Espera unos segundos para permitir que la respuesta HTTP llegue al cliente
+    # y luego finaliza el proceso. Docker o el supervisor correspondiente se
+    # encargará de iniciarlo nuevamente.
+    # --------------------------------------------------------------------------------------
+    @staticmethod
+    def _restart() -> None:
+
+        time.sleep(3)
+
+        os._exit(0)
 ```
 
 ---
@@ -7095,7 +9208,7 @@ async def redis_event_listener():
 - CashMovementType
 - CashMovement
 
-**Imports (11):**
+**Imports (13):**
 - enum
 - sqlalchemy.Column
 - sqlalchemy.Integer
@@ -7104,6 +9217,8 @@ async def redis_event_listener():
 - sqlalchemy.ForeignKey
 - sqlalchemy.Enum
 - sqlalchemy.String
+- sqlalchemy.Identity
+- sqlalchemy.Index
 - sqlalchemy.sql.func
 - sqlalchemy.orm.relationship
 - app.db.base_class.Base
@@ -7111,7 +9226,17 @@ async def redis_event_listener():
 ```python
 import enum
 
-from sqlalchemy import Column, Integer, DateTime, Numeric, ForeignKey, Enum, String
+from sqlalchemy import (
+    Column,
+    Integer,
+    DateTime,
+    Numeric,
+    ForeignKey,
+    Enum,
+    String,
+    Identity,
+    Index
+)
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -7124,10 +9249,13 @@ class CashMovementType(str, enum.Enum):
 
 
 class CashMovement(Base):
-
     __tablename__ = "cash_movements"
 
-    id = Column(Integer, primary_key=True)
+    id = Column(
+        Integer,
+        Identity(),
+        primary_key=True
+    )
 
     cash_register_id = Column(
         Integer,
@@ -7142,17 +9270,44 @@ class CashMovement(Base):
     )
 
     type = Column(
-        Enum(CashMovementType),
+        Enum(
+            CashMovementType,
+            values_callable=lambda enum: [
+                item.value
+                for item in enum
+            ],
+            native_enum=False,
+            length=20
+        ),
         nullable=False
     )
 
-    amount = Column(Numeric(10,2))
+    amount = Column(
+        Numeric(10, 2),
+        nullable=False
+    )
 
-    reason = Column(String(255))
+    reason = Column(
+        String(255),
+        nullable=True
+    )
 
     created_at = Column(
         DateTime,
+        nullable=False,
         server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_cash_movements_register",
+            "cash_register_id"
+        ),
+        Index(
+            "ix_cash_movements_register_type",
+            "cash_register_id",
+            "type"
+        ),
     )
 
     cash_register = relationship(
@@ -7170,7 +9325,7 @@ class CashMovement(Base):
 **Clases (1):**
 - CashRegister
 
-**Imports (10):**
+**Imports (11):**
 - sqlalchemy.Column
 - sqlalchemy.Integer
 - sqlalchemy.DateTime
@@ -7178,12 +9333,22 @@ class CashMovement(Base):
 - sqlalchemy.ForeignKey
 - sqlalchemy.Boolean
 - sqlalchemy.JSON
+- sqlalchemy.Identity
 - sqlalchemy.sql.func
 - sqlalchemy.orm.relationship
 - app.db.base_class.Base
 
 ```python
-from sqlalchemy import Column, Integer, DateTime, Numeric, ForeignKey, Boolean, JSON
+from sqlalchemy import (
+    Column,
+    Integer,
+    DateTime,
+    Numeric,
+    ForeignKey,
+    Boolean,
+    JSON,
+    Identity
+)
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -7191,10 +9356,13 @@ from app.db.base_class import Base
 
 
 class CashRegister(Base):
-
     __tablename__ = "cash_registers"
 
-    id = Column(Integer, primary_key=True)
+    id = Column(
+        Integer,
+        Identity(),
+        primary_key=True
+    )
 
     restaurant_id = Column(
         Integer,
@@ -7211,7 +9379,8 @@ class CashRegister(Base):
 
     opened_by_id = Column(
         Integer,
-        ForeignKey("users.id")
+        ForeignKey("users.id"),
+        nullable=False
     )
 
     closed_by_id = Column(
@@ -7222,7 +9391,8 @@ class CashRegister(Base):
 
     opened_at = Column(
         DateTime(timezone=True),
-        server_default=func.now()
+        server_default=func.now(),
+        nullable=False
     )
 
     closed_at = Column(
@@ -7231,40 +9401,39 @@ class CashRegister(Base):
     )
 
     opening_amount = Column(
-        Numeric(10,2),
+        Numeric(10, 2),
         nullable=False
     )
 
     closing_amount = Column(
-        Numeric(10,2),
+        Numeric(10, 2),
         nullable=True
     )
 
     expected_cash = Column(
-        Numeric(10,2),
+        Numeric(10, 2),
         nullable=True
     )
 
     counted_cash = Column(
-        Numeric(10,2),
+        Numeric(10, 2),
         nullable=True
     )
 
     difference = Column(
-        Numeric(10,2),
+        Numeric(10, 2),
         nullable=True
     )
 
     total_sales = Column(
-        Numeric(10,2),
+        Numeric(10, 2),
         nullable=True
     )
 
-    payments_snapshot = Column(JSON)
-
-    # -------------------------
-    # RELATIONSHIPS
-    # -------------------------
+    payments_snapshot = Column(
+        JSON,
+        nullable=True
+    )
 
     restaurant = relationship(
         "Restaurant",
@@ -7276,7 +9445,6 @@ class CashRegister(Base):
         back_populates="cash_register",
         cascade="all, delete-orphan"
     )
-
 ```
 
 ---
@@ -7288,97 +9456,97 @@ class CashRegister(Base):
 **Clases (1):**
 - Category
 
-**Imports (8):**
+**Imports (9):**
 - sqlalchemy.Column
 - sqlalchemy.Integer
 - sqlalchemy.Boolean
 - sqlalchemy.ForeignKey
 - sqlalchemy.String
 - sqlalchemy.UniqueConstraint
-- app.db.base_class.Base
+- sqlalchemy.Identity
 - sqlalchemy.orm.relationship
+- app.db.base_class.Base
 
 ```python
-from sqlalchemy import Column, Integer, Boolean, ForeignKey, String, UniqueConstraint
-from app.db.base_class import Base
+from sqlalchemy import (
+    Column,
+    Integer,
+    Boolean, 
+    ForeignKey, 
+    String, 
+    UniqueConstraint, 
+    Identity
+)
 from sqlalchemy.orm import relationship
 
+from app.db.base_class import Base
 
 class Category(Base):
     __tablename__ = "categories"
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, Identity(), primary_key=True)
 
     name = Column(String, nullable=False)
 
-    restaurant_id = Column(
-        Integer,
-        ForeignKey("restaurants.id"),
-        nullable=False
-    )
-    __table_args__ = (
-        UniqueConstraint("restaurant_id", "name", name="uq_category_name_per_restaurant"),
-    )
-    restaurant = relationship("Restaurant", back_populates="categories")
-    products = relationship("Product", back_populates="category")
-
-
-```
-
----
-
-### .\backend\app\models\domain_event.py
-
-**Funciones (0):**
-
-**Clases (1):**
-- DomainEvent
-
-**Imports (9):**
-- sqlalchemy.Column
-- sqlalchemy.Integer
-- sqlalchemy.String
-- sqlalchemy.JSON
-- sqlalchemy.DateTime
-- sqlalchemy.func
-- sqlalchemy.ForeignKey
-- sqlalchemy.orm.relationship
-- app.db.base_class.Base
-
-```python
-from sqlalchemy import Column, Integer, String, JSON, DateTime, func, ForeignKey
-from sqlalchemy.orm import relationship
-
-from app.db.base_class import Base
-
-
-class DomainEvent(Base):
-
-    __tablename__ = "domain_events"
-
-    id = Column(Integer, primary_key=True, index=True)
-
-    restaurant_id = Column(
-        Integer,
-        ForeignKey("restaurants.id"),
+    active = Column(
+        Boolean,
         nullable=False,
-        index=True
+        default=True
     )
 
-    event_type = Column(String, nullable=False)
-
-    payload = Column(JSON)
-
-    created_at = Column(
-        DateTime,
-        server_default=func.now(),
+    restaurant_id = Column(
+        Integer,
+        ForeignKey("restaurants.id"),
         nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "restaurant_id",
+            "name",
+            name="uq_category_name_per_restaurant"
+        ),
     )
 
     restaurant = relationship(
         "Restaurant",
-        back_populates="domain_events"
+        back_populates="categories"
     )
+
+    products = relationship(
+        "Product",
+        back_populates="category"
+    )
+```
+
+---
+
+### .\backend\app\models\enums.py
+
+**Funciones (0):**
+
+**Clases (2):**
+- BackupFrequency
+- TableShape
+
+**Imports (1):**
+- enum.Enum
+
+```python
+from enum import Enum
+
+
+class BackupFrequency(str, Enum):
+    MANUAL = "manual"
+    DAILY = "daily"
+    WEEKLY = "weekly"
+    MONTHLY = "monthly"
+
+class TableShape(str, Enum):
+    CIRCLE = "circle"
+    SQUARE = "square"
+    RECTANGLE_HORIZONTAL = "rectangle-horizontal"
+    RECTANGLE_VERTICAL = "rectangle-vertical"
 ```
 
 ---
@@ -7390,13 +9558,15 @@ class DomainEvent(Base):
 **Clases (1):**
 - EventOutbox
 
-**Imports (9):**
+**Imports (11):**
 - sqlalchemy.Column
 - sqlalchemy.Integer
 - sqlalchemy.String
 - sqlalchemy.DateTime
 - sqlalchemy.JSON
 - sqlalchemy.ForeignKey
+- sqlalchemy.Identity
+- sqlalchemy.Index
 - sqlalchemy.func
 - sqlalchemy.orm.relationship
 - app.db.base_class.Base
@@ -7409,29 +9579,33 @@ from sqlalchemy import (
     DateTime,
     JSON,
     ForeignKey,
+    Identity,
+    Index,
     func
 )
-
 from sqlalchemy.orm import relationship
+
 from app.db.base_class import Base
 
-class EventOutbox(Base):
 
+class EventOutbox(Base):
     __tablename__ = "event_outbox"
 
-    id = Column(Integer, primary_key=True)
+    id = Column(
+        Integer,
+        Identity(),
+        primary_key=True
+    )
 
     restaurant_id = Column(
         Integer,
         ForeignKey("restaurants.id"),
-        nullable=False,
-        index=True
+        nullable=False
     )
 
     event_type = Column(
         String,
-        nullable=False,
-        index=True
+        nullable=False
     )
 
     payload = Column(
@@ -7452,8 +9626,7 @@ class EventOutbox(Base):
     status = Column(
         String,
         nullable=False,
-        default="pending",
-        index=True
+        default="pending"
     )
 
     retries = Column(
@@ -7465,8 +9638,7 @@ class EventOutbox(Base):
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
-        nullable=False,
-        index=True
+        nullable=False
     )
 
     processed_at = Column(
@@ -7477,6 +9649,36 @@ class EventOutbox(Base):
     last_error = Column(
         String,
         nullable=True
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_event_outbox_restaurant",
+            "restaurant_id"
+        ),
+        Index(
+            "ix_event_outbox_event_type",
+            "event_type"
+        ),
+        Index(
+            "ix_event_outbox_status",
+            "status"
+        ),
+        Index(
+            "ix_event_outbox_created",
+            "created_at"
+        ),
+        Index(
+            "idx_event_outbox_cleanup",
+            "status",
+            "processed_at"
+        ),
+        Index(
+            "idx_event_outbox_failed_cleanup",
+            "status",
+            "retries",
+            "created_at"
+        ),
     )
 
     restaurant = relationship(
@@ -7495,7 +9697,7 @@ class EventOutbox(Base):
 - OrderStatus
 - Order
 
-**Imports (13):**
+**Imports (14):**
 - enum
 - uuid
 - sqlalchemy.Column
@@ -7506,6 +9708,7 @@ class EventOutbox(Base):
 - sqlalchemy.DateTime
 - sqlalchemy.Enum
 - sqlalchemy.Index
+- sqlalchemy.Identity
 - sqlalchemy.sql.func
 - app.db.base_class.Base
 - sqlalchemy.orm.relationship
@@ -7513,7 +9716,17 @@ class EventOutbox(Base):
 ```python
 import enum
 import uuid
-from sqlalchemy import Column, Integer, Numeric, ForeignKey, String, DateTime, Enum, Index
+from sqlalchemy import (
+    Column, 
+    Integer, 
+    Numeric, 
+    ForeignKey, 
+    String, 
+    DateTime, 
+    Enum, 
+    Index, 
+    Identity
+)
 from sqlalchemy.sql import func
 from app.db.base_class import Base
 from sqlalchemy.orm import relationship
@@ -7531,7 +9744,7 @@ class OrderStatus(str, enum.Enum):
 class Order(Base):
     __tablename__ = "orders"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, Identity(), primary_key=True, index=True)
     restaurant_id = Column(
         Integer,
         ForeignKey("restaurants.id"),
@@ -7546,8 +9759,16 @@ class Order(Base):
         nullable=False
     )
 
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    closed_at = Column(DateTime, nullable=True)
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False
+    )
+
+    closed_at = Column(
+        DateTime(timezone=True),
+        nullable=True
+    )
     discount = Column(Numeric(10, 2), nullable=False, default=0)
     external_id = Column(
         String,
@@ -7575,19 +9796,30 @@ class Order(Base):
 - OrderItemStatus
 - OrderItem
 
-**Imports (9):**
+**Imports (11):**
 - sqlalchemy.Column
 - sqlalchemy.Integer
 - sqlalchemy.ForeignKey
 - sqlalchemy.Numeric
 - sqlalchemy.String
 - sqlalchemy.Enum
+- sqlalchemy.Identity
+- sqlalchemy.Index
 - sqlalchemy.orm.relationship
 - enum
 - app.db.base_class.Base
 
 ```python
-from sqlalchemy import Column, Integer, ForeignKey, Numeric, String, Enum
+from sqlalchemy import (
+    Column,
+    Integer,
+    ForeignKey,
+    Numeric,
+    String,
+    Enum,
+    Identity,
+    Index
+)
 from sqlalchemy.orm import relationship
 import enum
 
@@ -7605,7 +9837,11 @@ class OrderItemStatus(str, enum.Enum):
 class OrderItem(Base):
     __tablename__ = "order_items"
 
-    id = Column(Integer, primary_key=True)
+    id = Column(
+        Integer,
+        Identity(),
+        primary_key=True
+    )
 
     restaurant_id = Column(
         Integer,
@@ -7626,9 +9862,15 @@ class OrderItem(Base):
         nullable=False
     )
 
-    quantity = Column(Integer, nullable=False)
+    quantity = Column(
+        Integer,
+        nullable=False
+    )
 
-    unit_price = Column(Numeric(10, 2), nullable=False)
+    unit_price = Column(
+        Numeric(10, 2),
+        nullable=False
+    )
 
     status = Column(
         Enum(OrderItemStatus),
@@ -7636,13 +9878,30 @@ class OrderItem(Base):
         nullable=False
     )
 
-    notes = Column(String, nullable=True)
+    notes = Column(
+        String,
+        nullable=True
+    )
 
-    # Relaciones
-    order = relationship("Order", back_populates="items")
+    __table_args__ = (
+        Index(
+            "ix_order_items_order_status",
+            "order_id",
+            "status"
+        ),
+    )
+
+    order = relationship(
+        "Order",
+        back_populates="items"
+    )
+
     product = relationship("Product")
-    restaurant = relationship("Restaurant", back_populates="order_items")
 
+    restaurant = relationship(
+        "Restaurant",
+        back_populates="order_items"
+    )
 ```
 
 ---
@@ -7655,21 +9914,32 @@ class OrderItem(Base):
 - PaymentMethod
 - Payment
 
-**Imports (8):**
+**Imports (9):**
 - enum
 - sqlalchemy.Column
 - sqlalchemy.Integer
 - sqlalchemy.Enum
 - sqlalchemy.Numeric
 - sqlalchemy.ForeignKey
+- sqlalchemy.Identity
 - sqlalchemy.orm.relationship
 - app.db.base_class.Base
 
 ```python
 import enum
-from sqlalchemy import Column, Integer, Enum, Numeric, ForeignKey
+
+from sqlalchemy import (
+    Column,
+    Integer,
+    Enum,
+    Numeric,
+    ForeignKey,
+    Identity
+)
 from sqlalchemy.orm import relationship
+
 from app.db.base_class import Base
+
 
 class PaymentMethod(str, enum.Enum):
     CASH = "CASH"
@@ -7681,28 +9951,54 @@ class PaymentMethod(str, enum.Enum):
 class Payment(Base):
     __tablename__ = "payments"
 
-    id = Column(Integer, primary_key=True)
+    id = Column(
+        Integer,
+        Identity(),
+        primary_key=True
+    )
+
     restaurant_id = Column(
         Integer,
         ForeignKey("restaurants.id"),
         nullable=False,
         index=True
     )
-    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
-    method = Column(Enum(PaymentMethod), nullable=False)
-    amount = Column(Numeric(10,2), nullable=False)
+
+    order_id = Column(
+        Integer,
+        ForeignKey("orders.id"),
+        nullable=False
+    )
+
+    method = Column(
+        Enum(PaymentMethod),
+        nullable=False
+    )
+
+    amount = Column(
+        Numeric(10, 2),
+        nullable=False
+    )
+
     cash_register_id = Column(
         Integer,
         ForeignKey("cash_registers.id"),
         nullable=False
     )
-    order = relationship("Order", back_populates="payments")
-    cash_register = relationship("CashRegister")
-    restaurant = relationship("Restaurant", back_populates="payments")
 
+    order = relationship(
+        "Order",
+        back_populates="payments"
+    )
 
+    cash_register = relationship(
+        "CashRegister"
+    )
 
-
+    restaurant = relationship(
+        "Restaurant",
+        back_populates="payments"
+    )
 ```
 
 ---
@@ -7714,7 +10010,7 @@ class Payment(Base):
 **Clases (1):**
 - Product
 
-**Imports (9):**
+**Imports (10):**
 - sqlalchemy.Column
 - sqlalchemy.Integer
 - sqlalchemy.String
@@ -7722,18 +10018,20 @@ class Payment(Base):
 - sqlalchemy.Boolean
 - sqlalchemy.ForeignKey
 - sqlalchemy.UniqueConstraint
+- sqlalchemy.Identity
 - app.db.base_class.Base
 - sqlalchemy.orm.relationship
 
 ```python
-from sqlalchemy import Column, Integer, String, Numeric, Boolean, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Numeric, Boolean, ForeignKey, UniqueConstraint, Identity
 from app.db.base_class import Base
 from sqlalchemy.orm import relationship
 
 class Product(Base):
     __tablename__ = "products"
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, Identity(), primary_key=True)
+
     restaurant_id = Column(
         Integer,
         ForeignKey("restaurants.id"),
@@ -7742,9 +10040,23 @@ class Product(Base):
     )
     name = Column(String, nullable=False)
     price = Column(Numeric(10, 2), nullable=False)
-    active = Column(Boolean, default=True)
-    station_id = Column(ForeignKey("production_stations.id"))
-    category_id = Column(Integer, ForeignKey("categories.id"))
+    active = Column(
+        Boolean,
+        nullable=False,
+        default=True
+    )
+
+    station_id = Column(
+        Integer,
+        ForeignKey("production_stations.id"),
+        nullable=False
+    )
+
+    category_id = Column(
+        Integer,
+        ForeignKey("categories.id"),
+        nullable=False
+    )
     
     __table_args__ = (
         UniqueConstraint("restaurant_id", "name", name="uq_product_name_per_restaurant"),
@@ -7766,8 +10078,7 @@ class Product(Base):
 **Clases (1):**
 - ProductionStation
 
-**Imports (8):**
-- app.db.base_class.Base
+**Imports (9):**
 - sqlalchemy.orm.relationship
 - sqlalchemy.Column
 - sqlalchemy.Integer
@@ -7775,19 +10086,29 @@ class Product(Base):
 - sqlalchemy.Boolean
 - sqlalchemy.ForeignKey
 - sqlalchemy.UniqueConstraint
+- sqlalchemy.Identity
+- app.db.base_class.Base
 
 ```python
-from app.db.base_class import Base
 from sqlalchemy.orm import relationship
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, UniqueConstraint
+from sqlalchemy import (
+    Column, 
+    Integer, 
+    String, 
+    Boolean, 
+    ForeignKey, 
+    UniqueConstraint, 
+    Identity
+)
+from app.db.base_class import Base
 
 class ProductionStation(Base):
     __tablename__ = "production_stations"
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, Identity(), primary_key=True)
     restaurant_id = Column(ForeignKey("restaurants.id"), nullable=False)
     name = Column(String, nullable=False)
-    active = Column(Boolean, default=True)
+    active = Column(Boolean, nullable=False, default=True)
 
     __table_args__ = (
         UniqueConstraint("restaurant_id", "name", name="uq_station_name_per_restaurant"),
@@ -7806,23 +10127,33 @@ class ProductionStation(Base):
 **Clases (1):**
 - Restaurant
 
-**Imports (10):**
+**Imports (11):**
+- uuid
 - sqlalchemy.Column
 - sqlalchemy.Integer
 - sqlalchemy.String
 - sqlalchemy.DateTime
 - sqlalchemy.Boolean
+- sqlalchemy.Identity
 - sqlalchemy.orm.relationship
 - datetime.datetime
 - datetime.timezone
-- uuid
 - app.db.base_class.Base
 
 ```python
-from sqlalchemy import Column, Integer, String, DateTime, Boolean
-from sqlalchemy.orm import relationship
-from datetime import datetime, timezone
 import uuid
+
+from sqlalchemy import (
+    Column, 
+    Integer, 
+    String, 
+    DateTime, 
+    Boolean, 
+    Identity
+)
+from sqlalchemy.orm import relationship
+
+from datetime import datetime, timezone
 
 from app.db.base_class import Base
 
@@ -7830,7 +10161,7 @@ from app.db.base_class import Base
 class Restaurant(Base):
     __tablename__ = "restaurants"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, Identity(), primary_key=True)
 
     name = Column(String, nullable=False)
 
@@ -7853,21 +10184,65 @@ class Restaurant(Base):
     )
 
     # Relaciones
-    tables = relationship("Table", back_populates="restaurant", cascade="all, delete")
-    products = relationship("Product", back_populates="restaurant", cascade="all, delete")
-    payments = relationship("Payment", back_populates="restaurant", cascade="all, delete")
-    orders = relationship("Order", back_populates="restaurant", cascade="all, delete")
-    cash_registers = relationship("CashRegister", back_populates="restaurant", cascade="all, delete")
-    stations = relationship("ProductionStation", back_populates="restaurant", cascade="all, delete")
-    categories = relationship("Category", back_populates="restaurant", cascade="all, delete")
-    order_items = relationship("OrderItem", back_populates="restaurant", cascade="all, delete")
-    users = relationship("User", back_populates="restaurant")
-    domain_events = relationship("DomainEvent", back_populates="restaurant")
+    tables = relationship(
+        "Table",
+        back_populates="restaurant",
+        cascade="all, delete"
+    )
+
+    products = relationship(
+        "Product",
+        back_populates="restaurant",
+        cascade="all, delete"
+    )
+
+    payments = relationship(
+        "Payment",
+        back_populates="restaurant",
+        cascade="all, delete"
+    )
+
+    orders = relationship(
+        "Order",
+        back_populates="restaurant",
+        cascade="all, delete"
+    )
+
+    cash_registers = relationship(
+        "CashRegister",
+        back_populates="restaurant",
+        cascade="all, delete"
+    )
+
+    stations = relationship(
+        "ProductionStation",
+        back_populates="restaurant",
+        cascade="all, delete"
+    )
+
+    categories = relationship(
+        "Category",
+        back_populates="restaurant",
+        cascade="all, delete"
+    )
+
+    order_items = relationship(
+        "OrderItem",
+        back_populates="restaurant",
+        cascade="all, delete"
+    )
+
+    users = relationship(
+        "User",
+        back_populates="restaurant"
+    )
+
     event_outbox = relationship(
         "EventOutbox",
         back_populates="restaurant",
         cascade="all, delete-orphan"
     )
+
     settings = relationship(
         "SystemSettings",
         back_populates="restaurant",
@@ -7895,12 +10270,18 @@ class Restaurant(Base):
 - app.db.base_class.Base
 
 ```python
-from sqlalchemy import Column, Integer, Boolean, String, ForeignKey
+from sqlalchemy import (
+    Column,
+    Integer,
+    Boolean,
+    String,
+    ForeignKey
+)
+
 from app.db.base_class import Base
 
 
 class RestaurantLayout(Base):
-
     __tablename__ = "restaurant_layout"
 
     restaurant_id = Column(
@@ -7909,13 +10290,34 @@ class RestaurantLayout(Base):
         primary_key=True
     )
 
-    width = Column(Integer, default=900)
-    height = Column(Integer, default=500)
+    width = Column(
+        Integer,
+        nullable=False,
+        default=900
+    )
 
-    grid_size = Column(Integer, default=40)
-    snap_to_grid = Column(Boolean, default=True)
+    height = Column(
+        Integer,
+        nullable=False,
+        default=500
+    )
 
-    background_image = Column(String, nullable=True)
+    grid_size = Column(
+        Integer,
+        nullable=False,
+        default=40
+    )
+
+    snap_to_grid = Column(
+        Boolean,
+        nullable=False,
+        default=True
+    )
+
+    background_image = Column(
+        String,
+        nullable=True
+    )
 ```
 
 ---
@@ -7927,47 +10329,77 @@ class RestaurantLayout(Base):
 **Clases (1):**
 - SystemSettings
 
-**Imports (7):**
+**Imports (12):**
+- datetime.time
 - sqlalchemy.Column
+- sqlalchemy.DateTime
 - sqlalchemy.Integer
 - sqlalchemy.String
 - sqlalchemy.Boolean
 - sqlalchemy.ForeignKey
+- sqlalchemy.Time
+- sqlalchemy.Enum
 - sqlalchemy.orm.relationship
+- app.models.enums.BackupFrequency
 - app.db.base_class.Base
 
 ```python
 # app/models/system_settings.py
 
+from datetime import time
+
 from sqlalchemy import (
     Column,
+    DateTime,
     Integer,
     String,
     Boolean,
-    ForeignKey
+    ForeignKey,
+    Time,
+    Enum as SqlEnum,
 )
 from sqlalchemy.orm import relationship
 
+from app.models.enums import BackupFrequency
+
 from app.db.base_class import Base
+
 
 class SystemSettings(Base):
     __tablename__ = "system_settings"
 
     restaurant_id = Column(
         Integer,
-        ForeignKey(
-            "restaurants.id",
-            ondelete="CASCADE"
-        ),
+        ForeignKey("restaurants.id", ondelete="CASCADE"),
         primary_key=True
     )
 
-    smtp_host = Column(String)
-    smtp_port = Column(Integer,nullable=True)
-    smtp_user = Column(String)
-    smtp_password = Column(String)
+    # SMTP
+    smtp_host = Column(
+        String,
+        nullable=True
+    )
 
-    smtp_from = Column(String)
+    smtp_port = Column(
+        Integer,
+        nullable=False,
+        default=587
+    )
+
+    smtp_user = Column(
+        String,
+        nullable=True
+    )
+
+    smtp_password = Column(
+        String,
+        nullable=True
+    )
+
+    smtp_from = Column(
+        String,
+        nullable=True
+    )
 
     smtp_use_tls = Column(
         Boolean,
@@ -7975,7 +10407,99 @@ class SystemSettings(Base):
         default=True
     )
 
-    backup_email = Column(String)
+
+    # Backups
+    backup_email = Column(
+        String,
+        nullable=True
+    )
+
+    backup_frequency = Column(
+        SqlEnum(
+            BackupFrequency,
+            values_callable=lambda enum: [
+                item.value
+                for item in enum
+            ],
+            native_enum=False,
+            length=20
+        ),
+        nullable=False,
+        default=BackupFrequency.MANUAL
+    )
+
+    backup_retention_daily = Column(
+        Integer,
+        nullable=False,
+        default=30
+    )
+
+    backup_retention_weekly = Column(
+        Integer,
+        nullable=False,
+        default=84
+    )
+
+    backup_retention_monthly = Column(
+        Integer,
+        nullable=False,
+        default=365
+    )
+
+    backup_time = Column(
+        Time,
+        nullable=False,
+        default=time(hour=3, minute=0)
+    )
+
+    backup_weekday = Column(
+        Integer,
+        nullable=True
+    )
+
+    backup_monthday = Column(
+        Integer,
+        nullable=True
+    )
+
+    backup_enabled = Column(
+        Boolean,
+        nullable=False,
+        default=False
+    )
+
+    last_automatic_backup_at = Column(
+        DateTime(timezone=True),
+        nullable=True
+    )
+
+    next_automatic_backup_at = Column(
+        DateTime(timezone=True),
+        nullable=True
+    )
+
+    last_backup_result = Column(
+        String,
+        nullable=True
+    )
+
+    backup_keep_local = Column(
+        Boolean,
+        nullable=False,
+        default=True
+    )
+
+    backup_send_email = Column(
+        Boolean,
+        nullable=False,
+        default=False
+    )
+
+    backup_timezone = Column(
+        String,
+        nullable=False,
+        default="America/Montevideo"
+    )
 
     restaurant = relationship(
         "Restaurant",
@@ -7992,7 +10516,7 @@ class SystemSettings(Base):
 **Clases (1):**
 - Table
 
-**Imports (10):**
+**Imports (12):**
 - uuid
 - sqlalchemy.Column
 - sqlalchemy.Integer
@@ -8001,11 +10525,14 @@ class SystemSettings(Base):
 - sqlalchemy.String
 - sqlalchemy.UniqueConstraint
 - sqlalchemy.Index
+- sqlalchemy.Identity
 - sqlalchemy.orm.relationship
 - app.db.base_class.Base
+- app.models.enums.TableShape
 
 ```python
 import uuid
+
 from sqlalchemy import (
     Column,
     Integer,
@@ -8013,16 +10540,24 @@ from sqlalchemy import (
     ForeignKey,
     String,
     UniqueConstraint,
-    Index
+    Index,
+    Identity
 )
 from sqlalchemy.orm import relationship
+
 from app.db.base_class import Base
+
+from app.models.enums import TableShape
 
 
 class Table(Base):
     __tablename__ = "tables"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(
+        Integer,
+        Identity(),
+        primary_key=True
+    )
 
     restaurant_id = Column(
         Integer,
@@ -8031,24 +10566,47 @@ class Table(Base):
         index=True
     )
 
-    number = Column(Integer, nullable=False)
-
-    active = Column(Boolean, default=True, nullable=False)
-
-    x = Column(Integer, nullable=False, default=0)
-    y = Column(Integer, nullable=False, default=0)
-
-    capacity = Column(Integer, default=4, nullable=False)
-
-    shape = Column(String, default="Circular")
-
-    external_id = Column(
-        String,
-        default=lambda: str(uuid.uuid4()),
+    number = Column(
+        Integer,
         nullable=False
     )
 
-    # 🔐 Multi-tenant constraints correctas
+    active = Column(
+        Boolean,
+        nullable=False,
+        default=True
+    )
+
+    x = Column(
+        Integer,
+        nullable=False,
+        default=0
+    )
+
+    y = Column(
+        Integer,
+        nullable=False,
+        default=0
+    )
+
+    capacity = Column(
+        Integer,
+        nullable=False,
+        default=4
+    )
+
+    shape = Column(
+        String,
+        nullable=False,
+        default=TableShape.CIRCLE.value
+    )
+
+    external_id = Column(
+        String,
+        nullable=False,
+        default=lambda: str(uuid.uuid4())
+    )
+
     __table_args__ = (
         UniqueConstraint(
             "restaurant_id",
@@ -8067,7 +10625,6 @@ class Table(Base):
         ),
     )
 
-    # Relaciones
     orders = relationship(
         "Order",
         back_populates="table"
@@ -8089,7 +10646,7 @@ class Table(Base):
 - UserRole
 - User
 
-**Imports (9):**
+**Imports (11):**
 - enum
 - sqlalchemy.Column
 - sqlalchemy.Integer
@@ -8097,12 +10654,24 @@ class Table(Base):
 - sqlalchemy.Enum
 - sqlalchemy.ForeignKey
 - sqlalchemy.Boolean
+- sqlalchemy.Identity
+- sqlalchemy.UniqueConstraint
 - sqlalchemy.orm.relationship
 - app.db.base_class.Base
 
 ```python
 import enum
-from sqlalchemy import Column, Integer, String, Enum, ForeignKey, Boolean
+
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Enum,
+    ForeignKey,
+    Boolean,
+    Identity,
+    UniqueConstraint
+)
 from sqlalchemy.orm import relationship
 
 from app.db.base_class import Base
@@ -8118,24 +10687,52 @@ class UserRole(str, enum.Enum):
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True)
+    id = Column(
+        Integer,
+        Identity(),
+        primary_key=True
+    )
 
     restaurant_id = Column(
         Integer,
         ForeignKey("restaurants.id"),
+        nullable=False,
+        index=True
+    )
+
+    username = Column(
+        String,
         nullable=False
     )
 
-    username = Column(String, nullable=False)
+    role = Column(
+        Enum(UserRole),
+        nullable=False
+    )
 
-    role = Column(Enum(UserRole), nullable=False)
+    password_hash = Column(
+        String,
+        nullable=False
+    )
 
-    password_hash = Column(String, nullable=False)
+    active = Column(
+        Boolean,
+        nullable=False,
+        default=True
+    )
 
-    active = Column(Boolean, default=True)
+    __table_args__ = (
+        UniqueConstraint(
+            "restaurant_id",
+            "username",
+            name="uq_user_username_per_restaurant"
+        ),
+    )
 
-    restaurant = relationship("Restaurant", back_populates="users")
-
+    restaurant = relationship(
+        "Restaurant",
+        back_populates="users"
+    )
 ```
 
 ---
@@ -8157,11 +10754,11 @@ class User(Base):
 - production_station.ProductionStation
 - category.Category
 - user.User
-- domain_event.DomainEvent
 - restaurant_layout.RestaurantLayout
 - cash_movement.CashMovement
 - event_outbox.EventOutbox
 - system_settings.SystemSettings
+- enums.BackupFrequency
 
 ```python
 from .table import Table
@@ -8174,11 +10771,11 @@ from .restaurant import Restaurant
 from .production_station import ProductionStation
 from .category import Category
 from .user import User
-from .domain_event import DomainEvent
 from .restaurant_layout import RestaurantLayout
 from .cash_movement import CashMovement
 from .event_outbox import EventOutbox
 from .system_settings import SystemSettings
+from .enums import BackupFrequency
 
 ```
 
@@ -8193,40 +10790,56 @@ from .system_settings import SystemSettings
 **Clases (0):**
 
 **Imports (14):**
+- logging
 - fastapi.APIRouter
 - fastapi.Depends
 - fastapi.HTTPException
 - fastapi.status
-- sqlalchemy.orm.Session
 - fastapi.security.OAuth2PasswordRequestForm
-- logging
+- sqlalchemy.orm.Session
 - app.db.session.get_db
+- app.dependencies.auth.get_current_user
+- app.core.security.create_access_token
+- app.core.security.verify_password
 - app.models.user.User
 - app.schemas.auth.TokenResponse
 - app.schemas.user.UserOut
-- app.core.security.create_access_token
-- app.core.security.verify_password
-- app.dependencies.auth.get_current_user
 
 ```python
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from fastapi.security import OAuth2PasswordRequestForm
+"""
+Endpoints para la gestión de la autenticación de usuarios.
+Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
+"""
 import logging
 
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy.orm import Session
+
 from app.db.session import get_db
+
+from app.dependencies.auth import get_current_user
+from app.core.security import create_access_token, verify_password
+
 from app.models.user import User
+
 from app.schemas.auth import TokenResponse
 from app.schemas.user import UserOut
-from app.core.security import create_access_token, verify_password
-from app.dependencies.auth import get_current_user
 
 logger = logging.getLogger("app.routers.auth")
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-
-@router.post("/login", response_model=TokenResponse)
+# ----------------------------------------------------------------------------------------------------
+# Autenticar usuario
+# ----------------------------------------------------------------------------------------------------
+@router.post(
+    "/login",
+    response_model=TokenResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Iniciar sesión",
+    description="Autentica un usuario y devuelve un JWT."
+)
 def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
@@ -8253,17 +10866,19 @@ def login(
         "role": user.role.value,
         "restaurant_id": user.restaurant_id
     })
+    return TokenResponse(access_token=token, token_type="bearer")
 
-    return TokenResponse(
-        access_token=token,
-        token_type="bearer"
-    )
-
-
-@router.get("/me", response_model=UserOut)
-def get_me(
-    user: User = Depends(get_current_user)
-):
+# ----------------------------------------------------------------------------------------------------
+# Obtener datos del usuario autenticado
+# ----------------------------------------------------------------------------------------------------
+@router.get(
+    "/me",
+    response_model=UserOut,
+    status_code=status.HTTP_200_OK,
+    summary="Usuario autenticado",
+    description="Devuelve la información del usuario autenticado."
+)
+def get_me(user: User = Depends(get_current_user)):
     return user
 ```
 
@@ -8271,42 +10886,109 @@ def get_me(
 
 ### .\backend\app\routers\backups.py
 
-**Funciones (3):**
-- backup_status
+**Funciones (7):**
 - create_backup
 - create_and_email_backup
+- restore_backup
+- backup_status
+- list_backups
+- download_backup
+- delete_backup
 
-**Clases (1):**
-- BackupEmailRequest
+**Clases (0):**
 
 **Imports (8):**
 - fastapi.APIRouter
 - fastapi.Depends
-- fastapi.HTTPException
-- pydantic.BaseModel
+- fastapi.status
 - app.dependencies.roles.admin_only
 - app.domain.backup.backup_service.BackupService
-- app.models.user.User
 - app.domain.backup.dependencies.get_backup_service
+- app.models.user.User
+- app.schemas.backup.BackupEmailRequest
 
 ```python
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+"""
+Endpoints para la gestión de backups.
+Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
+"""
+
+from fastapi import APIRouter, Depends, status
 
 from app.dependencies.roles import admin_only
+
 from app.domain.backup.backup_service import BackupService
-from app.models.user import User
 from app.domain.backup.dependencies import get_backup_service
 
+from app.models.user import User
+
+from app.schemas.backup import BackupEmailRequest
 
 router = APIRouter(prefix="/backups", tags=["backups"])
 
+# ----------------------------------------------------------------------------------------------------
+# Crear un backup
+# ----------------------------------------------------------------------------------------------------
+@router.post(
+    "",
+    status_code=status.HTTP_201_CREATED,
+    summary="Crea un backup",
+    description="Crea un backup manual."
+)
+def create_backup(
+    user: User = Depends(admin_only),
+    service: BackupService = Depends(
+        get_backup_service
+    )
+):
+    return service.create_backup(user.restaurant_id)
 
-class BackupEmailRequest(BaseModel):
-    email: str
+# ----------------------------------------------------------------------------------------------------
+# Crea un backup y lo envía por correo electrónico
+# ----------------------------------------------------------------------------------------------------
+@router.post(
+    "/email",
+    status_code=status.HTTP_201_CREATED,
+    summary="Crear backup y enviar por e-mail",
+    description="Crea un backup y lo envía por e-mail al e-mail configurado."
+)
+def create_and_email_backup(
+    data: BackupEmailRequest,
+    user: User = Depends(admin_only),
+    service: BackupService = Depends(
+        get_backup_service
+    )
+):
+    return service.create_and_email_backup(data.email, user.restaurant_id)
 
+# ----------------------------------------------------------------------------------------------------
+# Restaura un backup
+# ----------------------------------------------------------------------------------------------------
+@router.post(
+    "/restore/{filename:path}",
+    status_code=status.HTTP_201_CREATED,
+    summary="Restaurar un backup existente",
+    description="Restaura un backup existente a partir del archivo seleccionado."
+)
+def restore_backup(
+    filename: str,
+    user: User = Depends(admin_only),
+    service: BackupService = Depends(get_backup_service)
+):
+    return service.restore_backup(
+        restaurant_id=user.restaurant_id,
+        filename=filename
+    )
 
-@router.get("/status")
+# ----------------------------------------------------------------------------------------------------
+# Obtiene el status de un backup
+# ----------------------------------------------------------------------------------------------------
+@router.get(
+    "/status",
+    status_code=status.HTTP_200_OK,
+    summary="Obtener el status del backup",
+    description="Obtiene el status del backup seleccionado."
+)
 def backup_status(
     user: User = Depends(admin_only),
     service: BackupService = Depends(
@@ -8317,31 +10999,58 @@ def backup_status(
         user.restaurant_id
     )
 
-
-@router.post("")
-def create_backup(
+# ----------------------------------------------------------------------------------------------------
+# Obtiene un listado de los backups
+# ----------------------------------------------------------------------------------------------------
+@router.get(
+    "/files",
+    status_code=status.HTTP_200_OK,
+    summary="Listado de backups",
+    description="Obtiene un listado de todos los backups del restaurant autenticado."
+)
+def list_backups(
     user: User = Depends(admin_only),
-    service: BackupService = Depends(
-        get_backup_service
-    )
+    service: BackupService = Depends(get_backup_service)
 ):
-    return service.create_backup(user.restaurant_id)
+    return service.list_backups(user.restaurant_id)
 
-
-
-@router.post("/email")
-def create_and_email_backup(
-    data: BackupEmailRequest,
+# ----------------------------------------------------------------------------------------------------
+# Descarga un backup a un dispositivo de almacenamiento
+# ----------------------------------------------------------------------------------------------------
+@router.get(
+    "/download/{filename:path}",
+    status_code=status.HTTP_200_OK,
+    summary="Descargar backup",
+    description="Descarga un backup a un dispositivo de almacenamiento."
+)
+def download_backup(
+    filename: str,
     user: User = Depends(admin_only),
-    service: BackupService = Depends(
-        get_backup_service
-    )
+    service: BackupService = Depends(get_backup_service)
 ):
-    if "@" not in data.email or "." not in data.email:
-        raise HTTPException(status_code=400, detail="Correo electronico invalido")
+    return service.download_backup(
+        restaurant_id=user.restaurant_id,
+        filename=filename
+    )
 
-    return service.create_and_email_backup(data.email, user.restaurant_id)
-
+# ----------------------------------------------------------------------------------------------------
+# Elimina un backup
+# ----------------------------------------------------------------------------------------------------
+@router.delete(
+    "/{filename:path}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Elimina un backup",
+    description="Elimina el backup seleccionado."
+)
+def delete_backup(
+    filename: str,
+    user: User = Depends(admin_only),
+    service: BackupService = Depends(get_backup_service)
+):
+    service.delete_backup(
+        restaurant_id=user.restaurant_id,
+        filename=filename
+    )
 ```
 
 ---
@@ -8352,43 +11061,40 @@ def create_and_email_backup(
 - open_cash_register
 - close_cash_register
 - create_cash_movement
-- delete_cash_movement
 - current_cash_register
 - get_cash_register_dashboard
+- delete_cash_movement
 
 **Clases (0):**
 
-**Imports (14):**
+**Imports (17):**
 - fastapi.APIRouter
 - fastapi.Depends
-- app.models.user.User
+- fastapi.status
 - app.dependencies.roles.cashier_or_admin
-- app.schemas.cash_register.CashRegisterOpen
-- app.schemas.cash_register.CashRegisterSummary
-- app.schemas.cash_register.CashRegisterCloseOut
-- app.schemas.cash_register.CashMovementCreate
-- app.schemas.cash_register.CashRegisterClose
-- app.schemas.cash_register.CashRegisterDashboard
 - app.domain.cash_register.cash_register_service.CashRegisterService
 - app.domain.cash_register.cash_movement_service.CashMovementService
 - app.domain.cash_register.dependencies.get_cash_register_service
 - app.domain.cash_register.dependencies.get_cash_movement_service
+- app.models.user.User
+- app.schemas.cash_register.CashRegisterOpen
+- app.schemas.cash_register.CashRegisterResponse
+- app.schemas.cash_register.CashRegisterSummary
+- app.schemas.cash_register.CashRegisterCloseOut
+- app.schemas.cash_register.CashMovementCreate
+- app.schemas.cash_register.CashMovementOut
+- app.schemas.cash_register.CashRegisterClose
+- app.schemas.cash_register.CashRegisterDashboard
 
 ```python
-from fastapi import APIRouter, Depends
+"""
+Endpoints para la gestión de la caja registradora.
+Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
+"""
 
-from app.models.user import User
+from fastapi import APIRouter, Depends, status
 
 from app.dependencies.roles import cashier_or_admin
-
-from app.schemas.cash_register import (
-    CashRegisterOpen,
-    CashRegisterSummary,
-    CashRegisterCloseOut,
-    CashMovementCreate,
-    CashRegisterClose,
-    CashRegisterDashboard
-)
 
 from app.domain.cash_register.cash_register_service import CashRegisterService
 from app.domain.cash_register.cash_movement_service import CashMovementService
@@ -8397,14 +11103,32 @@ from app.domain.cash_register.dependencies import (
     get_cash_movement_service
 )
 
+from app.models.user import User
 
-router = APIRouter(
-    prefix="/cash-register",
-    tags=["cash-register"]
+from app.schemas.cash_register import (
+    CashRegisterOpen,
+    CashRegisterResponse,
+    CashRegisterSummary,
+    CashRegisterCloseOut,
+    CashMovementCreate,
+    CashMovementOut,
+    CashRegisterClose,
+    CashRegisterDashboard
 )
 
+router = APIRouter(prefix="/cash-register", tags=["cash-register"])
 
-@router.post("/open")
+# ----------------------------------------------------------------------------------------------------
+# Abrir caja registradora
+# ----------------------------------------------------------------------------------------------------
+@router.post(
+    "/open",
+    response_model=CashRegisterResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Abre caja registradora",
+    description="Abre una caja registradora con un monto inicial en el restaurant autenticado."
+    )
+
 def open_cash_register(
     data: CashRegisterOpen,
     user: User = Depends(cashier_or_admin),
@@ -8416,48 +11140,58 @@ def open_cash_register(
         opening_amount=data.opening_amount
     )
 
-
-@router.post("/close", response_model=CashRegisterCloseOut)
+# ----------------------------------------------------------------------------------------------------
+# Cerrar caja registradora
+# ----------------------------------------------------------------------------------------------------
+@router.post(
+    "/close",
+    response_model=CashRegisterCloseOut,
+    status_code=status.HTTP_200_OK,
+    summary="Cierra una caja registradora",
+    description="Cierra la caja registradora del restaurant autenticado."
+)
 def close_cash_register(
-    payload: CashRegisterClose,
+    data: CashRegisterClose,
     user: User = Depends(cashier_or_admin),
     service: CashRegisterService = Depends(get_cash_register_service)   
 ):
     return service.close_cash_register(
         restaurant_id=user.restaurant_id,
         user_id=user.id,
-        counted_cash=payload.counted_cash
+        data=data
     )
 
-
-@router.post("/movements")
+# ----------------------------------------------------------------------------------------------------
+# Agregar un movimiento de caja
+# ----------------------------------------------------------------------------------------------------
+@router.post(
+    "/movements",
+    response_model=CashMovementOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Agrega un movimiento de caja",
+    description="Agrega un movimiento de caja para el restaurant autenticado."
+)
 def create_cash_movement(
-    payload: CashMovementCreate,
+    data: CashMovementCreate,
     user: User = Depends(cashier_or_admin),
     service: CashMovementService = Depends(get_cash_movement_service)
 ):
     return service.create_cash_movement(
         restaurant_id=user.restaurant_id,
         user_id=user.id,
-        movement_type=payload.type,
-        amount=payload.amount,
-        reason=payload.reason
+        data=data
     )
 
-
-@router.delete("/movements/{movement_id}")
-def delete_cash_movement(
-    movement_id: int,
-    user: User = Depends(cashier_or_admin),
-    service: CashMovementService = Depends(get_cash_movement_service),
-):
-    return service.delete_cash_movement(
-        restaurant_id=user.restaurant_id,
-        movement_id=movement_id
-    )
-
-
-@router.get("/current", response_model=CashRegisterSummary | None)
+# ----------------------------------------------------------------------------------------------------
+# Devuelve un resumen de la caja actual
+# ----------------------------------------------------------------------------------------------------
+@router.get(
+    "/current",
+    response_model=CashRegisterSummary | None,
+    status_code=status.HTTP_200_OK,
+    summary="Resumen de la caja actual",
+    description="Obtener un resumen de la caja actual del restaurant autenticado."
+)
 def current_cash_register(
     service: CashRegisterService = Depends(get_cash_register_service),
     user: User = Depends(cashier_or_admin)
@@ -8466,14 +11200,41 @@ def current_cash_register(
         restaurant_id=user.restaurant_id
     )
 
-
-@router.get("/dashboard", response_model=CashRegisterDashboard | None)
+# ----------------------------------------------------------------------------------------------------
+# Devuelve un resumen para el dashboard de la página del cajero
+# ----------------------------------------------------------------------------------------------------
+@router.get(
+    "/dashboard",
+    response_model=CashRegisterDashboard | None,
+    status_code=status.HTTP_200_OK,
+    summary="Obtener dashboard",
+    description="Obtener resumen de la caja actual para el dashboard de la página del cajero del restaurant autenticado."
+)
 def get_cash_register_dashboard(
     service: CashRegisterService = Depends(get_cash_register_service),
     user: User = Depends(cashier_or_admin)
 ):
     return service.get_dashboard(
         restaurant_id=user.restaurant_id
+    )
+
+# ----------------------------------------------------------------------------------------------------
+# Eliminar un movimiento de caja
+# ----------------------------------------------------------------------------------------------------
+@router.delete(
+    "/movements/{movement_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Eliminar un movimiento de caja",
+    description="Elimina un movimientod de caja para el restaurant autenticado."
+)
+def delete_cash_movement(
+    movement_id: int,
+    user: User = Depends(cashier_or_admin),
+    service: CashMovementService = Depends(get_cash_movement_service),
+):
+    return service.delete_cash_movement(
+        restaurant_id=user.restaurant_id,
+        movement_id=movement_id
     )
 ```
 
@@ -8486,132 +11247,182 @@ def get_cash_register_dashboard(
 - list_categories
 - list_categories_with_products
 - update_category
-- delete_category
+- toggle_category
 
 **Clases (0):**
 
-**Imports (10):**
+**Imports (13):**
 - fastapi.APIRouter
 - fastapi.Depends
-- app.dependencies.roles.waiter_or_admin
+- fastapi.status
+- fastapi.Query
 - app.dependencies.roles.admin_only
-- app.models.user.User
-- app.schemas.category.CategoryResponse
-- app.schemas.category.CategoryCreate
-- app.schemas.category.CategoryWithProducts
+- app.dependencies.roles.waiter_or_admin
 - app.domain.category.category_service.CategoryService
 - app.domain.category.dependencies.get_category_service
+- app.models.user.User
+- app.schemas.category.CategoryCreate
+- app.schemas.category.CategoryResponse
+- app.schemas.category.CategoryUpdate
+- app.schemas.category.CategoryWithProducts
 
 ```python
-from fastapi import APIRouter, Depends
+"""
+Endpoints para la gestión de categorías.
+Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
+"""
 
-from app.dependencies.roles import waiter_or_admin, admin_only
-from app.models.user import User
+from fastapi import APIRouter, Depends, status, Query
 
-from app.schemas.category import CategoryResponse, CategoryCreate, CategoryWithProducts
+from app.dependencies.roles import admin_only, waiter_or_admin
+
 from app.domain.category.category_service import CategoryService
 from app.domain.category.dependencies import get_category_service
 
+from app.models.user import User
+
+from app.schemas.category import (
+    CategoryCreate,
+    CategoryResponse,
+    CategoryUpdate,
+    CategoryWithProducts,
+)
 
 router = APIRouter(prefix="/categories", tags=["categories"])
 
-
-@router.post("/", response_model=CategoryResponse)
+# ----------------------------------------------------------------------------------------------------
+# Crear categoría
+# ----------------------------------------------------------------------------------------------------
+@router.post(
+    "/",
+    response_model=CategoryResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Crear categoría",
+    description="Crea una nueva categoría para el restaurante autenticado."
+)
 def create_category(
     data: CategoryCreate,
     user: User = Depends(admin_only),
-    service: CategoryService = Depends(get_category_service)
+    service: CategoryService = Depends(get_category_service),
 ):
-    return service.create_category(user.restaurant_id, data.name)
+    return service.create_category(user.restaurant_id, data)
 
-
-@router.get("/", response_model=list[CategoryResponse])
+# ----------------------------------------------------------------------------------------------------
+# Listar categorías
+# ----------------------------------------------------------------------------------------------------
+@router.get(
+    "/",
+    response_model=list[CategoryResponse],
+    status_code=status.HTTP_200_OK,
+    summary="Listar categorías",
+    description="Devuelve la lista de categorías del restaurante autenticado."
+)
 def list_categories(
+    active: bool | None = Query(default=True),
     user: User = Depends(waiter_or_admin),
     service: CategoryService = Depends(get_category_service)
 ):
-    return service.list_categories(user.restaurant_id)
+    return service.list_categories(user.restaurant_id, active)
 
-
-@router.get("/with-products", response_model=list[CategoryWithProducts])
+# ----------------------------------------------------------------------------------------------------
+# Listar categorías con productos
+# ----------------------------------------------------------------------------------------------------
+@router.get(
+    "/with-products",
+    response_model=list[CategoryWithProducts],
+    status_code=status.HTTP_200_OK,
+    summary="Listar categorías con productos",
+    description="Devuelve la lista de categorías del restaurante autenticado junto con sus productos."
+)
 def list_categories_with_products(
     user: User = Depends(waiter_or_admin),
     service: CategoryService = Depends(get_category_service)
 ):
     return service.list_categories_with_products(user.restaurant_id)
 
-
-@router.patch("/{category_id}", response_model=CategoryResponse)
+# ----------------------------------------------------------------------------------------------------
+# Actualizar categoría
+# ----------------------------------------------------------------------------------------------------
+@router.patch(
+    "/{category_id}",
+    response_model=CategoryResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Actualizar categoría",
+    description="Actualiza una categoría del restaurante."
+)
 def update_category(
     category_id: int,
-    data: CategoryCreate,
+    data: CategoryUpdate,
     user: User = Depends(admin_only),
     service: CategoryService = Depends(get_category_service)
 ):
-    return service.update_category(user.restaurant_id, category_id, data.name)
+    return service.update_category(user.restaurant_id, category_id, data)
 
-
-@router.delete("/{category_id}")
-def delete_category(
+# ----------------------------------------------------------------------------------------------------
+# Activar o desactivar categoría
+# ----------------------------------------------------------------------------------------------------
+@router.patch(
+    "/{category_id}/toggle",
+    response_model=CategoryResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Activar o desactivar categoría",
+    description="Activa o desactiva una categoría del restaurante."
+)
+def toggle_category(
     category_id: int,
     user: User = Depends(admin_only),
     service: CategoryService = Depends(get_category_service)
 ):
-    service.delete_category(user.restaurant_id, category_id)
-    return {"ok": True}
-
-
-
+    return service.toggle_category(user.restaurant_id, category_id)
 ```
 
 ---
 
 ### .\backend\app\routers\kitchen.py
 
-**Funciones (2):**
+**Funciones (1):**
 - get_station_items
-- update_item_status
 
 **Clases (0):**
 
-**Imports (9):**
+**Imports (8):**
 - fastapi.APIRouter
 - fastapi.Depends
-- app.models.user.User
+- fastapi.status
 - app.dependencies.roles.kitchen_or_admin
-- app.schemas.order.order_item.OrderItemStatusUpdate
-- app.schemas.order.order_item.OrderItemOut
-- app.schemas.order.kitchen.KitchenItemOut
 - app.domain.kitchen.dependencies.get_kitchen_service
 - app.domain.kitchen.kitchen_service.KitchenService
+- app.models.user.User
+- app.schemas.order.kitchen.KitchenItemOut
 
 ```python
-from fastapi import APIRouter, Depends
+"""
+Endpoints para la gestión de la cocina.
+Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
+"""
 
-from app.models.user import User
+from fastapi import APIRouter, Depends, status
 
 from app.dependencies.roles import kitchen_or_admin
-
-from app.schemas.order.order_item import (
-    OrderItemStatusUpdate,
-    OrderItemOut
-)
-from app.schemas.order.kitchen import KitchenItemOut
 
 from app.domain.kitchen.dependencies import get_kitchen_service
 from app.domain.kitchen.kitchen_service import KitchenService
 
+from app.models.user import User
 
-router = APIRouter(
-    prefix="/kitchen",
-    tags=["kitchen"]
-)
+from app.schemas.order.kitchen import KitchenItemOut
 
-# -----------------------------------------------------
+router = APIRouter(prefix="/kitchen", tags=["kitchen"])
 
+# ----------------------------------------------------------------------------------------------------
+# Obtener items por estación
+# ----------------------------------------------------------------------------------------------------
 @router.get(
     "/stations/{station_id}/items",
-    response_model=list[KitchenItemOut]
+    response_model=list[KitchenItemOut],
+    status_code=status.HTTP_200_OK,
+    summary="Devolver items por estación",
+    description="Devuelve la lista de items por estación del restaurante autenticado."
 )
 def get_station_items(
     station_id: int,
@@ -8622,59 +11433,40 @@ def get_station_items(
         station_id=station_id,
         user=user
     )
-
-# -----------------------------------------------------
-
-@router.patch(
-    "/{item_id}/status",
-    response_model=OrderItemOut
-)
-def update_item_status(
-    item_id: int,
-    data: OrderItemStatusUpdate,
-    user: User = Depends(kitchen_or_admin),
-    service: KitchenService = Depends(get_kitchen_service)
-):
-    item = service.update_item_status(
-        item_id=item_id,
-        status=data.status,
-        user=user
-    )
-    return OrderItemOut(
-        id=item.id,
-        product_name=item.product.name,
-        quantity=item.quantity,
-        unit_price=item.unit_price,
-        subtotal=item.quantity * item.unit_price,
-        status=item.status
-    )
 ```
 
 ---
 
 ### .\backend\app\routers\layout.py
 
-**Funciones (2):**
+**Funciones (3):**
+- upload_background
 - get_layout
 - update_layout
 
 **Clases (0):**
 
-**Imports (9):**
+**Imports (12):**
 - fastapi.APIRouter
 - fastapi.Depends
-- app.schemas.layout.LayoutOut
-- app.schemas.layout.LayoutUpdate
+- fastapi.File
+- fastapi.UploadFile
+- fastapi.status
 - app.dependencies.roles.waiter_or_admin
 - app.dependencies.roles.admin_only
 - app.domain.layout.dependencies.get_layout_service
 - app.domain.layout.layout_service.LayoutService
 - app.models.user.User
+- app.schemas.layout.LayoutOut
+- app.schemas.layout.LayoutUpdate
 
 ```python
-from fastapi import APIRouter, Depends
+"""
+Endpoints para la gestión de la layout del restaurant.
+Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
+"""
 
-from app.schemas.layout import LayoutOut, LayoutUpdate
+from fastapi import APIRouter, Depends, File, UploadFile, status
 
 from app.dependencies.roles import waiter_or_admin, admin_only
 
@@ -8683,100 +11475,159 @@ from app.domain.layout.layout_service import LayoutService
 
 from app.models.user import User
 
+from app.schemas.layout import(
+    LayoutOut,
+    LayoutUpdate
+)
 
 router = APIRouter(prefix="/layout", tags=["layout"])
 
+# ----------------------------------------------------------------------------------------------------
+# Subir imagen de fondo
+# ----------------------------------------------------------------------------------------------------
+@router.post(
+    "/background",
+    response_model=LayoutOut,
+    status_code=status.HTTP_200_OK,
+    summary="Aplicar background",
+    description="Aplica un background al diseño del restaurant a partir de una imagen cargada desde disco."
+)
+async def upload_background(
+    file: UploadFile = File(..., description="Carga el archivo seleccionado."),
+    user: User = Depends(admin_only),
+    service: LayoutService = Depends(get_layout_service)
+):
+    return await service.update_background_image(user.restaurant_id, file)
 
-@router.get("/", response_model=LayoutOut)
+# ----------------------------------------------------------------------------------------------------
+# Obtener el diseño del restaurant
+# ----------------------------------------------------------------------------------------------------
+@router.get(
+    "/",
+    response_model=LayoutOut,
+    status_code=status.HTTP_200_OK,
+    summary="Obtener diseño del restaurant",
+    description="Obtiene el diseño del restaurant: tamaño, background, grid y snap_to_grid."
+)
 def get_layout(
     user: User = Depends(waiter_or_admin),
     service: LayoutService = Depends(get_layout_service)
 ):
     return service.get_layout(user.restaurant_id)
 
-
-@router.patch("/", response_model=LayoutUpdate)
+# ----------------------------------------------------------------------------------------------------
+# Actualizar el diseño del restaurant
+# ----------------------------------------------------------------------------------------------------
+@router.patch(
+    "/",
+    response_model=LayoutOut,
+    status_code=status.HTTP_200_OK,
+    summary="Actualizar diseño del restaurant",
+    description="Actualiza el diseño del restaurant: tamaño, background, grid y snap_to_grid."
+)
 def update_layout(
     data: LayoutUpdate,
     user: User = Depends(admin_only),
     service: LayoutService = Depends(get_layout_service)
 ):
-    return service.update_layout(
-        user.restaurant_id,
-        data
-    )
+    return service.update_layout(user.restaurant_id, data)
 ```
 
 ---
 
 ### .\backend\app\routers\orders.py
 
-**Funciones (11):**
+**Funciones (10):**
 - add_item_to_order
 - send_to_kitchen
 - add_payment
-- apply_discount
 - close_order
+- apply_discount
 - get_active_orders
 - get_order
-- update_order_status
 - update_order_item_quantity
 - delete_order_item
-- cancel_payment
+- delete_payment
 
 **Clases (0):**
 
-**Imports (13):**
+**Imports (17):**
 - decimal.Decimal
 - fastapi.APIRouter
 - fastapi.Depends
 - fastapi.Query
-- app.models.user.User
+- fastapi.status
 - app.dependencies.roles.waiter_or_admin
 - app.dependencies.roles.waiter_cashier_or_admin
 - app.dependencies.roles.all_staff
-- app.schemas.order.order_item.OrderItemCreate
-- app.schemas.order.payment.PaymentCreate
-- app.schemas.order.order.OrderStatusUpdate
 - app.domain.order.order_service.OrderService
 - app.domain.order.dependencies.get_order_service
+- app.models.user.User
+- app.schemas.order.order_item.OrderItemCreate
+- app.schemas.order.payment.PaymentCreate
+- app.schemas.order.payment.PaymentOut
+- app.schemas.order.order.OrderStatusUpdate
+- app.schemas.order.order.OrderDetail
+- app.schemas.order.order.OrderResponse
 
 ```python
-from decimal import Decimal
-from fastapi import APIRouter, Depends, Query
+"""
+Endpoints para la gestión de órdenes.
+Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
+"""
 
-from app.models.user import User
+from decimal import Decimal
+from fastapi import APIRouter, Depends, Query, status
 
 from app.dependencies.roles import waiter_or_admin, waiter_cashier_or_admin, all_staff
-
-from app.schemas.order.order_item import OrderItemCreate
-from app.schemas.order.payment import PaymentCreate
-from app.schemas.order.order import OrderStatusUpdate
 
 from app.domain.order.order_service import OrderService
 from app.domain.order.dependencies import get_order_service
 
+from app.models.user import User
+
+from app.schemas.order.order_item import OrderItemCreate
+from app.schemas.order.payment import (
+    PaymentCreate,
+    PaymentOut
+)
+from app.schemas.order.order import (
+    OrderStatusUpdate,
+    OrderDetail,
+    OrderResponse
+)
 
 router = APIRouter(prefix="/orders", tags=["orders"])
-
 
 # -------------------------
 # Agregar item
 # -------------------------
-@router.post("/{order_id}/items")
+@router.post(
+    "/{order_id}/items",
+    response_model=OrderDetail,
+    status_code=status.HTTP_201_CREATED,
+    summary="Agregar item a orden",
+    description="Agrega un item a la orden especificada."
+)
 def add_item_to_order(
     order_id: int,
-    item: OrderItemCreate,
+    data: OrderItemCreate,
     user: User = Depends(waiter_or_admin),
     service: OrderService = Depends(get_order_service)
 ):
     order = service.get_order(order_id, user.restaurant_id)
-    return service.add_item(order, item.product_id, item.quantity)
+    return service.add_item(order, data)
 
 # -------------------------
 # Enviar a cocina
 # -------------------------
-@router.post("/{order_id}/send-to-kitchen")
+@router.post(
+    "/{order_id}/send-to-kitchen",
+    response_model=OrderDetail,
+    status_code=status.HTTP_200_OK,
+    summary="Enviar orden a cocina",
+    description="Envía la orden especificada a la cocina."
+)
 def send_to_kitchen(
     order_id: int,
     user: User = Depends(waiter_or_admin),
@@ -8788,20 +11639,50 @@ def send_to_kitchen(
 # -------------------------
 # Agregar pago
 # -------------------------
-@router.post("/{order_id}/payments")
+@router.post(
+    "/{order_id}/payments",
+    response_model=PaymentOut,
+    status_code=status.HTTP_200_OK,
+    summary="Agregar pago a orden",
+    description="Agrega un pago a la orden especificada."
+)
 def add_payment(
     order_id: int,
-    payment: PaymentCreate,
+    data: PaymentCreate,
     user: User = Depends(waiter_cashier_or_admin),
     service: OrderService = Depends(get_order_service)
 ):
     order = service.get_order(order_id, user.restaurant_id)
-    return service.add_payment(order, payment.amount, payment.method)
+    return service.add_payment(order, data)
+
+# -------------------------
+# Cerrar orden
+# -------------------------
+@router.post(
+    "/{order_id}/close",
+    response_model=OrderDetail,
+    status_code=status.HTTP_200_OK,
+    summary="Cerrar orden",
+    description="Cierra la orden especificada."
+)
+def close_order(
+    order_id: int,
+    user: User = Depends(waiter_cashier_or_admin),
+    service: OrderService = Depends(get_order_service)
+):
+    order = service.get_order(order_id, user.restaurant_id)
+    return service.close_order(order)
 
 # -------------------------
 # Aplicar descuento
 # -------------------------
-@router.put("/{order_id}/discount")
+@router.put(
+    "/{order_id}/discount",
+    response_model=OrderDetail,
+    status_code=status.HTTP_200_OK,
+    summary="Aplicar descuento a orden",
+    description="Aplica un descuento a la orden especificada."
+)
 def apply_discount(
     order_id: int,
     discount: Decimal = Query(..., ge=0),
@@ -8812,72 +11693,66 @@ def apply_discount(
     return service.apply_discount(order, discount)
 
 # -------------------------
-# Cerrar orden
-# -------------------------
-@router.post("/{order_id}/close")
-def close_order(
-    order_id: int,
-    user: User = Depends(waiter_cashier_or_admin),
-    service: OrderService = Depends(get_order_service)
-):
-    order = service.get_order(order_id, user.restaurant_id)
-    return service.close_order(order)
-
-# -------------------------
 # Obtener ordenes activas
 # -------------------------
-@router.get("/active")
+@router.get(
+    "/active",
+    response_model=list[OrderResponse],
+    status_code=status.HTTP_200_OK,
+    summary="Obtener ordenes activas",
+    description="Obtiene todas las órdenes activas del restaurante."
+)
 def get_active_orders(
     user: User = Depends(all_staff),
     service: OrderService = Depends(get_order_service)
 ):
-    return service.serialize_orders(user.restaurant_id)
+    return service.to_order_response_list(user.restaurant_id)
 
 # -------------------------
 # Obtener orden por ID
 # -------------------------
-@router.get("/{order_id}")
+@router.get(
+    "/{order_id}",
+    response_model=OrderResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Obtener orden por ID",
+    description="Obtiene la orden especificada por su ID."
+)
 def get_order(
     order_id: int,
     user: User = Depends(all_staff),
     service: OrderService = Depends(get_order_service)
 ):
     order = service.get_order(order_id, user.restaurant_id)
-    return service.serialize_order(order)
-
-# -------------------------
-# Actualizar estado
-# -------------------------
-@router.patch("/{order_id}/status")
-def update_order_status(
-    order_id: int,
-    data: OrderStatusUpdate,
-    user: User = Depends(all_staff),
-    service: OrderService = Depends(get_order_service)
-):
-    order = service.get_order(order_id, user.restaurant_id)
-    return service.update_status(order, data.status)
+    return service.to_order_response(order)
 
 # -------------------------
 # Actualizar cantidad de item
 # -------------------------
-@router.patch("/order-items/{item_id}")
+@router.patch(
+    "/order-items/{item_id}",
+    response_model=OrderDetail,
+    status_code=status.HTTP_200_OK,
+    summary="Actualizar cantidad de item",
+    description="Actualiza la cantidad del item especificado en la orden."
+)
 def update_order_item_quantity(
     item_id: int,
-    quantity: int,
+    quantity: int = Query(..., ge=1),
     service: OrderService = Depends(get_order_service),
     user: User = Depends(waiter_or_admin)
 ):
-    return service.update_item_quantity(
-        restaurant_id=user.restaurant_id,
-        item_id=item_id,
-        quantity=quantity
-    )
+    return service.update_item_quantity(user.restaurant_id, item_id, quantity)
 
 # -------------------------
 # Borrar item de orden
 # -------------------------
-@router.delete("/{order_id}/items/{item_id}")
+@router.delete(
+    "/{order_id}/items/{item_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Borrar item de orden",
+    description="Borra el item especificado de la orden."
+)
 def delete_order_item(
     order_id: int,
     item_id: int,
@@ -8885,20 +11760,22 @@ def delete_order_item(
     service: OrderService = Depends(get_order_service)
 ):
     service.delete_order_item(user.restaurant_id, order_id, item_id)
-    return {"ok": True}
 
 # -------------------------
 # Borrar Pago
 # -------------------------
-@router.delete("/payments/{payment_id}")
-def cancel_payment(
+@router.delete(
+    "/payments/{payment_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Borrar pago",
+    description="Borra el pago especificado."
+)
+def delete_payment(
     payment_id: int,
     user: User = Depends(waiter_cashier_or_admin),
     service: OrderService = Depends(get_order_service)
 ):
-    service.cancel_payment(user.restaurant_id, payment_id)
-    return {"ok": True}
-
+    service.delete_payment(user.restaurant_id, payment_id)
 ```
 
 ---
@@ -8910,44 +11787,61 @@ def cancel_payment(
 
 **Clases (0):**
 
-**Imports (8):**
+**Imports (9):**
 - fastapi.APIRouter
 - fastapi.Depends
-- app.models.user.User
-- app.models.user.UserRole
+- fastapi.status
 - app.dependencies.roles.waiter_kitchen_or_admin
-- app.schemas.order.order_item.OrderItemStatusUpdate
 - app.domain.order_item.order_item_service.OrderItemService
 - app.domain.order_item.dependencies.get_order_item_service
+- app.models.user.User
+- app.schemas.order.order_item.OrderItemStatusUpdate
+- app.schemas.order.order_item.OrderItemOut
 
 ```python
-from fastapi import APIRouter, Depends
+"""
+Endpoints para la gestión de los items de una orden.
+Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
+"""
 
-from app.models.user import User, UserRole
+from fastapi import APIRouter, Depends, status
 
 from app.dependencies.roles import waiter_kitchen_or_admin
 
-from app.schemas.order.order_item import OrderItemStatusUpdate
-
 from app.domain.order_item.order_item_service import OrderItemService
 from app.domain.order_item.dependencies import get_order_item_service
+
+from app.models.user import User
+
+from app.schemas.order.order_item import (
+    OrderItemStatusUpdate,
+    OrderItemOut
+)
 
 router = APIRouter(
     prefix="/order-items",
     tags=["order-items"]
 )
 
-@router.patch("/{item_id}/status")
-async def update_item_status(
+# ----------------------------------------------------------------------------------------------------
+# Cambiar estado de item
+# ----------------------------------------------------------------------------------------------------
+@router.patch(
+    "/{item_id}/status",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Actualizar estado de item",
+    description="Actualiza el estado del item especificado."
+)
+def update_item_status(
     item_id: int,
     data: OrderItemStatusUpdate,
     user: User = Depends(waiter_kitchen_or_admin),
-    service: OrderItemService = Depends(get_order_item_service)
+    service: OrderItemService = Depends(get_order_item_service),
 ):
-    return service.update_status(
+    service.update_status(
         item_id=item_id,
         new_status=data.status,
-        user=user
+        user=user,
     )
 ```
 
@@ -8963,78 +11857,119 @@ async def update_item_status(
 
 **Clases (0):**
 
-**Imports (9):**
+**Imports (12):**
 - fastapi.APIRouter
 - fastapi.Depends
+- fastapi.status
+- fastapi.Query
+- app.dependencies.roles.admin_only
+- app.dependencies.roles.waiter_or_admin
+- app.domain.product.dependencies.get_product_service
+- app.domain.product.product_service.ProductService
 - app.models.user.User
 - app.schemas.product.ProductCreate
+- app.schemas.product.ProductResponse
 - app.schemas.product.ProductUpdate
-- app.dependencies.roles.waiter_or_admin
-- app.dependencies.roles.admin_only
-- app.domain.product.product_service.ProductService
-- app.domain.product.dependencies.get_product_service
 
 ```python
-from fastapi import APIRouter, Depends
+"""
+Endpoints para la gestión de productos.
+Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
+"""
+
+from fastapi import(
+    APIRouter, 
+    Depends, 
+    status,
+    Query
+)
+
+from app.dependencies.roles import admin_only, waiter_or_admin
+
+from app.domain.product.dependencies import get_product_service
+from app.domain.product.product_service import ProductService
 
 from app.models.user import User
 
-from app.schemas.product import ProductCreate, ProductUpdate
-
-from app.dependencies.roles import waiter_or_admin,admin_only
-
-from app.domain.product.product_service import ProductService
-from app.domain.product.dependencies import get_product_service
-
+from app.schemas.product import (
+    ProductCreate,
+    ProductResponse,
+    ProductUpdate,
+)
 
 router = APIRouter(prefix="/products", tags=["products"])
 
-
-@router.post("/")
+# ----------------------------------------------------------------------------------------------------
+# Crear producto
+# ----------------------------------------------------------------------------------------------------
+@router.post(
+    "/",
+    response_model=ProductResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Crear producto",
+    description="Crea un nuevo producto para el restaurante autenticado."
+)
 def create_product(
     product: ProductCreate,
     user: User = Depends(admin_only),
     service: ProductService = Depends(get_product_service)
 ):
-    return service.create_product(
-        user.restaurant_id,
-        product
-    )
+    return service.create_product(user.restaurant_id, product)
 
-
-@router.get("/")
+# ----------------------------------------------------------------------------------------------------
+# Listar productos
+# ----------------------------------------------------------------------------------------------------
+@router.get(
+    "/",
+    response_model=list[ProductResponse],
+    status_code=status.HTTP_200_OK,
+    summary="Listar productos",
+    description="Devuelve la lista de productos del restaurante autenticado."
+)
 def list_products(
+    active: bool | None = Query(default=True),
     user: User = Depends(waiter_or_admin),
     service: ProductService = Depends(get_product_service)
 ):
+    return service.list_products(
+        user.restaurant_id,
+        active
+    )
 
-    return service.list_products(user.restaurant_id)
-
-
-@router.patch("/{product_id}")
+# ----------------------------------------------------------------------------------------------------
+# Actualizar producto
+# ----------------------------------------------------------------------------------------------------
+@router.patch(
+    "/{product_id}",
+    response_model=ProductResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Actualizar producto",
+    description="Actualiza un producto del restaurante autenticado."
+)
 def update_product(
     product_id: int,
     product: ProductUpdate,
     user: User = Depends(admin_only),
     service: ProductService = Depends(get_product_service)
 ):
-    return service.update_product(
-        product_id,
-        user.restaurant_id,
-        product
-    )
+    return service.update_product(product_id, user.restaurant_id, product)
 
-
-@router.patch("/{product_id}/toggle")
+# ----------------------------------------------------------------------------------------------------
+# Alternar estado del producto (Activo/Inactivo)
+# ----------------------------------------------------------------------------------------------------
+@router.patch(
+    "/{product_id}/toggle",
+    response_model=ProductResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Alternar estado del producto",
+    description="Alterna el estado de un producto (Activo/Inactivo) del restaurante autenticado."
+)
 def toggle_product(
     product_id: int,
     user: User = Depends(admin_only),
     service: ProductService = Depends(get_product_service)
 ):
-    return service.toggle_product(
-        product_id,
-        user.restaurant_id
-    )
+    return service.toggle_product(product_id, user.restaurant_id)
 ```
 
 ---
@@ -9049,34 +11984,58 @@ def toggle_product(
 
 **Clases (0):**
 
-**Imports (8):**
+**Imports (13):**
 - datetime.date
 - fastapi.APIRouter
 - fastapi.Depends
 - fastapi.Query
+- fastapi.status
 - app.dependencies.roles.admin_only
 - app.domain.reports.dependencies.get_report_service
 - app.domain.reports.report_service.ReportService
 - app.models.user.User
+- app.schemas.reports.ProductEvolutionReportOut
+- app.schemas.reports.SalesOrdersReportOut
+- app.schemas.reports.ProductsReportOut
+- app.schemas.reports.SalesReportOut
 
 ```python
+"""
+Endpoints para la gestión de reportes.
+Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
+"""
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, status
 
 from app.dependencies.roles import admin_only
+
 from app.domain.reports.dependencies import get_report_service
 from app.domain.reports.report_service import ReportService
+
 from app.models.user import User
 
+from app.schemas.reports import (
+    ProductEvolutionReportOut,
+    SalesOrdersReportOut,
+    ProductsReportOut,
+    SalesReportOut
+)
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
-
-@router.get("/sales")
+# ----------------------------------------------------------------------------------------------------
+# Reporte de Ventas
+# ----------------------------------------------------------------------------------------------------
+@router.get(
+    "/sales",
+    response_model=SalesReportOut,
+    status_code=status.HTTP_200_OK,
+    summary="Reporte de ventas",
+    description="Reporte conteniendo la evolución de las ventas en un período determinado.")
 def sales_report(
-    start_date: date = Query(...),
-    end_date: date = Query(...),
+    start_date: date = Query(..., description="Fecha inicial del reporte."),
+    end_date: date = Query(..., description="Fecha final del reporte."),
     user: User = Depends(admin_only),
     service: ReportService = Depends(get_report_service)
 ):
@@ -9086,11 +12045,19 @@ def sales_report(
         end_date=end_date
     )
 
-
-@router.get("/sales/orders")
+# ----------------------------------------------------------------------------------------------------
+# Reporte de ventas por orden
+# ----------------------------------------------------------------------------------------------------
+@router.get(
+    "/sales/orders",
+    response_model=SalesOrdersReportOut,
+    status_code=status.HTTP_200_OK,
+    summary="Reporte de ventas por orden",
+    description="Reporte con listado de ventas realizadas en un período determinado."
+)
 def sales_orders_report(
-    start_date: date = Query(...),
-    end_date: date = Query(...),
+    start_date: date = Query(..., description="Fecha inicial del reporte."),
+    end_date: date = Query(..., description="Fecha final del reporte."),
     user: User = Depends(admin_only),
     service: ReportService = Depends(get_report_service)
 ):
@@ -9100,12 +12067,20 @@ def sales_orders_report(
         end_date=end_date
     )
 
-
-@router.get("/products")
+# ----------------------------------------------------------------------------------------------------
+# Reporte de productos más y menos vendidos
+# ----------------------------------------------------------------------------------------------------
+@router.get(
+    "/products",
+    response_model=ProductsReportOut,
+    status_code=status.HTTP_200_OK,
+    summary="Reporte de productos más y menos vendidos",
+    description="Reporte conteniendo el top 10 de los productos más y menos vendidos en un período determinado."
+)
 def products_report(
-    start_date: date = Query(...),
-    end_date: date = Query(...),
-    category_id: int | None = Query(None),
+    start_date: date = Query(..., description="Fecha inicial del reporte."),
+    end_date: date = Query(..., description="Fecha final del reporte."),
+    category_id: int | None = Query(None, description="Filtrar por categoría."),
     user: User = Depends(admin_only),
     service: ReportService = Depends(get_report_service)
 ):
@@ -9116,12 +12091,20 @@ def products_report(
         category_id=category_id
     )
 
-
-@router.get("/products/{product_id}/evolution")
+# ----------------------------------------------------------------------------------------------------
+# Reporte de evolución de productos
+# ----------------------------------------------------------------------------------------------------
+@router.get(
+    "/products/{product_id}/evolution",
+    response_model=ProductEvolutionReportOut,
+    status_code=status.HTTP_200_OK,
+    summary="Reporte de evolución de las ventas de un producto",
+    description="Reporte conteniendo la evolución de las ventas de un producto seleccionado en un período determinado."
+)
 def product_evolution_report(
     product_id: int,
-    start_date: date = Query(...),
-    end_date: date = Query(...),
+    start_date: date = Query(..., description="Fecha inicial del reporte."),
+    end_date: date = Query(..., description="Fecha final del reporte."),
     user: User = Depends(admin_only),
     service: ReportService = Depends(get_report_service)
 ):
@@ -9131,127 +12114,165 @@ def product_evolution_report(
         start_date=start_date,
         end_date=end_date
     )
-
 ```
 
 ---
 
 ### .\backend\app\routers\stations.py
 
-**Funciones (7):**
+**Funciones (6):**
 - create_station
 - list_stations
 - list_active_stations
 - get_station
 - update_station
 - toggle_station
-- get_station_items
 
 **Clases (0):**
 
-**Imports (11):**
+**Imports (12):**
 - fastapi.APIRouter
+- fastapi.status
 - fastapi.Depends
-- app.models.user.User
+- fastapi.Query
+- app.dependencies.roles.admin_only
+- app.dependencies.roles.kitchen_or_admin
 - app.domain.stations.dependencies.get_station_service
 - app.domain.stations.station_service.StationService
+- app.models.user.User
 - app.schemas.station.StationCreate
-- app.schemas.station.StationOut
+- app.schemas.station.StationResponse
 - app.schemas.station.StationUpdate
-- app.schemas.order.kitchen.KitchenItemOut
-- app.dependencies.auth.get_current_user
-- app.dependencies.roles.admin_only
 
 ```python
-from fastapi import APIRouter, Depends
+"""
+Endpoints para la gestión de estaciones.
+Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
+"""
 
-from app.models.user import User
+from fastapi import (
+    APIRouter,
+    status, 
+    Depends, 
+    Query
+)
+
+from app.dependencies.roles import admin_only, kitchen_or_admin
 
 from app.domain.stations.dependencies import get_station_service
 from app.domain.stations.station_service import StationService
 
-from app.schemas.station import StationCreate, StationOut, StationUpdate
-from app.schemas.order.kitchen import KitchenItemOut
+from app.models.user import User
 
-from app.dependencies.auth import get_current_user
-from app.dependencies.roles import admin_only
+from app.schemas.station import (
+    StationCreate,
+    StationResponse,
+    StationUpdate,
+)
 
 router = APIRouter(prefix="/stations", tags=["stations"])
 
-
-@router.post("/", response_model=StationOut)
+# ----------------------------------------------------------------------------------------------------
+# Crear estación
+# ----------------------------------------------------------------------------------------------------
+@router.post(
+    "/",
+    response_model=StationResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Crear estación",
+    description="Crea una nueva estación para el restaurante autenticado."
+)
 def create_station(
     data: StationCreate,
     user: User = Depends(admin_only),
     service: StationService = Depends(get_station_service)
 ):
-    return service.create_station(
-        user.restaurant_id,
-        data.name
-    )
+    return service.create_station(user.restaurant_id, data)
 
-
-@router.get("/", response_model=list[StationOut])
+# ----------------------------------------------------------------------------------------------------
+# Listar estaciones
+# ----------------------------------------------------------------------------------------------------
+@router.get(
+    "/",
+    response_model=list[StationResponse],
+    status_code=status.HTTP_200_OK,
+    summary="Listar estaciones",
+    description="Devuelve la lista de estaciones del restaurante autenticado."
+)
 def list_stations(
-    user: User = Depends(get_current_user),
+    active: bool | None = Query(default=True),
+    user: User = Depends(kitchen_or_admin),
+    service: StationService = Depends(get_station_service)
+):
+    return service.list_stations(user.restaurant_id, active)
+
+# ----------------------------------------------------------------------------------------------------
+# Listar estaciones activas
+# ----------------------------------------------------------------------------------------------------
+@router.get(
+    "/active",
+    response_model=list[StationResponse],
+    status_code=status.HTTP_200_OK,
+    summary="Listar estaciones activas",
+    description="Devuelve la lista de estaciones activas del restaurante autenticado."
+)
+def list_active_stations(
+    user: User = Depends(kitchen_or_admin),
     service: StationService = Depends(get_station_service)
 ):
     return service.list_stations(user.restaurant_id)
 
-
-@router.get("/active", response_model=list[StationOut])
-def list_active_stations(
-    user: User = Depends(get_current_user),
-    service: StationService = Depends(get_station_service)
-):
-    return service.list_active_stations(user.restaurant_id)
-
-
-@router.get("/{station_id}", response_model=StationOut)
+# ----------------------------------------------------------------------------------------------------
+# Obtener estación
+# ----------------------------------------------------------------------------------------------------
+@router.get(
+    "/{station_id}",
+    response_model=StationResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Obtener estación",
+    description="Devuelve una estación específica del restaurante autenticado."
+)
 def get_station(
     station_id: int,
-    user: User = Depends(get_current_user),
+    user: User = Depends(kitchen_or_admin),
     service: StationService = Depends(get_station_service)
 ):
     return service.get_station(user.restaurant_id, station_id)
 
-
-@router.patch("/{station_id}")
+# ----------------------------------------------------------------------------------------------------
+# Actualizar estación
+# ----------------------------------------------------------------------------------------------------
+@router.patch(
+    "/{station_id}",
+    response_model=StationResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Actualizar estación",
+    description="Actualiza la información de una estación específica del restaurante autenticado."
+)
 def update_station(
     station_id: int,
     data: StationUpdate,
     user: User = Depends(admin_only),
     service: StationService = Depends(get_station_service)
 ):
-    return service.update_station(
-        user.restaurant_id,
-        station_id,
-        data.name
-    )
+    return service.update_station(user.restaurant_id, station_id, data)
 
-
-@router.patch("/{station_id}/toggle")
+# ----------------------------------------------------------------------------------------------------
+# Alternar estado de estación
+# ----------------------------------------------------------------------------------------------------
+@router.patch(
+    "/{station_id}/toggle",
+    response_model=StationResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Alternar estado de estación",
+    description="Alterna el estado de una estación específica del restaurante autenticado."
+)
 def toggle_station(
     station_id: int,
     user: User = Depends(admin_only),
     service: StationService = Depends(get_station_service)
 ):
-    return service.toggle_station(
-        user.restaurant_id,
-        station_id
-    )
-
-
-@router.get("/stations/{station_id}/items", response_model=list[KitchenItemOut])
-def get_station_items(
-    station_id: int,
-    user: User = Depends(get_current_user),
-    service: StationService = Depends(get_station_service)
-):
-    return service.get_station_items(
-        user.restaurant_id,
-        station_id
-    )
+    return service.toggle_station(user.restaurant_id, station_id)
 ```
 
 ---
@@ -9259,86 +12280,96 @@ def get_station_items(
 ### .\backend\app\routers\system_settings.py
 
 **Funciones (3):**
-- update_settings
-- get_settings
 - test_email
+- get_settings
+- update_settings
 
 **Clases (0):**
 
-**Imports (7):**
+**Imports (10):**
 - fastapi.APIRouter
 - fastapi.Depends
+- fastapi.status
 - app.dependencies.roles.admin_only
-- app.models.user.User
-- app.schemas.system_settings.SettingsUpdateRequest
 - app.domain.settings.dependencies.get_settings_service
 - app.domain.settings.settings_service.SettingsService
+- app.models.user.User
+- app.schemas.system_settings.SettingsUpdateRequest
+- app.schemas.system_settings.SettingsResponse
+- app.schemas.system_settings.EmailTestResponse
 
 ```python
-from fastapi import APIRouter, Depends
+"""
+Endpoints para la gestión de la configuración del sistema.
+Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
+"""
+
+from fastapi import APIRouter, Depends, status
 
 from app.dependencies.roles import admin_only
+
+from app.domain.settings.dependencies import get_settings_service
+
+from app.domain.settings.settings_service import SettingsService
+
 from app.models.user import User
 
 from app.schemas.system_settings import (
-    SettingsUpdateRequest
+    SettingsUpdateRequest,
+    SettingsResponse,
+    EmailTestResponse
 )
 
-from app.domain.settings.dependencies import (
-    get_settings_service
-)
+router = APIRouter(prefix="/settings", tags=["settings"])
 
-from app.domain.settings.settings_service import (
-    SettingsService
-)
+# ----------------------------------------------------------------------------------------------------
+# Testear correo electrónico configurado
+# ----------------------------------------------------------------------------------------------------
+@router.post(
+    "/test-email",
+    response_model=EmailTestResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Testear el e-mail",
+    description="Testea el correo electrónico configurado enviando un correo de prueba.")
+def test_email(
+    user: User = Depends(admin_only),
+    service: SettingsService = Depends(get_settings_service)
+):
+    return service.send_test_email(user.restaurant_id)
 
-router = APIRouter(
-    prefix="/settings",
-    tags=["settings"]
+# ----------------------------------------------------------------------------------------------------
+# Obtener settings del sistema
+# ----------------------------------------------------------------------------------------------------
+@router.get(
+    "",
+    response_model=SettingsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Obtener settings",
+    description="Obtiene las settings del sistema."
 )
+def get_settings(
+    user: User = Depends(admin_only),
+    service: SettingsService = Depends(get_settings_service)
+):
+    settings = service.get_settings(user.restaurant_id)
+    return service.to_response(settings)
 
-@router.put("")
+# ----------------------------------------------------------------------------------------------------
+# Actualizar settings del sistema
+# ----------------------------------------------------------------------------------------------------
+@router.patch(
+    "",
+    response_model=SettingsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Actualizar settings",
+    description="Actualiza settings del sistema.")
 def update_settings(
     data: SettingsUpdateRequest,
     user: User = Depends(admin_only),
-    service: SettingsService = Depends(
-        get_settings_service
-    )
+    service: SettingsService = Depends(get_settings_service)
 ):
-    settings = service.update_settings(
-        user.restaurant_id,
-        data
-    )
-
-    return service.serialize_settings(
-        settings
-    )
-
-@router.get("")
-def get_settings(
-    user: User = Depends(admin_only),
-    service: SettingsService = Depends(
-        get_settings_service
-    )
-):
-    settings = service.get_settings(
-        user.restaurant_id
-    )
-
-    return service.serialize_settings(
-        settings
-    )
-
-@router.post("/test-email")
-def test_email(
-    user: User = Depends(admin_only),
-    service: SettingsService = Depends(
-        get_settings_service
-    )
-):
-    return service.send_test_email(
-        user.restaurant_id
-    )
+    settings = service.update_settings(user.restaurant_id, data)
+    return service.to_response(settings)
 ```
 
 ---
@@ -9348,7 +12379,7 @@ def test_email(
 **Funciones (9):**
 - create_table
 - touch_table
-- add_product_to_table
+- add_product_to_order
 - list_tables
 - list_tables_status
 - update_position
@@ -9358,38 +12389,37 @@ def test_email(
 
 **Clases (0):**
 
-**Imports (17):**
+**Imports (20):**
 - fastapi.APIRouter
 - fastapi.Depends
 - fastapi.Query
-- app.schemas.table.TableCreate
-- app.schemas.table.TableUpdate
-- app.schemas.table.TableList
-- app.schemas.table.TableOut
-- app.schemas.table.TablePositionUpdate
-- app.schemas.table.TablePositionOut
-- app.schemas.order.order_item.AddItemRequest
+- fastapi.status
+- app.dependencies.roles.waiter_or_admin
+- app.dependencies.roles.admin_only
 - app.domain.table.table_service.TableService
 - app.domain.table.dependencies.get_table_service
 - app.domain.order.order_service.OrderService
 - app.domain.order.dependencies.get_order_service
 - app.models.user.User
-- app.dependencies.roles.waiter_or_admin
-- app.dependencies.roles.admin_only
+- app.schemas.table.TableCreate
+- app.schemas.table.TableResponse
+- app.schemas.table.TableUpdate
+- app.schemas.table.TableList
+- app.schemas.table.TableStatusResponse
+- app.schemas.table.TablePositionUpdate
+- app.schemas.table.TablePositionOut
+- app.schemas.table.TableTouchResponse
+- app.schemas.order.order_item.OrderItemCreate
 
 ```python
-from fastapi import APIRouter, Depends, Query
+"""
+Endpoints para la gestión de mesas.
+Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
+"""
 
-from app.schemas.table import (
-    TableCreate,
-    TableUpdate,
-    TableList,
-    TableOut,
-    TablePositionUpdate,
-    TablePositionOut
-)
+from fastapi import APIRouter, Depends, Query, status
 
-from app.schemas.order.order_item import AddItemRequest
+from app.dependencies.roles import waiter_or_admin, admin_only
 
 from app.domain.table.table_service import TableService
 from app.domain.table.dependencies import get_table_service
@@ -9398,22 +12428,48 @@ from app.domain.order.dependencies import get_order_service
 
 from app.models.user import User
 
-from app.dependencies.roles import waiter_or_admin, admin_only
+from app.schemas.table import (
+    TableCreate,
+    TableResponse,
+    TableUpdate,
+    TableList,
+    TableStatusResponse,
+    TablePositionUpdate,
+    TablePositionOut,
+    TableTouchResponse
+)
 
+from app.schemas.order.order_item import OrderItemCreate
 
 router = APIRouter(prefix="/tables", tags=["tables"])
 
-
-@router.post("/")
+# ----------------------------------------------------------------------------------------------------
+# Crear mesa
+# ----------------------------------------------------------------------------------------------------
+@router.post(
+    "/",
+    response_model=TableResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Crear mesa",
+    description="Crea una nueva mesa para el restaurante autenticado."
+)
 def create_table(
-    table_in: TableCreate,
+    data: TableCreate,
     user: User = Depends(admin_only),
     service: TableService = Depends(get_table_service)
 ):
-    return service.create_table(user.restaurant_id, table_in)
+    return service.create_table(user.restaurant_id, data)
 
-
-@router.post("/{table_id}/touch")
+# ----------------------------------------------------------------------------------------------------
+# Tocar mesa
+# ----------------------------------------------------------------------------------------------------
+@router.post(
+    "/{table_id}/touch",
+    response_model=TableTouchResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Tocar mesa",
+    description="Accede a una mesa para realizar operaciones."
+)
 def touch_table(
     table_id: int,
     user: User = Depends(waiter_or_admin),
@@ -9421,23 +12477,37 @@ def touch_table(
 ):
     return service.touch_table(user.restaurant_id, table_id)
 
-
-@router.post("/{table_id}/add-product")
-def add_product_to_table(
+# ----------------------------------------------------------------------------------------------------
+# Agregar producto a la orden de la mesa
+# ----------------------------------------------------------------------------------------------------
+@router.post(
+    "/{table_id}/add-product",
+    status_code=status.HTTP_200_OK,
+    summary="Agregar producto a la orden",
+    description="Agrega un producto a la orden abierta de una mesa."
+)
+def add_product_to_order(
     table_id: int,
-    payload: AddItemRequest,
+    data: OrderItemCreate,
     user: User = Depends(waiter_or_admin),
     service: OrderService = Depends(get_order_service)
 ):
-    return service.add_product_to_table(
+    return service.add_product_to_order(
         restaurant_id=user.restaurant_id,
         table_id=table_id,
-        product_id=payload.product_id,
-        quantity=payload.quantity
+        data=data
     )
 
-
-@router.get("/", response_model=list[TableList])
+# ----------------------------------------------------------------------------------------------------
+# Listar mesas
+# ----------------------------------------------------------------------------------------------------
+@router.get(
+    "/",
+    response_model=list[TableList],
+    status_code=status.HTTP_200_OK,
+    summary="Listar mesas",
+    description="Lista todas las mesas del restaurante autenticado."
+)
 def list_tables(
     active: bool | None = Query(default=True),
     user: User = Depends(waiter_or_admin),
@@ -9445,16 +12515,32 @@ def list_tables(
 ):
     return service.list_tables(user.restaurant_id, active)
 
-
-@router.get("/status", response_model=list[TableOut])
+# ----------------------------------------------------------------------------------------------------
+# Listar estado de las mesas
+# ----------------------------------------------------------------------------------------------------
+@router.get(
+    "/status",
+    response_model=list[TableStatusResponse],
+    status_code=status.HTTP_200_OK,
+    summary="Listar estado de las mesas",
+    description="Lista el estado de todas las mesas del restaurante autenticado."
+)
 def list_tables_status(
     user: User = Depends(waiter_or_admin),
     service: TableService = Depends(get_table_service)
 ):
     return service.list_tables_status(user.restaurant_id)
 
-
-@router.patch("/{table_id}/position", response_model=TablePositionOut)
+# ----------------------------------------------------------------------------------------------------
+# Modificar posición de la mesa
+# ----------------------------------------------------------------------------------------------------
+@router.patch(
+    "/{table_id}/position",
+    response_model=TablePositionOut,
+    status_code=status.HTTP_200_OK,
+    summary="Modificar posición de la mesa",
+    description="Modifica la posición de una mesa específica del restaurante autenticado."
+)
 def update_position(
     table_id: int,
     data: TablePositionUpdate,
@@ -9463,8 +12549,15 @@ def update_position(
 ):
     return service.update_position(user.restaurant_id, table_id, data)
 
-
-@router.patch("/{table_id}/activate")
+# ----------------------------------------------------------------------------------------------------
+# Activar mesa
+# ----------------------------------------------------------------------------------------------------
+@router.patch(
+    "/{table_id}/activate",
+    status_code=status.HTTP_200_OK,
+    summary="Activar mesa",
+    description="Activa una mesa específica del restaurante autenticado."
+)
 def activate_table(
     table_id: int,
     user: User = Depends(admin_only),
@@ -9472,25 +12565,39 @@ def activate_table(
 ):
     return service.activate_table(user.restaurant_id, table_id)
 
-
-@router.patch("/{table_id}", response_model=TableList)
+# ----------------------------------------------------------------------------------------------------
+# Actualizar mesa
+# ----------------------------------------------------------------------------------------------------
+@router.patch(
+    "/{table_id}",
+    response_model=TableResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Actualizar mesa",
+    description="Actualiza la información de una mesa específica del restaurante autenticado."
+)
 def update_table(
     table_id: int,
-    table_in: TableUpdate,
+    data: TableUpdate,
     user: User = Depends(admin_only),
     service: TableService = Depends(get_table_service)
 ):
-    return service.update_table(user.restaurant_id, table_id, table_in)
+    return service.update_table(user.restaurant_id, table_id, data)
 
-
-@router.delete("/{table_id}")
+# ----------------------------------------------------------------------------------------------------
+# Desactivar mesa
+# ----------------------------------------------------------------------------------------------------
+@router.delete(
+    "/{table_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Desactivar mesa",
+    description="Desactiva una mesa específica del restaurante autenticado."
+)
 def deactivate_table(
     table_id: int,
     user: User = Depends(admin_only),
     service: TableService = Depends(get_table_service)
 ):
     return service.deactivate_table(user.restaurant_id, table_id)
-
 ```
 
 ---
@@ -9508,30 +12615,48 @@ def deactivate_table(
 **Imports (10):**
 - fastapi.APIRouter
 - fastapi.Depends
+- fastapi.status
 - app.dependencies.roles.admin_only
+- app.domain.user.user_service.UserService
+- app.domain.user.dependencies.get_user_service
 - app.models.user.User
-- app.models.user.UserRole
 - app.schemas.user.UserCreate
 - app.schemas.user.UserUpdate
 - app.schemas.user.UserOut
-- app.domain.user.user_service.UserService
-- app.domain.user.dependencies.get_user_service
 
 ```python
-from fastapi import APIRouter, Depends
+"""
+Endpoints para la gestión de los usuarios del sistema.
+Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
+"""
+
+from fastapi import APIRouter, Depends, status
 
 from app.dependencies.roles import admin_only
-
-from app.models.user import User, UserRole
-from app.schemas.user import UserCreate, UserUpdate, UserOut
 
 from app.domain.user.user_service import UserService
 from app.domain.user.dependencies import get_user_service
 
+from app.models.user import User
+
+from app.schemas.user import (
+    UserCreate,
+    UserUpdate,
+    UserOut
+)
+
 router = APIRouter(prefix="/users", tags=["users"])
 
-
-@router.post("/", response_model=UserOut)
+# ----------------------------------------------------------------------------------------------------
+# Crear usuario
+# ----------------------------------------------------------------------------------------------------
+@router.post(
+    "/",
+    response_model=UserOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Crear usuario",
+    description="Crea un usuario en el sistema."
+)
 def create_user(
     data: UserCreate,
     user: User = Depends(admin_only),
@@ -9539,16 +12664,32 @@ def create_user(
 ):
     return service.create_user(user.restaurant_id, data)
 
-
-@router.get("/", response_model=list[UserOut])
+# ----------------------------------------------------------------------------------------------------
+# Listar usuarios del sistema
+# ----------------------------------------------------------------------------------------------------
+@router.get(
+    "/",
+    response_model=list[UserOut],
+    status_code=status.HTTP_200_OK,
+    summary="Listar usuarios",
+    description="Lista los usuarios del sistema."
+)
 def list_users(
     user: User = Depends(admin_only),
     service: UserService = Depends(get_user_service)
 ):
     return service.list_users(user.restaurant_id)
 
-
-@router.patch("/{user_id}", response_model=UserOut)
+# ----------------------------------------------------------------------------------------------------
+# Actualiza un usuario
+# ----------------------------------------------------------------------------------------------------
+@router.patch(
+    "/{user_id}",
+    response_model=UserOut,
+    status_code=status.HTTP_200_OK,
+    summary="Actualizar usuario",
+    description="Actualiza un usuario del sistema."
+)
 def update_user(
     user_id: int,
     data: UserUpdate,
@@ -9557,14 +12698,97 @@ def update_user(
 ):
     return service.update_user(user_id, user.restaurant_id, data)
 
-
-@router.patch("/{user_id}/toggle", response_model=UserOut)
+# ----------------------------------------------------------------------------------------------------
+# Activa/Desactiva un usuario
+# ----------------------------------------------------------------------------------------------------
+@router.patch(
+    "/{user_id}/toggle",
+    response_model=UserOut,
+    status_code=status.HTTP_200_OK,
+    summary="Activar/Desactivar usuario",
+    description="Activa o desactiva a un usuario del sistema."
+)
 def toggle_user(
     user_id: int,
     user: User = Depends(admin_only),
     service: UserService = Depends(get_user_service)
 ):
-    return service.toggle_user(user_id, user.restaurant_id)
+    return service.toggle_user(user_id, user.id, user.restaurant_id)
+```
+
+---
+
+### .\backend\app\scheduler\backup_jobs.py
+
+**Funciones (2):**
+- register_jobs
+- scheduled_backup_job
+
+**Clases (0):**
+
+**Imports (4):**
+- sqlalchemy.orm.Session
+- app.db.session.SessionLocal
+- app.domain.backup.backup_service.BackupService
+- app.scheduler.scheduler.scheduler
+
+```python
+from sqlalchemy.orm import Session
+
+from app.db.session import SessionLocal
+from app.domain.backup.backup_service import BackupService
+from app.scheduler.scheduler import scheduler
+
+
+# --------------------------------------------------------------------------------------
+# Registra las tareas programadas relacionadas con los backups.
+# --------------------------------------------------------------------------------------
+def register_jobs() -> None:
+    scheduler.add_job(
+        scheduled_backup_job,
+        trigger="interval",
+        minutes=1,
+        id="backup_scheduler",
+        replace_existing=True,
+    )
+
+
+# --------------------------------------------------------------------------------------
+# Ejecuta la comprobación de backups pendientes.
+# Crea una sesión independiente de base de datos para el scheduler.
+# --------------------------------------------------------------------------------------
+def scheduled_backup_job() -> None:
+
+    db: Session = SessionLocal()
+
+    try:
+        BackupService(db).run_pending_backups()
+
+    finally:
+        db.close()
+```
+
+---
+
+### .\backend\app\scheduler\scheduler.py
+
+**Funciones (0):**
+
+**Clases (0):**
+
+**Imports (1):**
+- apscheduler.schedulers.background.BackgroundScheduler
+
+```python
+from apscheduler.schedulers.background import BackgroundScheduler
+
+# --------------------------------------------------------------------------------------
+# Scheduler global utilizado para registrar y ejecutar tareas programadas.
+# Todas las fechas se manejan internamente en UTC.
+# --------------------------------------------------------------------------------------
+scheduler: BackgroundScheduler = BackgroundScheduler(
+    timezone="UTC"
+)
 ```
 
 ---
@@ -9573,8 +12797,7 @@ def toggle_user(
 
 **Funciones (0):**
 
-**Clases (2):**
-- LoginRequest
+**Clases (1):**
 - TokenResponse
 
 **Imports (1):**
@@ -9583,16 +12806,92 @@ def toggle_user(
 ```python
 from pydantic import BaseModel
 
-
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
 
+```
+
+---
+
+### .\backend\app\schemas\backup.py
+
+**Funciones (0):**
+
+**Clases (7):**
+- BackupEmailRequest
+- BackupInfoOut
+- BackupFileOut
+- BackupStatusOut
+- BackupEmailOut
+- BackupDeleteOut
+- BackupRestoreOut
+
+**Imports (3):**
+- datetime.datetime
+- base.BaseSchema
+- pydantic.EmailStr
+
+```python
+from datetime import datetime
+
+from .base import BaseSchema
+from pydantic import EmailStr
+
+
+# -------------------------------------------------------------------
+# Request
+# -------------------------------------------------------------------
+class BackupEmailRequest(BaseSchema):
+    email: EmailStr
+
+# -------------------------------------------------------------------
+# Reusable
+# -------------------------------------------------------------------
+class BackupInfoOut(BaseSchema):
+    last_backup_at: datetime
+    last_backup_file: str
+    last_backup_size: int
+    type: str
+
+
+class BackupFileOut(BaseSchema):
+    filename: str
+    created_at: datetime
+    size: int
+    type: str
+
+# -------------------------------------------------------------------
+# Status
+# -------------------------------------------------------------------
+class BackupStatusOut(BaseSchema):
+    last_backup_at: datetime | None
+    last_backup_file: str | None
+    last_backup_size: int | None
+    last_backup_source: str | None
+
+    email_enabled: bool
+    email_from: str | None
+
+    last_automatic_backup_at: datetime | None
+    next_automatic_backup_at: datetime | None
+
+    last_backup_result: str | None
+
+# -------------------------------------------------------------------
+# Responses
+# -------------------------------------------------------------------
+class BackupEmailOut(BackupInfoOut):
+    sent_to: EmailStr
+
+
+class BackupDeleteOut(BaseSchema):
+    success: bool
+
+
+class BackupRestoreOut(BaseSchema):
+    success: bool
+    restart_required: bool
 ```
 
 ---
@@ -9630,35 +12929,36 @@ class TimestampSchema(BaseSchema):
 
 **Funciones (0):**
 
-**Clases (9):**
+**Clases (8):**
 - CashRegisterOpen
-- CashRegisterOut
+- CashRegisterResponse
 - CashRegisterSummary
-- PaymentBreakdown
 - CashRegisterCloseOut
 - CashRegisterClose
 - CashMovementCreate
 - CashMovementOut
 - CashRegisterDashboard
 
-**Imports (4):**
+**Imports (5):**
 - datetime.datetime
 - decimal.Decimal
 - pydantic.Field
 - base.BaseSchema
+- app.models.cash_movement.CashMovementType
 
 ```python
 from datetime import datetime
 from decimal import Decimal
 from pydantic import Field
 from .base import BaseSchema
+from app.models.cash_movement import CashMovementType
 
 
 class CashRegisterOpen(BaseSchema):
     opening_amount: Decimal = Field(ge=Decimal("0"))
 
 
-class CashRegisterOut(BaseSchema):
+class CashRegisterResponse(BaseSchema):
     id: int
     restaurant_id: int
     opening_amount: Decimal
@@ -9676,11 +12976,6 @@ class CashRegisterSummary(BaseSchema):
     orders_count: int
     average_ticket: Decimal
     by_method: dict[str, Decimal]
-
-class PaymentBreakdown(BaseSchema):
-    method: str
-    total: Decimal
-
 
 class CashRegisterCloseOut(BaseSchema):
     message: str
@@ -9701,14 +12996,14 @@ class CashRegisterClose(BaseSchema):
 
 
 class CashMovementCreate(BaseSchema):
-    type: str
+    type: CashMovementType
     amount: Decimal = Field(gt=Decimal("0"))
     reason: str
 
 
 class CashMovementOut(BaseSchema):
     id: int
-    type: str
+    type: CashMovementType
     amount: Decimal
     reason: str | None
     created_at: datetime
@@ -9725,9 +13020,6 @@ class CashRegisterDashboard(BaseSchema):
     by_method: dict[str, Decimal]
     cash_movements: list[CashMovementOut]
     expected_cash: Decimal
-
-
-
 ```
 
 ---
@@ -9736,43 +13028,44 @@ class CashRegisterDashboard(BaseSchema):
 
 **Funciones (0):**
 
-**Clases (5):**
-- CategoryBase
+**Clases (6):**
+- ProductRef
 - CategoryCreate
 - CategoryUpdate
+- CategoryRef
 - CategoryResponse
 - CategoryWithProducts
 
-**Imports (4):**
-- typing.List
-- base.BaseSchema
-- product.ProductMenu
+**Imports (3):**
 - decimal.Decimal
+- pydantic.Field
+- base.BaseSchema
 
 ```python
-from typing import List
-from .base import BaseSchema
-from .product import ProductMenu
 from decimal import Decimal
+from pydantic import Field
+from .base import BaseSchema
 
-class CategoryBase(BaseSchema):
+class ProductRef(BaseSchema):
+    id: int
     name: str
+    price: Decimal
 
-
-class CategoryCreate(CategoryBase):
-    pass
-
+class CategoryCreate(BaseSchema):
+    name: str
 
 class CategoryUpdate(BaseSchema):
     name: str
 
-
-class CategoryResponse(CategoryBase):
+class CategoryRef(BaseSchema):
     id: int
+    name: str
 
+class CategoryResponse(CategoryRef):
+    active: bool
 
 class CategoryWithProducts(CategoryResponse):
-    products: List[ProductMenu] = []
+    products: list[ProductRef] = Field(default_factory=list)
 ```
 
 ---
@@ -9785,24 +13078,30 @@ class CategoryWithProducts(CategoryResponse):
 - LayoutOut
 - LayoutUpdate
 
-**Imports (1):**
+**Imports (2):**
+- pydantic.Field
 - base.BaseSchema
 
 ```python
+from pydantic import Field
+
 from .base import BaseSchema
 
 class LayoutOut(BaseSchema):
+    restaurant_id: int
     width: int
     height: int
     grid_size: int
     snap_to_grid: bool
+    background_image: str | None = None
 
 
 class LayoutUpdate(BaseSchema):
-    width: int
-    height: int
-    grid_size: int
-    snap_to_grid: bool
+    width: int | None = None
+    height: int | None = None
+    grid_size: int | None = None
+    snap_to_grid: bool | None = None
+    background_image: str | None = None
 ```
 
 ---
@@ -9811,22 +13110,22 @@ class LayoutUpdate(BaseSchema):
 
 **Funciones (0):**
 
-**Clases (4):**
+**Clases (3):**
 - ProductCreate
 - ProductUpdate
-- ProductOut
-- ProductMenu
+- ProductResponse
 
-**Imports (3):**
+**Imports (4):**
 - decimal.Decimal
-- typing.Optional
 - base.BaseSchema
+- category.CategoryRef
+- station.StationRef
 
 ```python
 from decimal import Decimal
-from typing import Optional
 from .base import BaseSchema
-
+from .category import CategoryRef
+from .station import StationRef
 
 class ProductCreate(BaseSchema):
     name: str
@@ -9834,27 +13133,100 @@ class ProductCreate(BaseSchema):
     category_id: int
     station_id: int
 
-
 class ProductUpdate(BaseSchema):
-    name: Optional[str] = None
-    price: Optional[Decimal] = None
-    category_id: Optional[int] = None
-    station_id: Optional[int] = None
+    name: str | None = None
+    price: Decimal | None = None
+    category_id: int | None = None
+    station_id: int | None = None
 
-
-class ProductOut(BaseSchema):
+class ProductResponse(BaseSchema):
     id: int
     name: str
     price: Decimal
     category_id: int
     station_id: int
     active: bool
+    category: CategoryRef
+    station: StationRef
+```
 
+---
 
-class ProductMenu(BaseSchema):
-    id: int
+### .\backend\app\schemas\reports.py
+
+**Funciones (0):**
+
+**Clases (9):**
+- SalesOrderItemOut
+- SalesOrderOut
+- SalesOrdersReportOut
+- ProductEvolutionPoint
+- ProductEvolutionReportOut
+- ProductSummaryOut
+- ProductsReportOut
+- SalesPointOut
+- SalesReportOut
+
+**Imports (5):**
+- decimal.Decimal
+- datetime.datetime
+- datetime.date
+- base.BaseSchema
+- order.order_item.OrderItemOut
+
+```python
+from decimal import Decimal
+from datetime import datetime, date
+from .base import BaseSchema
+from .order.order_item import OrderItemOut
+
+class SalesOrderItemOut(BaseSchema):
+    item_id: int
+    product_id: int
+    product_name: str
+    unit_price: Decimal
+    quantity: int
+    line_total: Decimal
+
+class SalesOrderOut(BaseSchema):
+    order_id: int
+    table_number: int | None
+    closed_at: datetime | None
+    items: list[SalesOrderItemOut]
+    subtotal: Decimal
+    discount: Decimal
+    total: Decimal
+
+class SalesOrdersReportOut(BaseSchema):
+    orders: list[SalesOrderOut]
+
+class ProductEvolutionPoint(BaseSchema):
+    date: date
+    total: Decimal
+
+class ProductEvolutionReportOut(BaseSchema):
+    series: list[ProductEvolutionPoint]
+
+class ProductSummaryOut(BaseSchema):
+    product_id: int
     name: str
-    price: Decimal
+    category_id: int
+    quantity: int
+    total: Decimal
+
+class ProductsReportOut(BaseSchema):
+    today_best_seller: ProductSummaryOut | None
+    top_products: list[ProductSummaryOut]
+    least_products: list[ProductSummaryOut]
+
+class SalesPointOut(BaseSchema):
+    date: date
+    total: Decimal
+
+class SalesReportOut(BaseSchema):
+    series: list[SalesPointOut]
+    max_day: SalesPointOut | None
+    min_day: SalesPointOut | None
 ```
 
 ---
@@ -9863,10 +13235,11 @@ class ProductMenu(BaseSchema):
 
 **Funciones (0):**
 
-**Clases (3):**
+**Clases (4):**
 - StationCreate
 - StationUpdate
-- StationOut
+- StationRef
+- StationResponse
 
 **Imports (1):**
 - base.BaseSchema
@@ -9880,7 +13253,11 @@ class StationCreate(BaseSchema):
 class StationUpdate(BaseSchema):
     name: str
 
-class StationOut(BaseSchema):
+class StationRef(BaseSchema):
+    id: int
+    name: str
+
+class StationResponse(BaseSchema):
     id: int
     name: str
     active: bool
@@ -9892,23 +13269,88 @@ class StationOut(BaseSchema):
 
 **Funciones (0):**
 
-**Clases (1):**
+**Clases (3):**
 - SettingsUpdateRequest
+- SettingsResponse
+- EmailTestResponse
 
-**Imports (1):**
+**Imports (6):**
+- pydantic.Field
+- pydantic.EmailStr
 - base.BaseSchema
+- datetime.datetime
+- datetime.time
+- app.models.enums.BackupFrequency
 
 ```python
+from pydantic import Field, EmailStr
+
 from .base import BaseSchema
+from datetime import datetime, time
+from app.models.enums import BackupFrequency
 
 class SettingsUpdateRequest(BaseSchema):
     smtp_host: str | None = None
-    smtp_port: int | None = None
+    smtp_port: int | None = Field(ge=1, le=65535)
     smtp_user: str | None = None
     smtp_password: str | None = None
-    smtp_from: str | None = None
+    smtp_from: EmailStr | None = None
     smtp_use_tls: bool = True
-    backup_email: str | None = None
+
+    backup_email: EmailStr | None = None
+
+    backup_enabled: bool = False
+    backup_frequency: BackupFrequency = BackupFrequency.MANUAL
+
+    backup_time: time | None = None
+    backup_weekday: int | None = Field(default=None, ge=0, le=6)
+    backup_monthday: int | None = Field(default=None, ge=1, le=31)
+
+    backup_retention_daily: int = Field(default=30, ge=1)
+    backup_retention_weekly: int = Field(default=12, ge=1)
+    backup_retention_monthly: int = Field(default=24, ge=1)
+    backup_keep_local: bool = True
+    backup_send_email: bool = True
+
+    backup_timezone: str = "America/Montevideo"
+
+
+class SettingsResponse(BaseSchema):
+
+    smtp_host: str | None
+    smtp_port: int | None
+    smtp_user: str | None
+
+    smtp_from: EmailStr | None
+    smtp_use_tls: bool
+
+    smtp_password_configured: bool
+
+    backup_email: EmailStr | None
+
+    backup_enabled: bool
+    backup_frequency: BackupFrequency
+
+    backup_time: time | None
+    backup_weekday: int | None
+    backup_monthday: int | None
+
+    backup_retention_daily: int
+    backup_retention_weekly: int
+    backup_retention_monthly: int
+
+    backup_keep_local: bool
+    backup_send_email: bool
+
+    backup_timezone: str
+
+    last_automatic_backup_at: datetime | None
+    next_automatic_backup_at: datetime | None
+    last_backup_result: str | None
+
+class EmailTestResponse(BaseSchema):
+    success: bool
+    sent_to: str
 ```
 
 ---
@@ -9917,62 +13359,64 @@ class SettingsUpdateRequest(BaseSchema):
 
 **Funciones (0):**
 
-**Clases (7):**
-- TableStatus
-- TableOut
+**Clases (8):**
 - TableCreate
+- TableResponse
 - TableUpdate
+- TableStatusResponse
 - TableList
 - TablePositionUpdate
 - TablePositionOut
+- TableTouchResponse
 
-**Imports (4):**
+**Imports (3):**
 - app.models.order.OrderStatus
 - base.BaseSchema
-- typing.Optional
-- enum.Enum
+- app.models.enums.TableShape
 
 ```python
 from app.models.order import OrderStatus
 from .base import BaseSchema
-from typing import Optional
-from enum import Enum
+from app.models.enums import TableShape
 
-class TableStatus(str, Enum):
-    FREE = "libre"
-    OCCUPIED = "ocupada"
+class TableCreate(BaseSchema):
+    number: int | None = None
+    x: int = 0
+    y: int = 0
+    capacity: int = 4
+    shape: TableShape = TableShape.CIRCLE
 
-class TableOut(BaseSchema):
+class TableResponse(BaseSchema):
     id: int
     number: int
     x: int
     y: int
     capacity: int
-    shape: str
+    shape: TableShape
     active: bool
-    status: TableStatus
-    order_id: int | None
-    order_status: OrderStatus | None
-
-class TableCreate(BaseSchema):
-    number: Optional[int] = None
-    x: int = 0
-    y: int = 0
-    capacity: int = 4
-    shape: str = "Circular"
 
 class TableUpdate(BaseSchema):
-    number: Optional[int] = None
-    capacity: Optional[int] = None
-    shape: Optional[str] = None
-    active: Optional[bool] = None
+    number: int | None = None
+    capacity: int | None = None
+    shape: TableShape | None = None
+    active: bool | None = None
 
+class TableStatusResponse(BaseSchema):
+    id: int
+    number: int
+    x: int
+    y: int
+    capacity: int
+    shape: TableShape
+    active: bool
+    order_id: int | None
+    order_status: OrderStatus | None
 
 class TableList(BaseSchema):
     id: int
     number: int
     capacity: int
-    shape: str
+    shape: TableShape
     active: bool
 
 class TablePositionUpdate(BaseSchema):
@@ -9984,72 +13428,105 @@ class TablePositionOut(BaseSchema):
     x: int
     y: int
 
+class TableTouchResponse(BaseSchema):
+    table_id: int
+    table_number: int
+    order_id: int | None
 ```
 
 ---
 
 ### .\backend\app\schemas\user.py
 
-**Funciones (0):**
+**Funciones (4):**
+- validate_username
+- validate_password
+- validate_username
+- validate_password
 
 **Clases (3):**
 - UserCreate
 - UserUpdate
 - UserOut
 
-**Imports (3):**
-- typing.Optional
+**Imports (6):**
+- re
+- pydantic.SecretStr
+- pydantic.ConfigDict
+- pydantic.field_validator
 - base.BaseSchema
 - app.models.user.UserRole
 
 ```python
-from typing import Optional
+import re
+
+from pydantic import SecretStr, ConfigDict, field_validator
+
 from .base import BaseSchema
 from app.models.user import UserRole
 
+USERNAME_RE = re.compile(r"^[a-z0-9_.-]+$")
 
 class UserCreate(BaseSchema):
     username: str
-    password: str
+    password: SecretStr
     role: UserRole
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, value: str) -> str:
+        value = value.lower()
+        if not USERNAME_RE.fullmatch(value):
+            raise ValueError(
+                "Username may only contain lowercase letters, numbers, '.', '-' and '_'."
+            )
+        return value
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: SecretStr) -> SecretStr:
+        password = value.get_secret_value()
+        if len(password) < 4:
+            raise ValueError("Password must contain at least 4 characters.")
+        return value
 
 
 class UserUpdate(BaseSchema):
-    username: Optional[str] = None
-    password: Optional[str] = None
-    role: Optional[UserRole] = None
+    username: str | None = None
+    password: SecretStr | None = None
+    role: UserRole | None = None
 
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.lower()
+        if not USERNAME_RE.fullmatch(value):
+            raise ValueError(
+                "Username may only contain lowercase letters, numbers, '.', '-' and '_'."
+            )
+        return value
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is None:
+            return None
+        password = value.get_secret_value()
+        if len(password) < 4:
+            raise ValueError("Password must contain at least 4 characters.")
+        return value
 
 class UserOut(BaseSchema):
     id: int
     username: str
     role: UserRole
     active: bool
-```
-
----
-
-### .\backend\app\schemas\waiter.py
-
-**Funciones (0):**
-
-**Clases (1):**
-- WaiterItemOut
-
-**Imports (1):**
-- base.BaseSchema
-
-```python
-# schemas/waiter.py
-
-from .base import BaseSchema
-
-class WaiterItemOut(BaseSchema):
-    id: int
-    product_name: str
-    quantity: int
-    status: str
-
 ```
 
 ---
@@ -10085,13 +13562,14 @@ class KitchenItemOut(BaseSchema):
 **Funciones (0):**
 
 **Clases (3):**
-- OrderOut
-- WaiterOrderOut
+- OrderDetail
+- OrderResponse
 - OrderStatusUpdate
 
-**Imports (5):**
+**Imports (6):**
 - decimal.Decimal
 - app.models.order.OrderStatus
+- datetime.datetime
 - base.BaseSchema
 - order_item.OrderItemOut
 - payment.PaymentOut
@@ -10099,16 +13577,17 @@ class KitchenItemOut(BaseSchema):
 ```python
 from decimal import Decimal
 from app.models.order import OrderStatus
+from datetime import datetime
 from ..base import BaseSchema
 from .order_item import OrderItemOut
 from .payment import PaymentOut
 
 
-class OrderOut(BaseSchema):
+class OrderDetail(BaseSchema):
     id: int
     table_number: int
     status: OrderStatus
-    created_at: str
+    created_at: datetime
     items: list[OrderItemOut]
     payments: list[PaymentOut]
     subtotal: Decimal
@@ -10117,20 +13596,8 @@ class OrderOut(BaseSchema):
     total_paid: Decimal
     remaining: Decimal
 
-
-class WaiterOrderOut(BaseSchema):
-    id: int
+class OrderResponse(OrderDetail):
     table_id: int
-    table_number: int
-    status: OrderStatus
-    created_at: str
-    items: list[OrderItemOut]
-    subtotal: Decimal
-    discount: Decimal
-    total: Decimal
-    total_paid: Decimal
-    remaining: Decimal
-
 
 class OrderStatusUpdate(BaseSchema):
     status: OrderStatus
@@ -10142,11 +13609,10 @@ class OrderStatusUpdate(BaseSchema):
 
 **Funciones (0):**
 
-**Clases (4):**
+**Clases (3):**
 - OrderItemCreate
 - OrderItemStatusUpdate
 - OrderItemOut
-- AddItemRequest
 
 **Imports (3):**
 - decimal.Decimal
@@ -10174,10 +13640,6 @@ class OrderItemOut(BaseSchema):
     unit_price: Decimal
     subtotal: Decimal
     status: OrderItemStatus
-
-class AddItemRequest(BaseSchema):
-    product_id: int
-    quantity: int = 1
 ```
 
 ---
@@ -10209,6 +13671,8 @@ class PaymentOut(BaseSchema):
     id: int
     amount: Decimal
     method: PaymentMethod
+
+
 ```
 
 ---
@@ -10223,10 +13687,11 @@ class PaymentOut(BaseSchema):
 **Clases (1):**
 - EventCleanup
 
-**Imports (8):**
+**Imports (9):**
 - asyncio
 - logging
 - sqlalchemy.and_
+- sqlalchemy.orm.Session
 - datetime.datetime
 - datetime.timedelta
 - datetime.timezone
@@ -10238,48 +13703,60 @@ import asyncio
 import logging
 
 from sqlalchemy import and_
+from sqlalchemy.orm import Session
+
 from datetime import datetime, timedelta, timezone
 
 from app.db.session import SessionLocal
 from app.models.event_outbox import EventOutbox
 
-logger = logging.getLogger("app.services.event_cleanup")
+logger = logging.getLogger("app.event_cleanup")
 
+# --------------------------------------------------------------------------------------
+# Configuración
+# --------------------------------------------------------------------------------------
+PROCESSED_RETENTION_DAYS = 3
+FAILED_RETENTION_DAYS = 7
+FAILED_MAX_RETRIES = 10
 
+# --------------------------------------------------------------------------------------
+# Servicio encargado de eliminar eventos antiguos del EventOutbox.
+# --------------------------------------------------------------------------------------
 class EventCleanup:
 
-    def __init__(self, interval_seconds=3600):
+    """
+    Elimina periódicamente eventos antiguos del EventOutbox para evitar
+    el crecimiento indefinido de la tabla.
+    """
+    
+    def __init__(self, interval_seconds=3600) ->None:
         self.interval = interval_seconds
 
-    async def run(self):
-
+# --------------------------------------------------------------------------------------
+# Ejecuta el proceso de limpieza periódicamente.
+# --------------------------------------------------------------------------------------
+    async def run(self) -> None:
         logger.info("Event cleanup job started")
-
         while True:
-
             try:
                 await asyncio.sleep(self.interval)
                 self.cleanup()
-
             except asyncio.CancelledError:
                 logger.info("Event cleanup stopped")
                 raise
-
             except Exception:
                 logger.exception("Cleanup job failed")
 
-    def cleanup(self):
-
-        db = SessionLocal()
-
+# --------------------------------------------------------------------------------------
+# Elimina eventos procesados y fallidos que ya no deben conservarse.
+# --------------------------------------------------------------------------------------
+    def cleanup(self) -> None:
+        db: Session = SessionLocal()
         try:
-
             now = datetime.now(timezone.utc)
-
-            processed_cutoff = now - timedelta(days=3)
-            failed_cutoff = now - timedelta(days=7)
-
-            # borrar processed viejos
+            processed_cutoff = now - timedelta(days=PROCESSED_RETENTION_DAYS)
+            failed_cutoff = now - timedelta(days=FAILED_RETENTION_DAYS)
+            # Eliminar eventos procesados antiguos.
             processed_deleted = (
                 db.query(EventOutbox)
                 .filter(
@@ -10290,37 +13767,33 @@ class EventCleanup:
                 )
                 .delete(synchronize_session=False)
             )
-
-            # borrar failed irreparables
+            # Eliminar eventos fallidos que ya no volverán a reintentarse.
             failed_deleted = (
                 db.query(EventOutbox)
                 .filter(
                     and_(
                         EventOutbox.status == "failed",
-                        EventOutbox.retries >= 10,
+                        EventOutbox.retries >= FAILED_MAX_RETRIES,
                         EventOutbox.created_at < failed_cutoff
                     )
                 )
                 .delete(synchronize_session=False)
             )
-
             db.commit()
-
             total = processed_deleted + failed_deleted
+            if not total:
+                return
 
-            if total > 0:
-                logger.info(
-                    "event_cleanup_completed processed=%s failed=%s total=%s",
-                    processed_deleted, failed_deleted, total
-                )
-
+            logger.info(
+                "event_cleanup_completed processed=%s failed=%s total=%s",
+                processed_deleted,
+                failed_deleted,
+                total,
+            )
         except Exception:
-
             db.rollback()
             logger.exception("event_cleanup_failed")
-
         finally:
-
             db.close()
 ```
 
@@ -10335,28 +13808,42 @@ class EventCleanup:
 **Clases (1):**
 - EventService
 
-**Imports (2):**
+**Imports (3):**
+- typing.Any
 - sqlalchemy.orm.Session
 - app.models.event_outbox.EventOutbox
 
 ```python
+from typing import Any
+
 from sqlalchemy.orm import Session
+
 from app.models.event_outbox import EventOutbox
 
 
 class EventService:
+    """
+    Servicio encargado de registrar eventos en la tabla EventOutbox.
 
-    def __init__(self, db: Session):
+    Los eventos son procesados posteriormente por el EventWorker,
+    que los publica en Redis y actualiza su estado.
+    """
+
+    def __init__(self, db: Session) -> None:
         self.db = db
 
+    # --------------------------------------------------------------------------------------
+    # Registra un evento pendiente para ser procesado por el EventWorker.
+    # --------------------------------------------------------------------------------------
     def emit(
         self,
         restaurant_id: int,
         event_type: str,
-        payload: dict,
+        payload: dict[str, Any],
         target: str = "broadcast",
-        target_id: str | None = None
-    ):
+        target_id: str | None = None,
+    ) -> None:
+
         event = EventOutbox(
             restaurant_id=restaurant_id,
             event_type=event_type,
@@ -10364,7 +13851,7 @@ class EventService:
             target=target,
             target_id=target_id,
             status="pending",
-            retries=0
+            retries=0,
         )
 
         self.db.add(event)
@@ -10382,84 +13869,89 @@ class EventService:
 **Clases (1):**
 - EventWorker
 
-**Imports (13):**
+**Imports (14):**
 - asyncio
 - json
 - logging
+- uuid
 - datetime.datetime
 - datetime.timezone
+- typing.Any
 - sqlalchemy.select
 - sqlalchemy.orm.Session
 - app.db.session.SessionLocal
-- app.models.event_outbox.EventOutbox
 - app.websocket.manager.manager
 - app.core.redis.redis_client
 - app.models.user.UserRole
-- uuid
+- app.models.event_outbox.EventOutbox
 
 ```python
 import asyncio
 import json
 import logging
+import uuid
+
 from datetime import datetime, timezone
+
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
-from app.models.event_outbox import EventOutbox
 from app.websocket.manager import manager
 from app.core.redis import redis_client
-from app.models.user import UserRole
 
-import uuid
+from app.models.user import UserRole
+from app.models.event_outbox import EventOutbox
+
 
 INSTANCE_ID = str(uuid.uuid4())
 
 logger = logging.getLogger("app.event_worker")
 
-
-# =========================
-# CONFIGURACIÓN
-# =========================
-
+# --------------------------------------------------------------------------------------
+# Configuración
+# --------------------------------------------------------------------------------------
 POLL_INTERVAL = 0.5
+BATCH_SIZE = 50
+
 MAX_RETRIES = 6
 BASE_RETRY_DELAY = 2
-BATCH_SIZE = 50
-EVENT_TTL_HOURS = 48
 
+EVENT_TTL_HOURS = 48 # Utilizada por la tarea periódica que elimina eventos antiguos.
 
-# =========================
-# WORKER PRINCIPAL
-# =========================
 
 class EventWorker:
+    """
+    Procesa los eventos pendientes almacenados en la tabla EventOutbox.
 
-    async def run(self):
+    Su responsabilidad es:
 
+    - entregar eventos a los clientes WebSocket locales;
+    - replicarlos mediante Redis para otras instancias;
+    - gestionar reintentos automáticos;
+    - marcar los eventos como procesados o fallidos.
+    """
+
+# --------------------------------------------------------------------------------------
+# Inicia el ciclo principal del EventWorker.
+# --------------------------------------------------------------------------------------
+    async def run(self) -> None:
         logger.info("EventWorker started")
-
         while True:
-
             try:
                 await self._process_batch()
-
-            except Exception as e:
-                logger.exception("EventWorker loop error: %s", e)
-
+            except Exception:
+                logger.exception("EventWorker loop error")
             await asyncio.sleep(POLL_INTERVAL)
 
-    # =========================
-    # PROCESAR EVENTOS
-    # =========================
-
-    async def _process_batch(self):
-
+# --------------------------------------------------------------------------------------
+# Procesa un lote de eventos pendientes.
+# --------------------------------------------------------------------------------------
+    async def _process_batch(self) -> None:
         db: Session = SessionLocal()
-
         try:
-
             stmt = (
                 select(EventOutbox)
                 .where(EventOutbox.status == "pending")
@@ -10467,25 +13959,17 @@ class EventWorker:
                 .limit(BATCH_SIZE)
                 .with_for_update(skip_locked=True)
             )
-
             events = db.execute(stmt).scalars().all()
-
             if not events:
-                return
-
+                return None
             for event in events:
-
                 try:
                     await self._deliver_event(event)
-
                     event.status = "processed"
                     event.processed_at = datetime.now(timezone.utc)
-
                 except Exception as e:
-
                     event.retries += 1
                     event.last_error = str(e)
-
                     if event.retries >= MAX_RETRIES:
                         event.status = "failed"
                         logger.error(
@@ -10502,49 +13986,36 @@ class EventWorker:
                             delay
                         )
                         await asyncio.sleep(delay)
-
                 db.commit()
-
         finally:
             db.close()
 
-    # =========================
-    # ENTREGA DEL EVENTO
-    # =========================
-
-    async def _deliver_event(self, event: EventOutbox):
-
+# --------------------------------------------------------------------------------------
+# Entrega un evento mediante WebSocket y lo replica en Redis.
+# --------------------------------------------------------------------------------------
+    async def _deliver_event(self, event: EventOutbox,) -> None:
         payload = event.payload or {}
-
         message = {
             "type": event.event_type,
             "payload": payload
         }
-
         # ---- websocket delivery ----
-
         if event.target == "broadcast":
-
             await manager.broadcast(
                 event.restaurant_id,
                 message
             )
-
         elif event.target == "role":
-
             await manager.send_to_role(
                 event.restaurant_id,
                 UserRole(event.target_id),
                 message
             )
-
         elif event.target == "station":
-
             station_payload = {
                 **payload,
                 "station_id": int(event.target_id)
             }
-
             await manager.send_to_role(
                 event.restaurant_id,
                 UserRole.KITCHEN,
@@ -10580,37 +14051,48 @@ class EventWorker:
 
 **Clases (0):**
 
-**Imports (2):**
+**Imports (3):**
 - decimal.Decimal
 - decimal.ROUND_HALF_UP
+- typing.Any
 
 ```python
-# app/utils/money.py
-
 from decimal import Decimal, ROUND_HALF_UP
-
+from typing import Any
 
 TWOPLACES = Decimal("0.01")
 
 
-def to_decimal(value) -> Decimal:
+# --------------------------------------------------------------------------------------
+# Convierte un valor a Decimal de forma segura.
+# --------------------------------------------------------------------------------------
+def to_decimal(value: Any) -> Decimal:
     """
-    Convierte input a Decimal seguro.
+    Convierte cualquier valor numérico compatible a Decimal.
     """
     return Decimal(str(value))
 
 
-def money(value) -> str:
+# --------------------------------------------------------------------------------------
+# Devuelve un valor monetario con dos decimales utilizando ROUND_HALF_UP.
+# --------------------------------------------------------------------------------------
+def money(value: Any) -> str:
     """
-    Convierte un valor numérico a string monetario.
+    Convierte un valor numérico a su representación monetaria.
     """
+
     if value is None:
         value = Decimal("0")
 
     if not isinstance(value, Decimal):
         value = Decimal(str(value))
 
-    return str(value.quantize(TWOPLACES, rounding=ROUND_HALF_UP))
+    return str(
+        value.quantize(
+            TWOPLACES,
+            rounding=ROUND_HALF_UP,
+        )
+    )
 ```
 
 ---
@@ -10628,17 +14110,23 @@ def money(value) -> str:
 **Clases (1):**
 - ConnectionManager
 
-**Imports (4):**
+**Imports (6):**
+- logging
 - fastapi.WebSocket
 - collections.defaultdict
+- typing.Any
+- app.models.user.User
 - app.models.user.UserRole
-- logging
 
 ```python
+import logging
+
 from fastapi import WebSocket
 from collections import defaultdict
-from app.models.user import UserRole
-import logging
+from typing import Any
+
+from app.models.user import User, UserRole
+
 
 logger = logging.getLogger("app.websocket.manager")
 
@@ -10646,26 +14134,31 @@ MAX_CONNECTIONS_PER_USER = 3
 
 
 class ConnectionManager:
+    """
+    Administra las conexiones WebSocket activas.
 
-    def __init__(self):
+    Mantiene índices por restaurante, rol y usuario para facilitar
+    el envío eficiente de mensajes.
+    """
 
+    def __init__(self) -> None:
         # websocket_id -> connection
-        self._ws_index = {}
+        self._ws_index: dict[int, dict[str, Any]] = {}
 
         # restaurant -> connections
-        self._by_restaurant = defaultdict(set)
+        self._by_restaurant: defaultdict[int, set[int]] = defaultdict(set)
 
         # restaurant -> role -> connections
-        self._by_role = defaultdict(lambda: defaultdict(set))
+        self._by_role: defaultdict[int, defaultdict[UserRole, set[int]]] = \
+            defaultdict(lambda: defaultdict(set))
 
         # user -> connection_count
-        self._user_connections = defaultdict(int)
+        self._user_connections: defaultdict[int, int] = defaultdict(int)
 
-    # =========================
-    # CONNECT
-    # =========================
-
-    async def connect(self, websocket: WebSocket, user):
+# --------------------------------------------------------------------------------------
+# Acepta una nueva conexión WebSocket autenticada.
+# --------------------------------------------------------------------------------------
+    async def connect(self, websocket: WebSocket, user: User,) -> bool:
 
         if self._user_connections[user.id] >= MAX_CONNECTIONS_PER_USER:
             logger.warning(
@@ -10699,10 +14192,9 @@ class ConnectionManager:
 
         return True
 
-    # =========================
-    # DISCONNECT
-    # =========================
-
+# --------------------------------------------------------------------------------------
+# Elimina una conexión WebSocket.
+# --------------------------------------------------------------------------------------
     def disconnect(self, websocket: WebSocket):
 
         ws_id = id(websocket)
@@ -10730,10 +14222,9 @@ class ConnectionManager:
             user.id
         )
 
-    # =========================
-    # SENDS
-    # =========================
-
+# --------------------------------------------------------------------------------------
+# Envía un mensaje a todos los usuarios de un rol.
+# --------------------------------------------------------------------------------------
     async def send_to_role(
         self,
         restaurant_id: int,
@@ -10756,44 +14247,32 @@ class ConnectionManager:
         for ws_id in targets:
             await self._safe_send(ws_id, message)
 
-
+# --------------------------------------------------------------------------------------
+# Envía un mensaje a todos los usuarios.
+# --------------------------------------------------------------------------------------
     async def broadcast(
         self,
         restaurant_id: int,
         message: dict
     ):
-
         targets = list(self._by_restaurant.get(restaurant_id, []))
         logger.debug("WS broadcast: r=%s connections=%s", restaurant_id, len(targets))
         for ws_id in targets:
             await self._safe_send(ws_id, message)
 
-    # =========================
-    # SAFE SEND
-    # =========================
-
+# --------------------------------------------------------------------------------------
+# Envía un mensaje
+# --------------------------------------------------------------------------------------
     async def _safe_send(self, ws_id: int, message: dict):
-
         conn = self._ws_index.get(ws_id)
-
         if not conn:
             return
-
         ws = conn["ws"]
-
         try:
-            logger.info(
-                "WS send: ws_id=%s type=%s",
-                ws_id,
-                message["type"]
-            )
-
+            logger.info("WS send: ws_id=%s type=%s", ws_id, message["type"])
             await ws.send_json(message)
-
-        except Exception as e:
-
-            logger.warning("WS send failed: %s", e)
-
+        except Exception:
+            logger.exception("WS send failed ws_id=%s", ws_id,)
             self.disconnect(ws)
 
 
@@ -10815,25 +14294,28 @@ manager = ConnectionManager()
 - fastapi.WebSocket
 - fastapi.WebSocketDisconnect
 - sqlalchemy.orm.Session
-- app.websocket.manager.manager
 - app.db.session.SessionLocal
-- app.dependencies.auth.AuthError
+- app.domain.errors.base.DomainError
 - app.dependencies.auth.authenticate_token
+- app.websocket.manager.manager
 
 ```python
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
-from app.websocket.manager import manager
 from app.db.session import SessionLocal
-from app.dependencies.auth import AuthError, authenticate_token
-
+from app.domain.errors.base import DomainError
+from app.dependencies.auth import authenticate_token
+from app.websocket.manager import manager
 
 router = APIRouter()
 
 
+# --------------------------------------------------------------------------------------
+# Establece una conexión WebSocket autenticada mediante un token JWT.
+# --------------------------------------------------------------------------------------
 @router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(websocket: WebSocket) -> None:
 
     token = websocket.query_params.get("token")
 
@@ -10847,31 +14329,28 @@ async def websocket_endpoint(websocket: WebSocket):
 
         try:
             auth_user = authenticate_token(db, token)
-        except AuthError:
+        except DomainError:
             await websocket.close(code=1008)
             return
 
         connected = await manager.connect(
             websocket,
-            auth_user
+            auth_user,
         )
 
         if not connected:
             return
 
         try:
-
+            # Mantener la conexión abierta mientras el cliente permanezca conectado.
             while True:
                 await websocket.receive_text()
 
         except WebSocketDisconnect:
-
             manager.disconnect(websocket)
 
     finally:
-
         db.close()
-
 ```
 
 ---

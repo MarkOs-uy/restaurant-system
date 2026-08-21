@@ -186,13 +186,6 @@ class BackupService:
             directory /
             f"backup-{created_at:%Y%m%d-%H%M%S}{suffix}"
         )
-    '''
-#-------------------------------------------------------------------
-# DEVOLVER EL DIRECTORIO DE BACKUPS DEL RESTAURANTE
-#-------------------------------------------------------------------
-    def _restaurant_backup_directory(self, restaurant_id: int) -> Path:
-        return self._restaurant_backup_directory(restaurant_id)
-    '''
 
 #-------------------------------------------------------------------
 # BACKUP BASE DE DATOS DE ACUERDO AL MOTOR DE BASE DE DATOS

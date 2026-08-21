@@ -96,6 +96,108 @@ function normalizeProduct(
   }
 }
 
+
+function orderStatusLabel(status: OrderStatus): string {
+  switch (status) {
+    case OrderStatus.OPEN:
+      return "Abierta"
+
+    case OrderStatus.SENT:
+      return "Enviada"
+
+    case OrderStatus.IN_PROGRESS:
+      return "Preparando"
+
+    case OrderStatus.READY:
+      return "Lista"
+
+    case OrderStatus.CLOSED:
+      return "Cerrada"
+
+    case OrderStatus.CANCELLED:
+      return "Cancelada"
+    
+    default:
+      return status
+  }
+}
+
+function paymentMethodLabel(method: PaymentMethod): string {
+  switch (method) {
+    case PaymentMethod.CASH:
+      return "Efectivo"
+
+    case PaymentMethod.CARD:
+      return "Tarjeta"
+
+    case PaymentMethod.TRANSFER:
+      return "Transferencia"
+
+    case PaymentMethod.OTHER:
+      return "Otra forma de pago"
+
+    default:
+      return method
+  }
+}
+
+/**
+ * Asigna una etiqueta al item dependiendo de su status
+ */
+function orderItemStatusLabel(
+  status: OrderItemStatus
+): string {
+  switch (status) {
+    case OrderItemStatus.PENDING:
+      return "Pendiente"
+
+    case OrderItemStatus.SENT:
+      return "Enviado"
+
+    case OrderItemStatus.IN_PROGRESS:
+      return "Preparando"
+
+    case OrderItemStatus.READY:
+      return "Listo"
+
+    case OrderItemStatus.DELIVERED:
+      return "Entregado"
+
+    case OrderItemStatus.CANCELLED:
+      return "Cancelado"
+
+    default:
+      return status
+  }
+}
+
+function getItemStatusColor(
+  status: OrderItemStatus
+): string {
+  switch (status) {
+    case OrderItemStatus.PENDING:
+      return "var(--status-draft)"
+
+    case OrderItemStatus.SENT:
+      return "var(--status-sent)"
+
+    case OrderItemStatus.IN_PROGRESS:
+      return "var(--status-inprogress)"
+
+    case OrderItemStatus.READY:
+      return "var(--status-ready)"
+
+    case OrderItemStatus.DELIVERED:
+      return "var(--status-delivered)"
+
+    case OrderItemStatus.CANCELLED:
+      return "var(--color-danger)"
+
+    default:
+      return "var(--color-text-secondary)"
+  }
+}
+
 export default function OrderDetail() {
   const { orderId, tableId } = useParams()
 
@@ -175,7 +277,7 @@ export default function OrderDetail() {
             }
           }
         )
-
+      setQuantities(current => ({...current, [productId]: 1}))
       navigate(`/orders/${data.order_id}`)
       return
     }
@@ -495,456 +597,422 @@ export default function OrderDetail() {
   
   return (
 
-    <div
-      style={{
-        padding: 40,
-        display: "grid",
-        gridTemplateColumns: "1fr 400px",
-        gap: 40
-      }}
-    >
-      <div>
-        <h1>{order ? `Orden #${order.id}` : `Nueva orden - Mesa ${tableId}`}</h1>
+    <div className="order-detail-page">
+      <main className="order-detail-main">
+        <header className="order-detail-header">
 
-        <p>Mesa: {order?.table_number || tableId}</p>
+          <div>
+            <p className="order-detail-header__eyebrow">
+              Mesa {order?.table_number ?? tableId}
+            </p>
 
-        {order && (
-          <p>
-            Estado:{" "}
-            <strong
-              style={{color: getStatusColor()}}
+            <h1>
+              {order
+                ? `Orden #${order.id}`
+                : "Nueva orden"}
+            </h1>
+          </div>
+
+          {order && (
+            <span
+              className="order-status-badge"
+              style={{
+                color: getStatusColor(),
+                borderColor: getStatusColor()
+              }}
             >
-              {order.status}
-            </strong>
-          </p>
-        )}
+              {orderStatusLabel(order.status)}
+            </span>
+          )}
+
+        </header>
 
         {order?.status === OrderStatus.DRAFT && (
-          <div style={{
-            background: "#333",
-            padding: 10,
-            borderRadius: 8,
-            marginBottom: 10
-          }}>
-            🧾 Agrega productos para iniciar la orden
+          <div className="order-draft-notice">
+            🧾 Agrega productos para iniciar la orden.
           </div>
         )}
 
-        {/* ITEMS */}
-        <h2>Items</h2>
+        {/* PEDIDO */}
+        <section className="order-section">
+          <div className="order-section__header">
+            <h2>Pedido</h2>
 
-        <ul style={{ listStyle: "none", padding: 0 }}>
-          {items.map((item) => (
-            <li
-              key={item.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                padding: "6px 0",
-                borderBottom: "1px solid #eee"
-              }}
-            >
-              <span style={{ flex: 1 }}>
-                {item.product_name}
-              </span>
-
-              {item.status === OrderItemStatus.PENDING && (
-                <>
-                  <button className="btn btn-icon"
-                    onClick={() => updateQuantity(item.id, Math.max(1, item.quantity - 1))}
-                  >
-                    −
-                  </button>
-
-                  <strong>{item.quantity}</strong>
-
-                  <button className="btn btn-icon"
-                    onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                  >
-                    +
-                  </button>
-                </>
-              )}
-
-              <span style={{ width: 80, textAlign: "right" }}>
-                ${(item.quantity * item.unit_price).toFixed(2)}
-              </span>
-              <strong
-                style={{
-                  width: 100,
-                  textAlign: "center",
-                  fontWeight: 600,
-                  color:
-                    item.status === OrderItemStatus.PENDING
-                      ? "#b58900"
-                      : item.status === OrderItemStatus.READY
-                      ? "#268bd2"
-                      : item.status === OrderItemStatus.DELIVERED
-                      ? "#2a9d8f"
-                      : "#333",
-                  textDecoration:
-                    item.status === OrderItemStatus.DELIVERED
-                      ? "line-through"
-                      : "none"
-                }}
+            <span>
+              {items.length} ítem
+              {items.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+          <div className="order-items">
+            {items.map(item => (
+              <div
+                key={item.id}
+                className="order-item"
               >
-                {item.status}
-              </strong>
-              {item.status === OrderItemStatus.PENDING && (
-                <button
-                  onClick={() => {
-                    if (order) {
-                      removeItem(order.id, item.id)
-                    }
-                  }}
-                  style={{
-                    border: "none",
-                    background: "transparent",
-                    cursor: "pointer",
-                    fontSize: 16
-                  }}
-                >
-                  ❌
-                </button>
-              )}
-              {item.status === OrderItemStatus.READY && (
-                <button
-                  className="btn btn-primary"
-                  onClick={() => markDelivered(item.id)}
-                >
-                  Entregar
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
-        
-        <div style={{
-          background: "rgba(255, 255, 255, 0.03)",
-          border: "1px solid var(--color-border)",
-          color: "var(--color-text-primary)",
-          padding: "20px",
-          borderRadius: "var(--radius-md)",
-          marginTop: "16px",
-          boxShadow: "var(--shadow-glass)"
-        }}>
-          <p style={{ marginBottom: "8px", fontSize: "15px", color: "var(--color-text-secondary)" }}>
-            Subtotal: ${subtotal.toFixed(2)}
-          </p>
+                <div className="order-item__name">
+                  {item.product_name}
+                </div>
 
-          <p style={{ color: (order?.discount ?? 0) > 0 ? "#ef4444" : "var(--color-text-secondary)", marginBottom: "12px", fontSize: "15px" }}>
-            Descuento: {(order?.discount ?? 0) > 0 ? "-" : ""}${(order?.discount ?? 0).toFixed(2)}
-          </p>
-
-          <h3 style={{ fontSize: "22px", fontWeight: "700", borderTop: "1px solid var(--color-border)", paddingTop: "12px", margin: 0, color: "var(--color-primary)" }}>
-            Total: ${total.toFixed(2)}
-          </h3>
-        </div>
-
-        {/* ENVIAR A COCINA */}
-        {status !== OrderStatus.CLOSED && hasPendingItems && (
-          <div style={{ marginTop: 20 }}>
-            <button
-              onClick={sendToKitchen}
-              style={{
-                padding: 10,
-                backgroundColor: "orange",
-                color: "white",
-                borderRadius: 8
-              }}
-            >
-              Enviar a Cocina
-            </button>
-          </div>
-        )}
-
-        <hr />
-
-        <hr />
-
-        {order && order.status !== OrderStatus.DRAFT && (
-          <>
-            <h2>Descuento</h2>
-
-            <select
-              value={discountType}
-              onChange={(e) => setDiscountType(e.target.value as "amount" | "percent")}
-              style={{ marginRight: 10, padding: 5 }}
-            >
-              <option value="amount">Monto</option>
-              <option value="percent">%</option>
-            </select>
-
-            <input
-              type="text"
-              inputMode="decimal"
-              placeholder="Monto descuento"
-              value={discount}
-              onChange={e => setDiscount(e.target.value)}
-              disabled={orderLocked}
-              style={{
-                marginRight: 10,
-                padding: 5,
-                opacity: orderLocked ? 0.5 : 1
-              }}
-            />
-
-            <button
-              className="btn btn-primary"
-              onClick={applyDiscount}
-              disabled={orderLocked}
-              style={{
-                padding: 8,
-                borderRadius: 6,
-                opacity: orderLocked ? 0.5 : 1,
-                cursor: orderLocked
-                  ? "not-allowed"
-                  : "pointer"
-              }}
-            >
-              Aplicar Descuento
-            </button>
-
-            {(order?.discount ?? 0) > 0 && (
-              <button
-                className="btn btn-primary"
-                onClick={removeDiscount}
-                disabled={orderLocked}
-                style={{
-                  padding: 8,
-                  borderRadius: 6,
-                  marginLeft: 10,
-                  opacity: orderLocked ? 0.5 : 1,
-                  cursor: orderLocked
-                    ? "not-allowed"
-                    : "pointer"
-                }}
-              >
-                Quitar Descuento
-              </button>
-            )}
-          </>
-        )}
-
-        {/* PAGOS */}
-        {order && (
-          <>
-            <h2>Pagos</h2>
-
-            {payments.length === 0 && (
-              <p>No hay pagos registrados</p>
-            )}
-
-            <ul style={{ listStyle: "none", padding: 0 }}>
-              {payments.map(p => (
-                <li
-                  key={p.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "6px 0",
-                    borderBottom: "1px solid #eee"
-                  }}
-                >
-                  <span>
-                    ${p.amount.toFixed(2)} — {p.method}
-                  </span>
-
-                  {status !== OrderStatus.CLOSED && (
+                {item.status === OrderItemStatus.PENDING && (
+                  <div className="order-item__quantity">
                     <button
-                      onClick={() => cancelPayment(p.id)}
-                      style={{
-                        border: "none",
-                        background: "transparent",
-                        cursor: "pointer",
-                        fontSize: 16
-                      }}
-                    >
-                      ❌
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
-
-            <p>
-              <strong>Total pagado:</strong>{" "}
-              ${total_paid.toFixed(2)}
-            </p>
-
-            <p>
-              <strong>Saldo pendiente:</strong>{" "}
-              ${remaining.toFixed(2)}
-            </p>
-          </>
-        )}
-
-        {/* FORMULARIO DE PAGO */}
-        {order &&
-          order.status !== OrderStatus.CLOSED && (
-            <div style={{ marginTop: 20 }}>
-              <h3>Registrar Pago</h3>
-
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="Monto"
-                value={paymentAmount}
-                onChange={(e) => setPaymentAmount(e.target.value)}
-                style={{ marginRight: 10, padding: 5 }}
-              />
-
-              <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-                <button
-                  className="btn btn-payment-cash"
-                  onClick={() => registerPayment(PaymentMethod.CASH)}
-                >
-                💵 Efectivo
-                </button>
-
-                <button
-                  className="btn btn-payment-card"
-                  onClick={() => registerPayment(PaymentMethod.CARD)}
-                >
-                💳 Tarjeta
-                </button>
-
-                <button
-                  className="btn btn-payment-transfer"
-                  onClick={() => registerPayment(PaymentMethod.TRANSFER)}
-                >
-                🏦 Transferencia
-                </button>
-
-                <button
-                  className="btn btn-payment-other"
-                  onClick={() => registerPayment(PaymentMethod.OTHER)}
-                >
-                🤝 Otro
-                </button>
-              </div>
-            </div>
-          )
-        }
-
-        {/* CERRAR ORDEN SOLO SI CUMPLE REGLAS */}
-        {canClose && (
-          <div style={{ marginTop: 20 }}>
-            <p style={{ color: "green", fontWeight: "bold" }}>
-              ✔ Orden pagada y entregada. Puede cerrarse.
-            </p>
-
-            <button 
-              onClick={closeOrder}
-              style={{
-                padding: 10,
-                backgroundColor: "black",
-                color: "white",
-                borderRadius: 8
-              }}
-            >
-              Cerrar Orden
-            </button>
-          </div>
-        )}
-
-        <hr />
-      </div>
-      <div>
-        {/* PRODUCTOS */}
-        <h2>Agregar Productos</h2>
-
-        {categories.map(category => (
-          <div key={category.id} style={{ marginBottom: 15 }}>
-            <div
-              onClick={() => {
-                if (orderLocked) return
-                setOpenCategory(openCategory === category.id ? null : category.id)
-              }}
-              style={{
-                cursor: orderLocked
-                  ? "not-allowed"
-                  : "pointer",
-                fontWeight: "bold",
-                background: "#eee",
-                color: "#111",
-                padding: 10,
-                borderRadius: 6,
-                opacity: orderLocked ? 0.5 : 1
-              }}
-            >
-              {category.name}
-            </div>
-
-            {openCategory === category.id && (
-              <div style={{ padding: 10 }}>
-                {category.products.map(product => (
-                  <div
-                    key={product.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      marginBottom: 6
-                    }}
-                  >
-                    <button
-                      className="btn btn-product"
-                      disabled={orderLocked}
-                      onClick={() =>
-                        addProduct(product.id)
-                      }
-                    >
-                      {product.name} - $
-                      {product.price.toFixed(2)}
-                    </button>
-
-                    <button
-                      className="btn btn-primary"
-                      disabled={orderLocked}
-                      onClick={() =>
-                        setQuantities(current => ({
-                          ...current,
-
-                          [product.id]:
-                            Math.max(
-                              (current[product.id] || 1) - 1,
-                              1
-                            )
-                        }))
-                      }
+                      className="btn btn-icon"
+                      onClick={() => updateQuantity(item.id, Math.max(1, item.quantity - 1))}
                     >
                       −
                     </button>
 
-                    <strong>
-                      {quantities[product.id] || 1}
-                    </strong>
+                    <strong>{item.quantity}</strong>
 
                     <button
-                      className="btn btn-primary"
-                      disabled={orderLocked}
-                      onClick={() =>
-                        setQuantities(current => ({
-                          ...current,
-
-                          [product.id]:
-                            (current[product.id] || 1) + 1
-                        }))
-                      }
+                      className="btn btn-icon"
+                      onClick={() => updateQuantity(item.id, item.quantity + 1)}
                     >
                       +
                     </button>
                   </div>
+                )}
+
+                <span className="order-item__price">
+                  ${(item.quantity * item.unit_price).toFixed(2)}
+                </span>
+
+                <strong
+                  className="order-item__status"
+                  style={{color: getItemStatusColor(item.status)
+                  }}
+                >
+                  {orderItemStatusLabel(item.status)}
+                </strong>
+                
+                {item.status === OrderItemStatus.PENDING && (
+                  <button
+                    type="button"
+                    className="btn btn-icon btn-danger"
+                    title="Eliminar ítem"
+                    onClick={() => {if (order) {void removeItem(order.id, item.id)}}}
+                  >
+                    ❌
+                  </button>
+                )}
+                {item.status === OrderItemStatus.READY && (
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => markDelivered(item.id)}
+                  >
+                    Entregar
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+  
+          {/* Subtotales y Totales*/}
+          <div className="order-totals">
+            <div>
+              <span>Subtotal</span>
+              <strong>${subtotal.toFixed(2)}</strong>
+            </div>
+
+            <div>
+              <span>Descuento</span>
+              <strong
+                className={(order?.discount ?? 0) > 0 ? "order-totals__discount" : ""}
+              >
+                {(order?.discount ?? 0) > 0 ? "-" : ""}
+                ${(order?.discount ?? 0).toFixed(2)}
+              </strong>
+            </div>
+
+            <div className="order-totals__total">
+              <span>Total</span>
+              <strong>${total.toFixed(2)}</strong>
+            </div>
+          </div>
+        </section>
+
+        {/* ENVIAR A COCINA */}
+        {status !== OrderStatus.CLOSED &&
+          hasPendingItems && (
+            <div className="order-kitchen-action">
+              <button
+                type="button"
+                className="btn btn-kitchen order-primary-action"
+                onClick={sendToKitchen}
+              >
+                Enviar a cocina
+              </button>
+            </div>
+        )}
+
+        {/* Descuentos */}
+        {order && order.status !== OrderStatus.DRAFT && (
+          <section className="order-section">
+            <div className="order-section__header">
+              <h2>Descuento</h2>
+            </div>
+            <div className="discount-controls">
+              <select
+                value={discountType}
+                onChange={e =>
+                  setDiscountType(
+                    e.target.value as
+                      "amount" | "percent"
+                  )
+                }
+              >
+                <option value="amount">
+                  Monto
+                </option>
+                <option value="percent">
+                  %
+                </option>
+              </select>
+
+              <input
+                type="text"
+                inputMode="decimal"
+                placeholder="Monto descuento"
+                value={discount}
+                onChange={e =>
+                  setDiscount(e.target.value)
+                }
+                disabled={orderLocked}
+              />
+
+              <button
+                className="btn btn-primary"
+                onClick={applyDiscount}
+                disabled={orderLocked}
+              >
+                Aplicar descuento
+              </button>
+
+              {(order.discount ?? 0) > 0 && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={removeDiscount}
+                  disabled={orderLocked}
+                >
+                  Quitar descuento
+                </button>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* PAGOS */}
+        <section className="order-section">
+          {order && (
+            <>
+              <h2>Pagos</h2>
+              {payments.length === 0 && ( <p>No hay pagos registrados</p>)}
+
+              <div className="payment-list">
+                {payments.map(payment => (
+                  <div
+                    key={payment.id}
+                    className="payment-row"
+                  >
+                    <span>
+                      ${payment.amount.toFixed(2)}
+                      {" — "}
+                      {paymentMethodLabel(
+                        payment.method
+                      )}
+                    </span>
+
+                    {status !== OrderStatus.CLOSED && (
+                      <button
+                        type="button"
+                        className="btn btn-icon btn-danger"
+                        title="Cancelar pago"
+                        onClick={() =>
+                          cancelPayment(payment.id)
+                        }
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
                 ))}
               </div>
-            )}
+
+              <div className="payment-summary">
+                <div>
+                  <span>Total pagado</span>
+                  <strong>
+                    ${total_paid.toFixed(2)}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>Saldo pendiente</span>
+                  <strong>
+                    ${remaining.toFixed(2)}
+                  </strong>
+                </div>
+              </div>
+            </>
+          )}
+        
+          {/* FORMULARIO DE PAGO */}
+          {order &&
+            order.status !== OrderStatus.CLOSED && (
+              <div className="payment-form">
+                <h3>Registrar pago</h3>
+
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="Monto"
+                  value={paymentAmount}
+                  onChange={e => setPaymentAmount(e.target.value)}
+                />
+
+                <div className="payment-methods">
+                  <button
+                    className="btn btn-payment-cash"
+                    onClick={() => registerPayment(PaymentMethod.CASH)}
+                  >
+                    💵 Efectivo
+                  </button>
+
+                  <button
+                    className="btn btn-payment-card"
+                    onClick={() => registerPayment(PaymentMethod.CARD)}
+                  >
+                    💳 Tarjeta
+                  </button>
+
+                  <button
+                    className="btn btn-payment-transfer"
+                    onClick={() => registerPayment(PaymentMethod.TRANSFER)}
+                  >
+                    🏦 Transferencia
+                  </button>
+
+                  <button
+                    className="btn btn-payment-other"
+                    onClick={() => registerPayment(PaymentMethod.OTHER)}
+                  >
+                    🤝 Otro
+                  </button>
+                </div>
+              </div>
+          )}
+        </section>
+
+        {/* CERRAR ORDEN SOLO SI CUMPLE REGLAS */}
+        {canClose && (
+          <div className="order-close-ready">
+            <div>
+              <strong>✓ Orden lista para cerrar</strong>
+              <span>
+                Todos los ítems fueron entregados
+                y el saldo está pago.
+              </span>
+            </div>
+            <button
+              type="button"
+              className="btn btn-success"
+              onClick={closeOrder}
+            >
+              Cerrar orden
+            </button>
           </div>
-        ))}
-    </div>
+        )}
+      </main>
+
+      {/* AGREGAR PRODUCTOS */}
+      <aside className="order-detail-sidebar">
+        <section className="product-picker">
+          <div className="product-picker__header">
+            <h2>Agregar productos</h2>
+          </div>
+
+          {categories.map(category => (
+            <div key={category.id} className="product-category-block">
+              <button
+                type="button"
+                className="product-category"
+                disabled={orderLocked}
+                onClick={() => setOpenCategory(openCategory === category.id ? null : category.id)}
+              >
+                <span>
+                  {category.name}
+                </span>
+
+                <span>
+                  {openCategory === category.id
+                    ? "−"
+                    : "+"}
+                </span>
+              </button>
+
+              {openCategory === category.id && (
+                <div className="product-picker__items">
+                  {category.products.map(product => (
+                    <div
+                      key={product.id}
+                      className="product-picker__item"
+                    >
+                      <button
+                        className="btn btn-product"
+                        disabled={orderLocked}
+                        onClick={() =>
+                          addProduct(product.id)
+                        }
+                      >
+                        <span>
+                          {product.name}
+                        </span>
+
+                        <strong>
+                          ${product.price.toFixed(2)}
+                        </strong>
+                      </button>
+
+                      <button
+                        className="btn btn-icon"
+                        disabled={orderLocked}
+                        onClick={() => setQuantities(current => ({...current,
+                            [product.id]:
+                              Math.max((current[product.id] || 1) - 1, 1)
+                          }))
+                        }
+                      >
+                        −
+                      </button>
+
+                      <strong className="product-picker__quantity">
+                        {quantities[product.id] || 1}
+                      </strong>
+
+                      <button
+                        className="btn btn-icon"
+                        disabled={orderLocked}
+                        onClick={() =>
+                          setQuantities(current => ({
+                            ...current,
+
+                            [product.id]:
+                              (current[product.id] || 1) + 1
+                          }))
+                        }
+                      >
+                        +
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+          ))}
+        </section>
+      </aside>
   </div>      
   )
 

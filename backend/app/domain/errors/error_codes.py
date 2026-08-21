@@ -10,6 +10,7 @@ class ErrorCode(str, Enum):
     # ORDERS
     ORDER_NOT_FOUND = "order_not_found"
     ORDER_ALREADY_CLOSED = "order_already_closed"
+    ORDER_ALREADY_CANCELLED = "order_already_cancelled"
     ORDER_ITEMS_NOT_DELIVERED = "order_items_not_delivered"
     ORDER_EMPTY = "order_empty"
     ORDER_HAS_REMAINING_BALANCE = "order_has_remaining_balance"

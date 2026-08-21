@@ -225,16 +225,18 @@ export default function ProductsPage() {
   return (
     <Page title="Productos">
       <Card>
-        <button
-          className="btn btn-primary"
-          onClick={() => {
-            setEditingProduct(null)
-            setShowForm(true)
-          }}
-          style={{ marginBottom: 20 }}
-        >
-          + Nuevo producto
-        </button>
+
+        <div className="admin-page-actions">
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              setEditingProduct(null)
+              setShowForm(true)
+            }}
+          >
+            + Nuevo producto
+          </button>
+        </div>
 
 
         {showForm && (
@@ -251,15 +253,15 @@ export default function ProductsPage() {
         )}
 
 
-        <DataTable>
+        <DataTable className="products-table">
           <thead>
             <tr>
               <th>Nombre</th>
               <th>Precio</th>
               <th>Categoría</th>
               <th>Estación</th>
-              <th>Activo</th>
-              <th style={{ width: 300 }}>
+              <th>Estado</th>
+              <th className="admin-actions-column">
                 Acciones
               </th>
             </tr>
@@ -270,115 +272,116 @@ export default function ProductsPage() {
               .sort(([a], [b]) =>
                 a.localeCompare(b)
               )
-              .map(
-                ([categoryName, items]) => (
-                  <Fragment
-                    key={categoryName}
+              .map(([categoryName, items]) => (
+                <Fragment key={categoryName}>
+
+                  {/* Grupo de categoría */}
+                  <tr
+                    className="product-category-row"
+                    onClick={() =>
+                      toggleCategory(categoryName)
+                    }
                   >
-                    <tr
-                      style={{
-                        background:
-                          "rgba(255, 255, 255, 0.04)",
-                        cursor: "pointer"
-                      }}
-                      onClick={() =>
-                        toggleCategory(
-                          categoryName
-                        )
-                      }
-                    >
-                      <td
-                        colSpan={6}
-                        style={{
-                          fontWeight: "bold",
-                          color:
-                            "var(--color-primary)"
-                        }}
-                      >
-                        {openCategories[
-                          categoryName
-                        ]
+                    <td colSpan={6}>
+                      <span className="product-category-row__toggle">
+                        {openCategories[categoryName]
                           ? "▼"
-                          : "▶"}{" "}
+                          : "▶"}
+                      </span>
+
+                      <strong>
                         {categoryName}
-                      </td>
-                    </tr>
+                      </strong>
+
+                      <span className="product-category-row__count">
+                        {items.length}
+                      </span>
+                    </td>
+                  </tr>
 
 
-                    {openCategories[
-                      categoryName
-                    ] &&
-                      [...items]
-                        .sort(compareProducts)
-                        .map(product => (
-                          <tr
-                            key={product.id}
-                          >
-                            <td>
+                  {openCategories[categoryName] &&
+                    [...items]
+                      .sort(compareProducts)
+                      .map(product => (
+                        <tr
+                          key={product.id}
+                          className={
+                            product.active
+                              ? ""
+                              : "admin-row--inactive"
+                          }
+                        >
+                          <td>
+                            <strong>
                               {product.name}
-                            </td>
+                            </strong>
+                          </td>
 
-                            <td>
-                              $
-                              {product.price.toFixed(
-                                2
-                              )}
-                            </td>
+                          <td>
+                            ${product.price.toFixed(2)}
+                          </td>
 
-                            <td>
-                              {product.category
-                                ?.name ?? "-"}
-                            </td>
+                          <td>
+                            {product.category?.name ?? "-"}
+                          </td>
 
-                            <td>
-                              {product.station
-                                ?.name ?? "-"}
-                            </td>
+                          <td>
+                            {product.station?.name ?? "-"}
+                          </td>
 
-                            <td>
+                          <td>
+                            <span
+                              className={
+                                product.active
+                                  ? "status-badge status-badge--active"
+                                  : "status-badge status-badge--inactive"
+                              }
+                            >
                               {product.active
-                                ? "✔"
-                                : "❌"}
-                            </td>
+                                ? "Activo"
+                                : "Inactivo"}
+                            </span>
+                          </td>
 
-                            <td>
+                          <td>
+                            <div className="admin-table-actions">
+
                               <button
-                                className="btn btn-primary"
+                                className="btn btn-secondary"
                                 onClick={() => {
-                                  setEditingProduct(
-                                    product
-                                  )
-                                  setShowForm(
-                                    true
-                                  )
+                                  setEditingProduct(product)
+                                  setShowForm(true)
                                 }}
                               >
                                 Editar
                               </button>
 
                               <button
-                                className="btn btn-primary"
-                                onClick={() =>
-                                  toggleActive(
-                                    product.id
-                                  )
+                                className={
+                                  product.active
+                                    ? "btn btn-danger"
+                                    : "btn btn-success"
                                 }
-                                style={{
-                                  marginLeft: 10
-                                }}
+                                onClick={() =>
+                                  toggleActive(product.id)
+                                }
                               >
                                 {product.active
                                   ? "Desactivar"
                                   : "Activar"}
                               </button>
-                            </td>
-                          </tr>
-                        ))}
-                  </Fragment>
-                )
-              )}
+
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+
+                </Fragment>
+              ))}
           </tbody>
         </DataTable>
+
       </Card>
     </Page>
   )

@@ -136,13 +136,14 @@ export default function CategoriesPage() {
     setName("")
   }
 
-
   return (
     <Page title="Categorías">
       <Card>
-        <div style={{ marginBottom: 20 }}>
+
+        {/* Alta / edición */}
+        <div className="admin-form-row">
           <input
-            placeholder="Nombre categoría"
+            placeholder="Nombre de la categoría"
             value={name}
             onChange={event =>
               setName(event.target.value)
@@ -152,7 +153,6 @@ export default function CategoriesPage() {
           <button
             className="btn btn-primary"
             onClick={saveCategory}
-            style={{ marginLeft: 10 }}
           >
             {editingId
               ? "Actualizar"
@@ -161,9 +161,8 @@ export default function CategoriesPage() {
 
           {editingId !== null && (
             <button
-              className="btn btn-primary"
+              className="btn btn-secondary"
               onClick={cancelEdit}
-              style={{ marginLeft: 10 }}
             >
               Cancelar
             </button>
@@ -176,7 +175,7 @@ export default function CategoriesPage() {
             <tr>
               <th>Nombre</th>
               <th>Estado</th>
-              <th style={{ width: 300 }}>
+              <th className="admin-actions-column">
                 Acciones
               </th>
             </tr>
@@ -185,7 +184,10 @@ export default function CategoriesPage() {
           <tbody>
             {categories.length === 0 && (
               <tr>
-                <td colSpan={3}>
+                <td
+                  colSpan={3}
+                  className="admin-table-empty"
+                >
                   No hay categorías
                 </td>
               </tr>
@@ -193,40 +195,60 @@ export default function CategoriesPage() {
 
             {categories.map(category => (
               <tr key={category.id}>
-                <td>{category.name}</td>
-
                 <td>
-                  {category.active
-                    ? "Activa"
-                    : "Inactiva"}
+                  <strong>
+                    {category.name}
+                  </strong>
                 </td>
 
                 <td>
-                  <button
-                    className="btn btn-primary"
-                    onClick={() =>
-                      editCategory(category)
+                  <span
+                    className={
+                      category.active
+                        ? "status-badge status-badge--active"
+                        : "status-badge status-badge--inactive"
                     }
-                  >
-                    Editar
-                  </button>
-
-                  <button
-                    className="btn btn-primary"
-                    onClick={() =>
-                      toggleCategory(category.id)
-                    }
-                    style={{ marginLeft: 10 }}
                   >
                     {category.active
-                      ? "Desactivar"
-                      : "Activar"}
-                  </button>
+                      ? "Activa"
+                      : "Inactiva"}
+                  </span>
+                </td>
+
+                <td>
+                  <div className="admin-table-actions">
+
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() =>
+                        editCategory(category)
+                      }
+                    >
+                      Editar
+                    </button>
+
+                    <button
+                      className={
+                        category.active
+                          ? "btn btn-danger"
+                          : "btn btn-success"
+                      }
+                      onClick={() =>
+                        toggleCategory(category.id)
+                      }
+                    >
+                      {category.active
+                        ? "Desactivar"
+                        : "Activar"}
+                    </button>
+
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </DataTable>
+
       </Card>
     </Page>
   )

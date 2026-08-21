@@ -28,23 +28,14 @@ export function startHealthMonitor(): void {
             const healthy = await checkHealth()
 
             if (healthy) {
-
                 consecutiveFailures = 0
-
                 return
             }
 
             consecutiveFailures++
 
-            if (
-                consecutiveFailures >=
-                MAX_CONSECUTIVE_FAILURES
-            ) {
-
-                console.warn(
-                    "Servidor no disponible"
-                )
-
+            if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+                console.warn("Servidor no disponible")
                 stopHealthMonitor()
                 logout()
             }

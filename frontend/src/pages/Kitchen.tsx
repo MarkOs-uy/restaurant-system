@@ -12,6 +12,37 @@ import type { Station } from "../types/station"
 import type { WSEventParsed } from "../ws"
 
 
+/**
+ * Asigna una etiqueta al item dependiendo de su status
+ */
+function orderItemStatusLabel(
+  status: OrderItemStatus
+): string {
+  switch (status) {
+    case OrderItemStatus.PENDING:
+      return "Pendiente"
+
+    case OrderItemStatus.SENT:
+      return "Enviado"
+
+    case OrderItemStatus.IN_PROGRESS:
+      return "Preparando"
+
+    case OrderItemStatus.READY:
+      return "Listo"
+
+    case OrderItemStatus.DELIVERED:
+      return "Entregado"
+
+    case OrderItemStatus.CANCELLED:
+      return "Cancelado"
+
+    default:
+      return status
+  }
+}
+
+
 export default function Kitchen() {
   const { stationId } = useParams()
   const station = Number(stationId)
@@ -243,174 +274,169 @@ export default function Kitchen() {
 
 
   return (
-    <div style={{ padding: 40 }}>
-      <h1>
-        Estación: {stationName}
-      </h1>
+    <div className="kitchen-page">
 
-      <button
-        onClick={() => navigate("/kitchen")}
-        style={{ marginBottom: 20 }}
-      >
-        Cambiar estación
-      </button>
+      <header className="kitchen-header">
+        <div>
+          <p>Cocina</p>
 
-      {items.length === 0 && (
-        <p>No hay pedidos pendientes</p>
-      )}
+          <h1>
+            {stationName}
+          </h1>
+        </div>
 
-      {Object.entries(groupedOrders).map(
-        ([orderId, order]) => (
-          <div
-            key={orderId}
-            className="card"
-            style={{
-              border:
-                "1px solid var(--color-border)",
-              marginBottom: 20,
-              background:
-                "rgba(22, 28, 45, 0.4)",
-              boxShadow: "var(--shadow-md)"
-            }}
-          >
-            <h2
-              style={{
-                fontSize: 28,
-                marginBottom: 10
-              }}
-            >
-              Mesa {order.table}
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() =>
+            navigate("/kitchen")
+          }
+        >
+          Cambiar estación
+        </button>
+      </header>
 
-              {order.created_at && (
-                <span
-                  style={{
-                    marginLeft: 15,
-                    fontSize: 16,
-                    fontWeight: "normal",
-                    color:
-                      "var(--color-text-secondary)"
-                  }}
-                >
-                  ⏱ {getWaitingTime(
-                    order.created_at
-                  )}
-                </span>
-              )}
-            </h2>
 
-            {order.items.map(item => (
-              <div
-                key={item.item_id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent:
-                    "space-between",
-                  marginBottom: 12,
-                  padding: 12,
-                  border:
-                    "1px solid var(--color-border)",
-                  borderRadius: 6,
-                  background:
-                    item.status ===
-                    OrderItemStatus.SENT
-                      ? "rgba(245, 158, 11, 0.12)"
-                      : "rgba(255, 255, 255, 0.02)",
-                  color:
-                    "var(--color-text-primary)"
-                }}
+      {items.length === 0 ? (
+        <div className="kitchen-empty">
+          <strong>
+            No hay pedidos pendientes
+          </strong>
+
+          <span>
+            Los nuevos pedidos aparecerán
+            automáticamente.
+          </span>
+        </div>
+      ) : (
+        <div className="kitchen-orders">
+
+          {Object.entries(
+            groupedOrders
+          ).map(
+            ([orderId, order]) => (
+
+              <article
+                key={orderId}
+                className="kitchen-order"
               >
-                <div
-                  style={{
-                    fontSize: 20,
-                    fontWeight: 600
-                  }}
-                >
-                  {item.product_name} ×{" "}
-                  {item.quantity}
-                </div>
 
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 10,
-                    alignItems: "center"
-                  }}
-                >
-                  <strong
-                    style={{
-                      background:
-                        getStatusColor(
+                <header className="kitchen-order__header">
+
+                  <h2>
+                    Mesa {order.table}
+                  </h2>
+
+                  {order.created_at && (
+                    <span className="kitchen-order__time">
+                      ⏱{" "}
+                      {getWaitingTime(
+                        order.created_at
+                      )}
+                    </span>
+                  )}
+
+                </header>
+
+
+                <div className="kitchen-order__items">
+
+                  {order.items.map(item => (
+
+                    <div
+                      key={item.item_id}
+                      className={
+                        item.status ===
+                        OrderItemStatus.SENT
+                          ? "kitchen-item kitchen-item--new"
+                          : "kitchen-item"
+                      }
+                    >
+
+                      <div className="kitchen-item__product">
+                        <strong>
+                          {item.product_name}
+                        </strong>
+
+                        <span>
+                          × {item.quantity}
+                        </span>
+                      </div>
+
+
+                      <span
+                        className="kitchen-item__status"
+                        style={{
+                          backgroundColor:
+                            getStatusColor(
+                              item.status
+                            )
+                        }}
+                      >
+                        {orderItemStatusLabel(
                           item.status
-                        ),
-                      color: "white",
-                      padding: "6px 12px",
-                      borderRadius: 6,
-                      fontSize: 14
-                    }}
-                  >
-                    {item.status}
-                  </strong>
+                        )}
+                      </span>
 
-                  {item.status ===
-                    OrderItemStatus.SENT && (
-                    <button
-                      style={{
-                        fontSize: 16,
-                        padding: "8px 14px"
-                      }}
-                      onClick={() =>
-                        updateStatus(
-                          item.item_id,
-                          OrderItemStatus.IN_PROGRESS
-                        )
-                      }
-                    >
-                      Iniciar
-                    </button>
-                  )}
 
-                  {item.status ===
-                    OrderItemStatus.IN_PROGRESS && (
-                    <button
-                      style={{
-                        fontSize: 16,
-                        padding: "8px 14px"
-                      }}
-                      onClick={() =>
-                        updateStatus(
-                          item.item_id,
-                          OrderItemStatus.READY
-                        )
-                      }
-                    >
-                      Listo
-                    </button>
-                  )}
+                      <div className="kitchen-item__action">
 
-                  {item.status ===
-                    OrderItemStatus.READY && (
-                    <button
-                      style={{
-                        fontSize: 16,
-                        padding: "8px 14px"
-                      }}
-                      onClick={() =>
-                        updateStatus(
-                          item.item_id,
-                          OrderItemStatus.DELIVERED
-                        )
-                      }
-                    >
-                      Entregado
-                    </button>
-                  )}
+                        {item.status ===
+                          OrderItemStatus.SENT && (
+                          <button
+                            type="button"
+                            className="btn btn-kitchen-start"
+                            onClick={() =>
+                              updateStatus(
+                                item.item_id,
+                                OrderItemStatus.IN_PROGRESS
+                              )
+                            }
+                          >
+                            Iniciar
+                          </button>
+                        )}
+
+
+                        {item.status ===
+                          OrderItemStatus.IN_PROGRESS && (
+                          <button
+                            type="button"
+                            className="btn btn-kitchen-ready"
+                            onClick={() =>
+                              updateStatus(
+                                item.item_id,
+                                OrderItemStatus.READY
+                              )
+                            }
+                          >
+                            Listo
+                          </button>
+                        )}
+
+                        {item.status ===
+                          OrderItemStatus.READY && (
+                          <span className="kitchen-item__waiting-delivery">
+                            Esperando entrega
+                          </span>
+                        )}
+
+                      </div>
+
+                    </div>
+
+                  ))}
+
                 </div>
-              </div>
-            ))}
-          </div>
-        )
+
+              </article>
+
+            )
+          )}
+
+        </div>
       )}
+
     </div>
   )
 }

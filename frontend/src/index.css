@@ -1,65 +1,269 @@
-/* GastroFlow DESIGN SYSTEM TOKENS & RESET */
+/* =========================================================
+   MARCHA — DESIGN SYSTEM
+   Tokens, reset y estilos globales
+   ========================================================= */
 
 :root {
-  /* Colors */
+  /* ---------- Brand ---------- */
+
   --color-primary: #ff6b6b;
   --color-primary-hover: #ff5252;
   --color-primary-glow: rgba(255, 107, 107, 0.2);
-  
+
+
+  /* ---------- Backgrounds ---------- */
+
   --color-bg-base: #0c0f17;
   --color-bg-surface: rgba(22, 28, 45, 0.65);
+  --color-bg-surface-hover: rgba(255, 255, 255, 0.06);
   --color-bg-panel: #1a2035;
   --color-bg-input: #121625;
-  
+
+
+  /* ---------- Text ---------- */
+
   --color-text-primary: #f9fafb;
   --color-text-secondary: #919eab;
   --color-text-muted: #637381;
-  
+
+
+  /* ---------- Borders ---------- */
+
   --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-hover: rgba(255, 255, 255, 0.15);
   --color-border-active: rgba(255, 107, 107, 0.35);
-  
-  /* Status Colors */
+
+
+  /* ---------- Status ---------- */
+
   --status-draft: #919eab;
   --status-open: #f59e0b;
   --status-sent: #ef4444;
   --status-inprogress: #3b82f6;
   --status-ready: #10b981;
+  --status-delivered: #14b8a6;
   --status-closed: #6366f1;
-  
-  /* Typography */
-  --font-sans: 'Outfit', system-ui, -apple-system, sans-serif;
-  
-  /* Borders & Shadows */
+
+
+  /* ---------- Semantic ---------- */
+
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-info: #3b82f6;
+
+
+  /* ---------- Typography ---------- */
+
+  --font-sans:
+    "Outfit",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+
+
+  /* ---------- Radius ---------- */
+
   --radius-sm: 8px;
   --radius-md: 14px;
   --radius-lg: 20px;
-  
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
-  --shadow-glass: inset 0 1px 1px rgba(255, 255, 255, 0.05);
-  
+
+
+  /* ---------- Shadows ---------- */
+
+  --shadow-sm:
+    0 2px 8px rgba(0, 0, 0, 0.2);
+
+  --shadow-md:
+    0 8px 24px rgba(0, 0, 0, 0.35);
+
+  --shadow-lg:
+    0 16px 40px rgba(0, 0, 0, 0.5);
+
+  --shadow-glass:
+    inset 0 1px 1px rgba(255, 255, 255, 0.05);
+
+
+  /* ---------- Spacing ---------- */
+
+  --space-xs: 6px;
+  --space-sm: 10px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+
   color-scheme: dark;
 }
 
-* {
+
+/* =========================================================
+   RESET
+   ========================================================= */
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-  font-family: var(--font-sans);
 }
 
-html, body {
+* {
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+html,
+body {
   width: 100%;
-  height: 100%;
-  background-color: var(--color-bg-base);
+  background: var(--color-bg-base);
   color: var(--color-text-primary);
+  font-family: var(--font-sans);
+
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
   overflow-x: hidden;
 }
 
-/* Custom Scrollbars */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+
+/* =========================================================
+   TYPOGRAPHY
+   ========================================================= */
+
+h1,
+h2,
+h3 {
+  color: var(--color-text-primary);
+  line-height: 1.2;
+}
+
+h1 {
+  margin-bottom: 24px;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+h2 {
+  margin-bottom: 16px;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+h3 {
+  margin-bottom: 12px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+p {
+  line-height: 1.5;
+}
+
+
+/* =========================================================
+   LINKS
+   ========================================================= */
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+a:hover {
+  color: var(--color-primary-hover);
+}
+
+
+/* =========================================================
+   FORM CONTROLS
+   ========================================================= */
+
+input[type="text"],
+input[type="number"],
+input[type="password"],
+input[type="email"],
+input[type="time"],
+input[type="date"],
+select,
+textarea {
+  padding: 10px 14px;
+
+  color: var(--color-text-primary);
+  background: var(--color-bg-input);
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+
+  outline: none;
+
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.2);
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--color-primary);
+
+  box-shadow:
+    0 0 0 3px var(--color-primary-glow);
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+select {
+  padding-right: 36px;
+
+  cursor: pointer;
+  appearance: none;
+
+  background-image:
+    url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23919eab' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+}
+
+input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+
+/* =========================================================
+   SCROLLBARS
+   ========================================================= */
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -78,19 +282,23 @@ html, body {
   background: rgba(255, 255, 255, 0.2);
 }
 
-/* Selection */
+
+/* =========================================================
+   SELECTION
+   ========================================================= */
+
 ::selection {
-  background: var(--color-primary-glow);
   color: var(--color-text-primary);
+  background: var(--color-primary-glow);
 }
 
-/* Links */
-a {
-  color: var(--color-primary);
-  text-decoration: none;
-  transition: color 0.2s ease;
-}
 
-a:hover {
-  color: var(--color-primary-hover);
+/* =========================================================
+   MISC
+   ========================================================= */
+
+hr {
+  margin: 32px 0;
+  border: 0;
+  border-top: 1px solid var(--color-border);
 }

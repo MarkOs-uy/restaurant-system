@@ -35,6 +35,16 @@ export function getAuthHeaders(): Record<string, string> {
         : {}
 }
 
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return (
+        typeof value === "object" &&
+        value !== null &&
+        !Array.isArray(value)
+    )
+}
+
+
 // ---------------------------------------------------------------------------------------------
 // Opciones adicionales aceptadas por apiFetch.
 // body puede ser un objeto que será convertido automáticamente a JSON,
@@ -126,10 +136,9 @@ export async function apiFetch<T = unknown>(
     // -------------------------------------------------------------------------
     if (!res.ok) {
 
-        const responseData =
-            typeof data === "object" &&
-            data !== null
-                ? data as Record<string, unknown>
+        const responseData: Record<string, unknown> =
+            isRecord(data)
+                ? data
                 : {}
 
         const error: ApiError = {
@@ -148,7 +157,9 @@ export async function apiFetch<T = unknown>(
                     : `HTTP ${res.status}`,
 
             context:
-                responseData.context,
+                isRecord(responseData.context)
+                    ? responseData.context
+                    : undefined,
 
             status:
                 res.status

@@ -12,6 +12,28 @@ import type {
   UserUpdate
 } from "../types/user"
 
+function userRoleLabel(
+  role: UserRole
+): string {
+  switch (role) {
+    case UserRole.ADMIN:
+      return "Administrador"
+
+    case UserRole.WAITER:
+      return "Mozo"
+
+    case UserRole.KITCHEN:
+      return "Cocina"
+
+    case UserRole.CASHIER:
+      return "Caja"
+
+    default:
+      return role
+  }
+}
+
+
 export default function UsersPage() {
 
   const [users, setUsers] = useState<User[]>([])
@@ -107,30 +129,37 @@ export default function UsersPage() {
 
   return (
     <Page title="Usuarios">
-
       <Card>
 
-        <div style={{ marginBottom: 20 }}>
+        {/* Alta / edición */}
+        <div className="admin-form-row admin-form-row--users">
 
           <input
             placeholder="Usuario"
             value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            onChange={event =>
+              setUsername(event.target.value)
+            }
           />
 
           <input
             type="password"
-            placeholder="Password"
+            placeholder={
+              editingId !== null
+                ? "Nueva contraseña (opcional)"
+                : "Contraseña"
+            }
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={{ marginLeft: 10 }}
+            onChange={event =>
+              setPassword(event.target.value)
+            }
           />
 
           <select
             value={role}
-            onChange={e =>
+            onChange={event =>
               setRole(
-                e.target.value as UserRole
+                event.target.value as UserRole
               )
             }
           >
@@ -140,24 +169,25 @@ export default function UsersPage() {
                   key={userRole}
                   value={userRole}
                 >
-                  {userRole}
+                  {userRoleLabel(userRole)}
                 </option>
               )
             )}
           </select>
 
-          <button className="btn btn-primary"
+          <button
+            className="btn btn-primary"
             onClick={saveUser}
-            style={{ marginLeft: 10 }}
           >
-            {editingId !== null ? "Actualizar" : "Crear"}
+            {editingId !== null
+              ? "Actualizar"
+              : "Crear"}
           </button>
 
           {editingId !== null && (
             <button
-              className="btn btn-primary"
+              className="btn btn-secondary"
               onClick={resetForm}
-              style={{ marginLeft: 10 }}
             >
               Cancelar
             </button>
@@ -165,42 +195,95 @@ export default function UsersPage() {
 
         </div>
 
-        <DataTable>
+
+        <DataTable className="users-table">
 
           <thead>
             <tr>
               <th>Usuario</th>
               <th>Rol</th>
-              <th>Activo</th>
-              <th style={{ width: 300 }}>Acciones</th>
+              <th>Estado</th>
+              <th className="admin-actions-column">
+                Acciones
+              </th>
             </tr>
           </thead>
 
           <tbody>
 
-            {users.map(u => (
-              <tr key={u.id}>
+            {users.length === 0 && (
+              <tr>
+                <td
+                  colSpan={4}
+                  className="admin-table-empty"
+                >
+                  No hay usuarios
+                </td>
+              </tr>
+            )}
 
-                <td>{u.username}</td>
-
-                <td>{u.role}</td>
-
-                <td>{u.active ? "✔" : "❌"}</td>
+            {users.map(user => (
+              <tr
+                key={user.id}
+                className={
+                  user.active
+                    ? ""
+                    : "admin-row--inactive"
+                }
+              >
 
                 <td>
+                  <strong>
+                    {user.username}
+                  </strong>
+                </td>
 
-                  <button className="btn btn-primary"
-                    onClick={() => editUser(u)}>
-                    Editar
-                  </button>
+                <td>
+                  {userRoleLabel(user.role)}
+                </td>
 
-                  <button className="btn btn-primary"
-                    onClick={() => toggleUser(u.id)}
-                    style={{ marginLeft: 5 }}
+                <td>
+                  <span
+                    className={
+                      user.active
+                        ? "status-badge status-badge--active"
+                        : "status-badge status-badge--inactive"
+                    }
                   >
-                    {u.active ? "Desactivar" : "Activar"}
-                  </button>
+                    {user.active
+                      ? "Activo"
+                      : "Inactivo"}
+                  </span>
+                </td>
 
+                <td>
+                  <div className="admin-table-actions">
+
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() =>
+                        editUser(user)
+                      }
+                    >
+                      Editar
+                    </button>
+
+                    <button
+                      className={
+                        user.active
+                          ? "btn btn-danger"
+                          : "btn btn-success"
+                      }
+                      onClick={() =>
+                        toggleUser(user.id)
+                      }
+                    >
+                      {user.active
+                        ? "Desactivar"
+                        : "Activar"}
+                    </button>
+
+                  </div>
                 </td>
 
               </tr>
@@ -211,7 +294,6 @@ export default function UsersPage() {
         </DataTable>
 
       </Card>
-
     </Page>
   )
 }

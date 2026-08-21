@@ -686,6 +686,8 @@ export default function ReportsPage() {
   const [productEndDate, setProductEndDate] = useState(today)
   const [productEvolutionStartDate, setProductEvolutionStartDate] = useState(daysAgo(30))
   const [productEvolutionEndDate, setProductEvolutionEndDate] = useState(today)
+  const [salesOrdersStartDate, setSalesOrdersStartDate] = useState(today)
+  const [salesOrdersEndDate, setSalesOrdersEndDate] = useState(today)
   const [categoryId, setCategoryId] = useState("all")
   const [selectedProductId, setSelectedProductId] = useState("")
   const [salesReport, setSalesReport] = useState<SalesReport | null>(null)
@@ -726,25 +728,47 @@ export default function ReportsPage() {
         end_date: salesEndDate
       })
       try {
-        const [salesData, salesOrdersData] = await Promise.all([
-          apiFetch<RawSalesReport>(`/reports/sales?${query}`),
-          apiFetch<RawSalesOrdersReport>(`/reports/sales/orders?${query}`)
-        ])
-        setSalesReport(
-          normalizeSalesReport(salesData)
-        )
-
-        setSalesOrdersReport(
-          normalizeSalesOrdersReport(
-            salesOrdersData
-          )
-        )
+        const salesData = await apiFetch<RawSalesReport>(`/reports/sales?${query}`)
+        setSalesReport(normalizeSalesReport(salesData))
       } catch {
 
       }
     }
     void loadSales()
   }, [salesStartDate, salesEndDate])
+
+
+  useEffect(() => {
+    if (
+      !salesOrdersStartDate ||
+      !salesOrdersEndDate
+    ) {
+      setSalesOrdersReport(null)
+      return
+    }
+
+    const loadSalesOrders = async () => {
+      try {
+        const data =
+          await apiFetch<RawSalesOrdersReport>(
+            `/reports/sales/orders` +
+            `?start_date=${salesOrdersStartDate}` +
+            `&end_date=${salesOrdersEndDate}`
+          )
+
+        setSalesOrdersReport(normalizeSalesOrdersReport(data))
+      } catch {
+        // apiFetch ya mostró el error.
+      }
+    }
+
+    void loadSalesOrders()
+
+  }, [
+    salesOrdersStartDate,
+    salesOrdersEndDate
+  ])
+
 
   useEffect(() => {
     const loadProductsReport = async () => {
@@ -825,12 +849,14 @@ export default function ReportsPage() {
             <h2>Evolución de ventas</h2>
           </div>
 
-          <DateRange
-            startDate={salesStartDate}
-            endDate={salesEndDate}
-            onStartDate={setSalesStartDate}
-            onEndDate={setSalesEndDate}
-          />
+          <div className="report-date-range">
+            <DateRange
+              startDate={salesStartDate}
+              endDate={salesEndDate}
+              onStartDate={setSalesStartDate}
+              onEndDate={setSalesEndDate}
+            />
+          </div>
         </div>
 
         <LineChart data={salesReport?.series || []} label="Evolución de ventas" />
@@ -889,13 +915,14 @@ export default function ReportsPage() {
           )}
         </div>
 
-        <DateRange
-          startDate={productStartDate}
-          endDate={productEndDate}
-          onStartDate={setProductStartDate}
-          onEndDate={setProductEndDate}
-        />
-
+        <div className="report-date-range">
+          <DateRange
+            startDate={productStartDate}
+            endDate={productEndDate}
+            onStartDate={setProductStartDate}
+            onEndDate={setProductEndDate}
+          />
+        </div>
         <div className="product-ranks-grid">
           <ProductTable title="Top 10 más vendidos" items={productsReport?.top_products || []} />
           <ProductTable title="Top 10 menos vendidos" items={productsReport?.least_products || []} />
@@ -926,31 +953,54 @@ export default function ReportsPage() {
             </div>
           </div>
 
-          <DateRange
-            startDate={productEvolutionStartDate}
-            endDate={productEvolutionEndDate}
-            onStartDate={setProductEvolutionStartDate}
-            onEndDate={setProductEvolutionEndDate}
-          />
-
+          <div className="report-date-range">
+            <DateRange
+              startDate={productEvolutionStartDate}
+              endDate={productEvolutionEndDate}
+              onStartDate={setProductEvolutionStartDate}
+              onEndDate={setProductEvolutionEndDate}
+            />
+          </div>
           <LineChart data={productEvolution} label="Evolución de ventas por producto" />
         </div>
       </section>
-      <section>
-        <div className="sales-orders-block">
-          <div className="report-section__header">
-            <div>
-              <p>Detalle de ventas</p>
-              <h2>Ventas realizadas por orden</h2>
-            </div>
+      <section className="report-section">
+
+        <div className="report-section__header">
+
+          <div>
+            <p>Detalle de ventas</p>
+
+            <h2>
+              Ventas realizadas por orden
+            </h2>
           </div>
 
-          <SalesOrdersList
-            orders={salesOrdersReport?.orders || []}
-            startDate={salesStartDate}
-            endDate={salesEndDate}
+          <DateRange
+            startDate={salesOrdersStartDate}
+            endDate={salesOrdersEndDate}
+            onStartDate={
+              setSalesOrdersStartDate
+            }
+            onEndDate={
+              setSalesOrdersEndDate
+            }
           />
+
         </div>
+
+        <SalesOrdersList
+          orders={
+            salesOrdersReport?.orders || []
+          }
+          startDate={
+            salesOrdersStartDate
+          }
+          endDate={
+            salesOrdersEndDate
+          }
+        />
+
       </section>
     </main>
   )

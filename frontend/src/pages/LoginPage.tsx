@@ -149,101 +149,55 @@ export default function LoginPage() {
     }
   }
 
-
   return (
-    <div
-      style={{
-        height: "100vh",
-        width: "100vw",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background:
-          "radial-gradient(circle at top, #1a233a 0%, #0c0f17 100%)",
-        position: "fixed",
-        top: 0,
-        left: 0,
-        zIndex: 100
-      }}
-    >
+    <div className="login-page">
       <form
+        className="login-card"
         onSubmit={event => {
           event.preventDefault()
           void login()
         }}
-        style={{
-          background:
-            "rgba(22, 28, 45, 0.45)",
-          backdropFilter:
-            "blur(12px) saturate(180%)",
-          WebkitBackdropFilter:
-            "blur(12px) saturate(180%)",
-          border:
-            "1px solid var(--color-border)",
-          padding: "40px",
-          borderRadius:
-            "var(--radius-lg)",
-          boxShadow:
-            "var(--shadow-lg), var(--shadow-glass)",
-          width: "360px",
-          display: "flex",
-          flexDirection: "column",
-          gap: "20px"
-        }}
       >
-        <h2
-          style={{
-            textAlign: "center",
-            marginBottom: "10px",
-            fontSize: "28px",
-            fontWeight: "700",
-            letterSpacing: "-0.5px"
-          }}
-        >
-          🍳{" "}
-          <span
-            style={{
-              color:
-                "var(--color-primary)"
-            }}
-          >
+        <h1 className="login-title">
+          <span className="login-icon">
+            🍳
+          </span>
+
+          <span>
             Marcha
           </span>
-        </h2>
+        </h1>
 
-        <input
-          type="text"
-          placeholder="Usuario"
-          autoComplete="username"
-          value={username}
-          onChange={event =>
-            setUsername(
-              event.target.value
-            )
-          }
-        />
+        <div className="login-fields">
+          <input
+            type="text"
+            placeholder="Usuario"
+            autoComplete="username"
+            value={username}
+            onChange={event =>
+              setUsername(
+                event.target.value
+              )
+            }
+          />
 
-        <input
-          type="password"
-          placeholder="Contraseña"
-          autoComplete="current-password"
-          value={password}
-          onChange={event =>
-            setPassword(
-              event.target.value
-            )
-          }
-        />
+          <input
+            type="password"
+            placeholder="Contraseña"
+            autoComplete="current-password"
+            value={password}
+            onChange={event =>
+              setPassword(
+                event.target.value
+              )
+            }
+          />
+        </div>
 
         <button
           type="submit"
-          className="btn-primary"
+          className="btn btn-primary login-submit"
           disabled={loggingIn}
-          style={{
-            padding: "12px",
-            fontSize: "16px",
-            marginTop: "10px"
-          }}
         >
           {loggingIn
             ? "Ingresando..."

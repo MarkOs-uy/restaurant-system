@@ -83,11 +83,16 @@ class OrderService:
     # -------------------------
     # Calcular totales de la orden
     # -------------------------
-    def _calculate_totals(self, order: Order) -> tuple[Decimal, Decimal, Decimal, Decimal]:
-        subtotal = sum((item.quantity * item.unit_price for item in order.items), Decimal("0"))
+    def _calculate_totals(self, order: Order) -> tuple[Decimal, Decimal, Decimal, Decimal]: 
+        active_items = [
+            item
+            for item in order.items
+            if item.status != OrderItemStatus.CANCELLED
+        ]
+        subtotal = sum((item.quantity * item.unit_price for item in active_items), Decimal("0"))
         discount = order.discount or Decimal("0")
         total = max(subtotal - discount, Decimal("0"))
-        total_paid = sum(payment.amount for payment in order.payments)
+        total_paid = sum((payment.amount for payment in order.payments), Decimal("0"))
         remaining = total - total_paid
         return subtotal, total, total_paid, remaining
 
@@ -100,7 +105,10 @@ class OrderService:
             if i.status != OrderItemStatus.CANCELLED
         ]
         if not active_items:
-            if order.status in (OrderStatus.DRAFT, OrderStatus.OPEN):
+            if order.status not in (
+                OrderStatus.CLOSED,
+                OrderStatus.CANCELLED
+            ):
                 return OrderStatus.CANCELLED
             return order.status
         statuses = [i.status for i in active_items]
@@ -269,6 +277,11 @@ class OrderService:
                 "Cannot add items to closed order",
                 ErrorCode.ORDER_ALREADY_CLOSED
             )
+        if order.status == OrderStatus.CANCELLED:
+            raise DomainError(
+                "Cannot add items to cancelled order",
+                ErrorCode.ORDER_ALREADY_CANCELLED
+            )
         if data.quantity <= 0:
             raise DomainError(
                 "Quantity must be greater than zero",
@@ -404,7 +417,11 @@ class OrderService:
                 "Order is closed",
                 ErrorCode.ORDER_ALREADY_CLOSED
             )
-
+        if order.status == OrderStatus.CANCELLED:
+            raise DomainError(
+                "Order is cancelled",
+                ErrorCode.ORDER_ALREADY_CANCELLED
+            )
         pending_items = [
             item
             for item in order.items
@@ -496,6 +513,11 @@ class OrderService:
                 "Order already closed",
                 ErrorCode.ORDER_ALREADY_CLOSED
             )
+        if order.status == OrderStatus.CANCELLED:
+            raise DomainError(
+                "Order already cancelled",
+                ErrorCode.ORDER_ALREADY_CANCELLED
+            )
         cash_service = CashRegisterService(self.db)
         cash_register = cash_service.get_open_cash_register(order.restaurant_id)
         subtotal, total, total_paid, remaining = self._calculate_totals(order)
@@ -560,6 +582,11 @@ class OrderService:
                 "Cannot delete payment from closed order",
                 ErrorCode.INVALID_OPERATION
             )
+        if payment.order.status == OrderStatus.CANCELLED:
+            raise DomainError(
+                "Cannot delete payment from cancelled order",
+                ErrorCode.INVALID_OPERATION
+            )        
         logger.info("Pago eliminado order_id=%s amount=%s method=%s", payment.order_id, payment.amount, payment.method)
         order_id = payment.order_id
         amount = payment.amount
@@ -596,6 +623,11 @@ class OrderService:
                 "La orden ya está cerrada",
                 ErrorCode.ORDER_ALREADY_CLOSED
             )
+        if order.status == OrderStatus.CANCELLED:
+            raise DomainError(
+                "La orden está cancelada",
+                ErrorCode.ORDER_ALREADY_CANCELLED
+            )
         subtotal, total, total_paid, remaining = self._calculate_totals(order)
         if remaining > 0:
             raise DomainError(
@@ -603,9 +635,15 @@ class OrderService:
                 ErrorCode.ORDER_HAS_REMAINING_BALANCE,
                 context={"remaining": money(remaining)}
             )
-        if not order.items:
+        active_items = [
+            item
+            for item in order.items
+            if item.status != OrderItemStatus.CANCELLED
+        ]
+
+        if not active_items:
             raise DomainError(
-                "La orden no tiene items",
+                "La orden no tiene items activos",
                 ErrorCode.ORDER_EMPTY
             )
         not_delivered = [
@@ -649,7 +687,7 @@ class OrderService:
         restaurant_id: int,
         order_id: int,
         item_id: int,
-    ) -> None:
+    ) -> OrderResponse:
         item = (
             self.db.query(OrderItem)
             .filter(
@@ -681,12 +719,33 @@ class OrderService:
             )
 
         order = item.order
+        previous_status = order.status
 
         self.db.delete(item)
+        self.db.flush()
         new_status = self._calculate_order_status(order)
         self._set_status(order, new_status)
         logger.info("Item eliminado order_id=%s item_id=%s", order_id, item_id)
+
         # 🔔 EVENTO
+        if order.status != previous_status:
+            for role in [
+                UserRole.ADMIN,
+                UserRole.WAITER,
+                UserRole.CASHIER
+            ]:
+                self.events.emit(
+                    restaurant_id=restaurant_id,
+                    event_type=WSEvent.ORDER_STATUS_CHANGED,
+                    payload={
+                        "order_id": order.id,
+                        "status": order.status.value
+                    },
+                    target="role",
+                    target_id=role.value
+                )
+
+
         for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
             self.events.emit(
                 restaurant_id=restaurant_id,
@@ -695,8 +754,10 @@ class OrderService:
                 target="role",
                 target_id=role.value
             )
+            
         self.db.commit()
         self.db.refresh(order)
+        return self.to_order_response(order)
         
     # -------------------------
     # Actualizar cantidad por item de la orden

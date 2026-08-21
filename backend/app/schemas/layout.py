@@ -12,7 +12,8 @@ class LayoutOut(BaseSchema):
 
 
 class LayoutUpdate(BaseSchema):
-    width: int = Field(gt=0)
-    height: int = Field(gt=0)
-    grid_size: int = Field(gt=0)
-    snap_to_grid: bool
+    width: int | None = None
+    height: int | None = None
+    grid_size: int | None = None
+    snap_to_grid: bool | None = None
+    background_image: str | None = None

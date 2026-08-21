@@ -51,29 +51,47 @@ export default function KitchenStations() {
 
 
   return (
-    <div style={{ padding: 40 }}>
-      <h1>Elegir estación</h1>
+    <div className="kitchen-stations-page">
 
-      {stations.length === 0 && (
-        <p>No hay estaciones activas.</p>
+      <header className="kitchen-stations-header">
+        <p>Cocina</p>
+        <h1>Elegir estación</h1>
+      </header>
+
+      {stations.length === 0 ? (
+        <div className="kitchen-empty">
+          <strong>
+            No hay estaciones activas
+          </strong>
+
+          <span>
+            Configure una estación desde
+            administración.
+          </span>
+        </div>
+      ) : (
+        <div className="kitchen-stations-grid">
+          {stations.map(station => (
+            <button
+              key={station.id}
+              type="button"
+              className="kitchen-station-button"
+              onClick={() =>
+                selectStation(station)
+              }
+            >
+              <span>
+                {station.name}
+              </span>
+
+              <small>
+                Abrir estación →
+              </small>
+            </button>
+          ))}
+        </div>
       )}
 
-      {stations.map(station => (
-        <button
-          key={station.id}
-          onClick={() => selectStation(station)}
-          style={{
-            display: "block",
-            width: "100%",
-            padding: 20,
-            marginBottom: 20,
-            fontSize: 22,
-            borderRadius: 8
-          }}
-        >
-          {station.name}
-        </button>
-      ))}
     </div>
   )
 }

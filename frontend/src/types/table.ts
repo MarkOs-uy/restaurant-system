@@ -1,6 +1,9 @@
 /**
  * Interface de mesas
  */
+
+import { OrderStatus } from "./orderStatus"
+
 export interface Table {
   id: number
   number: number
@@ -11,7 +14,7 @@ export interface Table {
   status: string
   active: boolean
   order_id?: number | null
-  order_status?: string | null
+  order_status: OrderStatus | null
 }
 
 export interface InactiveTable {

@@ -176,6 +176,7 @@ def update_order_item_quantity(
 # -------------------------
 @router.delete(
     "/{order_id}/items/{item_id}",
+    response_model=OrderResponse,
     status_code=status.HTTP_200_OK,
     summary="Borrar item de orden",
     description="Borra el item especificado de la orden."
@@ -186,7 +187,7 @@ def delete_order_item(
     user: User = Depends(waiter_or_admin),
     service: OrderService = Depends(get_order_service)
 ):
-    service.delete_order_item(user.restaurant_id, order_id, item_id)
+    return service.delete_order_item(user.restaurant_id, order_id, item_id)
 
 # -------------------------
 # Borrar Pago

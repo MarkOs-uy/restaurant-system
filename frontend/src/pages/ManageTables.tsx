@@ -187,256 +187,338 @@ export default function ManageTables() {
     )
   }
 
-    return (
-    <div style={{ padding: 20 }}>
+  return (
+    <main className="manage-tables-page">
 
-        <button onClick={() => navigate("/")}>
-        ← Volver al plano
+      <div className="manage-tables-header">
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => navigate("/")}
+        >
+          ← Volver al plano
         </button>
 
-        <h1>Administrar mesas</h1>
+        <div>
+          <p>Configuración</p>
+          <h1>Administrar mesas</h1>
+        </div>
+      </div>
 
-        <h2 style={{ marginTop: 20 }}>Mesas activas</h2>
 
-        <table style={{ width: "100%", textAlign: "center" }}>
-        <thead>
-            <tr>
-                <th style={{ width: 120, textAlign: "center" }}>Número</th>
-                <th style={{ width: 120, textAlign: "center" }}>Capacidad</th>
-                <th style={{ width: 120, textAlign: "center" }}>Forma</th>
-                <th style={{ width: 120, textAlign: "center" }}>Activa</th>
-                <th style={{ width: 120, textAlign: "center" }}></th>
-            </tr>
-        </thead>
+      {/* MESAS ACTIVAS */}
+      <section className="manage-tables-section">
 
-        <tbody>
-            {activeTables.length === 0 && (
+        <div className="manage-tables-section__header">
+          <h2>Mesas activas</h2>
+
+          <span>
+            {activeTables.length}
+          </span>
+        </div>
+
+        <div className="data-table-wrapper">
+          <table className="data-table manage-tables-table">
+
+            <thead>
+              <tr>
+                <th>Número</th>
+                <th>Capacidad</th>
+                <th>Forma</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+
+            <tbody>
+
+              {activeTables.length === 0 && (
                 <tr>
-                    <td colSpan={5}>No hay mesas activas</td>
+                  <td
+                    colSpan={5}
+                    className="admin-table-empty"
+                  >
+                    No hay mesas activas
+                  </td>
                 </tr>
-            )}
-            {activeTables.map((t) => (
-            <tr
-              key={t.id}
-              style={{
-                background: hasChanges(t)
-                  ? "rgba(255, 193, 7, 0.12)"
-                  : "transparent",
-                outline: hasChanges(t)
-                  ? "1px solid rgba(255, 193, 7, 0.45)"
-                  : "none"
-              }}
-            >
+              )}
 
-                <td>
-                    <input
-                        type="number"
-                        value={t.number}
-                        style={{ textAlign: "center", width: 60 }}
-                        onChange={(e) =>
-                            updateField(t.id, "number", Number(e.target.value))
-                        }
-                    />
-                </td>
+              {activeTables.map(table => {
+                const changed = hasChanges(table)
 
-                <td>
-                    <input
-                        type="number"
-                        value={t.capacity}
-                        style={{ textAlign: "center", width: 60 }}
-                        onChange={(e) =>
-                            updateField(t.id, "capacity", Number(e.target.value))
-                        }
-                    />
-                </td>
-
-                <td>
-                <select
-                    value={t.shape}
-                    style={{ textAlign: "center" }}
-                    onChange={(e) =>
-                    updateField(
-                        t.id,
-                        "shape",
-                        e.target.value as TableShape
-                    )
+                return (
+                  <tr
+                    key={table.id}
+                    className={
+                      changed
+                        ? "manage-table-row manage-table-row--changed"
+                        : "manage-table-row"
                     }
-                >
-                    <option value={TableShape.CIRCLE}>
-                    Circular
-                    </option>
-
-                    <option value={TableShape.SQUARE}>
-                    Cuadrada
-                    </option>
-
-                    <option value={TableShape.RECTANGLE_HORIZONTAL}>
-                    Rectangular horizontal
-                    </option>
-
-                    <option value={TableShape.RECTANGLE_VERTICAL}>
-                    Rectangular vertical
-                    </option>
-                </select>
-                </td>
-
-                <td style={{ textAlign: "center" }}>
-                  <input
-                    type="checkbox"
-                    checked={t.active}
-                    onChange={e =>
-                      void toggleTableActive(
-                        t,
-                        e.target.checked
-                      )
-                    }
-                  />
-                </td>
-
-                <td>
-                <button
-                    onClick={() => updateTable(t)}
-                    disabled={!hasChanges(t)}
-                    style={{
-                        opacity: hasChanges(t) ? 1 : 0.5,
-                        cursor: hasChanges(t) ? "pointer" : "not-allowed"
-                    }}
-                >
-                    Guardar
-                </button>
-                </td>
-
-            </tr>
-            ))}
-        </tbody>
-        </table>
-
-
-        <h2 style={{ marginTop: 30 }}>Mesas inactivas</h2>
-
-        <table style={{ width: "100%", textAlign: "center" }}>
-        <thead>
-            <tr>
-                <th style={{ width: 120, textAlign: "center" }}>Número</th>
-                <th style={{ width: 120, textAlign: "center" }}>Capacidad</th>
-                <th style={{ width: 120, textAlign: "center" }}>Forma</th>
-                <th style={{ width: 120, textAlign: "center" }}>Activa</th>
-                <th style={{ width: 120, textAlign: "center" }}></th>
-            </tr>
-        </thead>
-
-        <tbody>
-            {inactiveTables.length === 0 && (
-                <tr>
-                    <td colSpan={5}>No hay mesas inactivas</td>
-                </tr>
-            )}
-            {inactiveTables.map((t) => (
-            <tr
-              key={t.id}
-              style={{
-                background: hasChanges(t)
-                  ? "rgba(255, 193, 7, 0.12)"
-                  : "transparent",
-                outline: hasChanges(t)
-                  ? "1px solid rgba(255, 193, 7, 0.45)"
-                  : "none"
-              }}
-            >
-
-                <td>
-                    <input
+                  >
+                    <td>
+                      <input
+                        className="manage-table-number"
                         type="number"
-                        value={t.number}
-                        style={{ textAlign: "center", width: 60 }}
-                        onChange={(e) =>
-                            updateField(t.id, "number", Number(e.target.value))
+                        value={table.number}
+                        onChange={event =>
+                          updateField(
+                            table.id,
+                            "number",
+                            Number(event.target.value)
+                          )
                         }
-                    />
-                </td>
+                      />
+                    </td>
 
-                <td>
-                    <input
+                    <td>
+                      <input
+                        className="manage-table-number"
                         type="number"
-                        style={{ textAlign: "center", width: 60 }}
-                        value={t.capacity}
-                        onChange={(e) =>
-                        updateField(t.id, "capacity", Number(e.target.value))
+                        value={table.capacity}
+                        onChange={event =>
+                          updateField(
+                            table.id,
+                            "capacity",
+                            Number(event.target.value)
+                          )
                         }
-                    />
-                </td>
+                      />
+                    </td>
 
-                <td>
-                    <select
-                        value={t.shape}
-                        style={{ textAlign: "center" }}
-                        onChange={(e) =>
-                        updateField(
-                            t.id,
+                    <td>
+                      <select
+                        value={table.shape}
+                        onChange={event =>
+                          updateField(
+                            table.id,
                             "shape",
-                            e.target.value as TableShape
-                        )
+                            event.target.value as TableShape
+                          )
                         }
-                    >
+                      >
                         <option value={TableShape.CIRCLE}>
-                        Circular
+                          Circular
                         </option>
 
                         <option value={TableShape.SQUARE}>
-                        Cuadrada
+                          Cuadrada
                         </option>
 
                         <option value={TableShape.RECTANGLE_HORIZONTAL}>
-                        Rectangular horizontal
+                          Rectangular horizontal
                         </option>
 
                         <option value={TableShape.RECTANGLE_VERTICAL}>
-                        Rectangular vertical
+                          Rectangular vertical
                         </option>
-                    </select>
-                </td>
+                      </select>
+                    </td>
 
-                <td style={{ textAlign: "center" }}>
-                  <input
-                    type="checkbox"
-                    checked={t.active}
-                    onChange={e =>
-                      void toggleTableActive(
-                        t,
-                        e.target.checked
-                      )
-                    }
-                  />
-                </td>
+                    <td>
+                      <label className="manage-table-active">
+                        <input
+                          type="checkbox"
+                          checked={table.active}
+                          onChange={event =>
+                            void toggleTableActive(
+                              table,
+                              event.target.checked
+                            )
+                          }
+                        />
 
-                <td>
-                  <button
-                    onClick={() => updateTable(t)}
-                    disabled={!hasChanges(t)}
-                    style={{
-                      opacity: hasChanges(t) ? 1 : 0.35,
-                      cursor: hasChanges(t)
-                        ? "pointer"
-                        : "not-allowed",
-                      fontWeight: hasChanges(t)
-                        ? "bold"
-                        : "normal",
-                      boxShadow: hasChanges(t)
-                        ? "0 0 0 2px rgba(255, 193, 7, 0.35)"
-                        : "none"
-                    }}
+                        <span>
+                          Activa
+                        </span>
+                      </label>
+                    </td>
+
+                    <td>
+                      <button
+                        type="button"
+                        className={
+                          changed
+                            ? "btn btn-primary manage-table-save"
+                            : "btn btn-secondary manage-table-save"
+                        }
+                        onClick={() =>
+                          updateTable(table)
+                        }
+                        disabled={!changed}
+                      >
+                        {changed
+                          ? "Guardar cambios"
+                          : "Guardado"}
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+
+            </tbody>
+
+          </table>
+        </div>
+
+      </section>
+
+
+      {/* MESAS INACTIVAS */}
+      <section className="manage-tables-section">
+
+        <div className="manage-tables-section__header">
+          <h2>Mesas inactivas</h2>
+
+          <span>
+            {inactiveTables.length}
+          </span>
+        </div>
+
+        <div className="data-table-wrapper">
+          <table className="data-table manage-tables-table">
+
+            <thead>
+              <tr>
+                <th>Número</th>
+                <th>Capacidad</th>
+                <th>Forma</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+
+            <tbody>
+
+              {inactiveTables.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="admin-table-empty"
                   >
-                    {hasChanges(t)
-                      ? "Guardar cambios"
-                      : "Guardado"}
-                  </button>
-                </td>
+                    No hay mesas inactivas
+                  </td>
+                </tr>
+              )}
 
-            </tr>
-            ))}
-        </tbody>
-        </table>
+              {inactiveTables.map(table => {
+                const changed = hasChanges(table)
 
-    </div>
-    )
+                return (
+                  <tr
+                    key={table.id}
+                    className={
+                      changed
+                        ? "manage-table-row manage-table-row--changed"
+                        : "manage-table-row manage-table-row--inactive"
+                    }
+                  >
+                    <td>
+                      <input
+                        className="manage-table-number"
+                        type="number"
+                        value={table.number}
+                        onChange={event =>
+                          updateField(
+                            table.id,
+                            "number",
+                            Number(event.target.value)
+                          )
+                        }
+                      />
+                    </td>
+
+                    <td>
+                      <input
+                        className="manage-table-number"
+                        type="number"
+                        value={table.capacity}
+                        onChange={event =>
+                          updateField(
+                            table.id,
+                            "capacity",
+                            Number(event.target.value)
+                          )
+                        }
+                      />
+                    </td>
+
+                    <td>
+                      <select
+                        value={table.shape}
+                        onChange={event =>
+                          updateField(
+                            table.id,
+                            "shape",
+                            event.target.value as TableShape
+                          )
+                        }
+                      >
+                        <option value={TableShape.CIRCLE}>
+                          Circular
+                        </option>
+
+                        <option value={TableShape.SQUARE}>
+                          Cuadrada
+                        </option>
+
+                        <option value={TableShape.RECTANGLE_HORIZONTAL}>
+                          Rectangular horizontal
+                        </option>
+
+                        <option value={TableShape.RECTANGLE_VERTICAL}>
+                          Rectangular vertical
+                        </option>
+                      </select>
+                    </td>
+
+                    <td>
+                      <label className="manage-table-active">
+                        <input
+                          type="checkbox"
+                          checked={table.active}
+                          onChange={event =>
+                            void toggleTableActive(
+                              table,
+                              event.target.checked
+                            )
+                          }
+                        />
+
+                        <span>
+                          Inactiva
+                        </span>
+                      </label>
+                    </td>
+
+                    <td>
+                      <button
+                        type="button"
+                        className={
+                          changed
+                            ? "btn btn-primary manage-table-save"
+                            : "btn btn-secondary manage-table-save"
+                        }
+                        onClick={() =>
+                          updateTable(table)
+                        }
+                        disabled={!changed}
+                      >
+                        {changed
+                          ? "Guardar cambios"
+                          : "Guardado"}
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+
+            </tbody>
+
+          </table>
+        </div>
+
+      </section>
+
+    </main>
+  )
 }

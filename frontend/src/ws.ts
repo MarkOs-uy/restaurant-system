@@ -17,9 +17,7 @@ export interface WSEventParsed<T = unknown> {
 // "data" se mantiene como compatibilidad por si algún evento antiguo utiliza
 // ese nombre.
 // ---------------------------------------------------------------------------------------------
-export function parseWSEvent(
-    event: MessageEvent
-): WSEventParsed {
+export function parseWSEvent(event: MessageEvent): WSEventParsed {
 
     let evt: unknown
 

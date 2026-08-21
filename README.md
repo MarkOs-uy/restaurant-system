@@ -35,3 +35,5 @@ Stack:
 - SQLAlchemy
 - Alembic
 - Docker
+
+![Backend tests](https://github.com/TU_USUARIO/TU_REPO/actions/workflows/backend-tests.yml/badge.svg)
