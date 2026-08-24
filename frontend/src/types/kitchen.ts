@@ -11,4 +11,5 @@ export interface KitchenItem {
   table_number: number
   order_id: number
   created_at: string
+  notes?: string | null
 }

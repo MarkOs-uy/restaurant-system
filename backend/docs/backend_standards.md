@@ -92,7 +92,7 @@ ProductResponse
 
 CategoryResponse
 
-OrderDetail
+OrderResponse
 
 CashMovementOut
 

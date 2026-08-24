@@ -3,9 +3,17 @@ Endpoints para la gestión de categorías.
 Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
 """
 
-from fastapi import APIRouter, Depends, status, Query
+from fastapi import (
+    APIRouter, 
+    Depends, 
+    status,
+    Query
+)
 
-from app.dependencies.roles import admin_only, waiter_or_admin
+from app.dependencies.roles import (
+    admin_only, 
+    waiter_or_admin
+)
 
 from app.domain.category.category_service import CategoryService
 from app.domain.category.dependencies import get_category_service

@@ -4,9 +4,18 @@ Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
 """
 
 from decimal import Decimal
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import (
+    APIRouter, 
+    Depends, 
+    status,
+    Query
+)
 
-from app.dependencies.roles import waiter_or_admin, waiter_cashier_or_admin, all_staff
+from app.dependencies.roles import (
+    waiter_or_admin, 
+    waiter_cashier_or_admin, 
+    all_staff
+)
 
 from app.domain.order.order_service import OrderService
 from app.domain.order.dependencies import get_order_service
@@ -19,9 +28,8 @@ from app.schemas.order.payment import (
     PaymentOut
 )
 from app.schemas.order.order import (
-    OrderStatusUpdate,
-    OrderDetail,
-    OrderResponse
+    OrderResponse,
+    OrderCancel
 )
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -31,7 +39,7 @@ router = APIRouter(prefix="/orders", tags=["orders"])
 # -------------------------
 @router.post(
     "/{order_id}/items",
-    response_model=OrderDetail,
+    response_model=OrderResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Agregar item a orden",
     description="Agrega un item a la orden especificada."
@@ -50,7 +58,7 @@ def add_item_to_order(
 # -------------------------
 @router.post(
     "/{order_id}/send-to-kitchen",
-    response_model=OrderDetail,
+    response_model=OrderResponse,
     status_code=status.HTTP_200_OK,
     summary="Enviar orden a cocina",
     description="Envía la orden especificada a la cocina."
@@ -87,7 +95,7 @@ def add_payment(
 # -------------------------
 @router.post(
     "/{order_id}/close",
-    response_model=OrderDetail,
+    response_model=OrderResponse,
     status_code=status.HTTP_200_OK,
     summary="Cerrar orden",
     description="Cierra la orden especificada."
@@ -105,7 +113,7 @@ def close_order(
 # -------------------------
 @router.put(
     "/{order_id}/discount",
-    response_model=OrderDetail,
+    response_model=OrderResponse,
     status_code=status.HTTP_200_OK,
     summary="Aplicar descuento a orden",
     description="Aplica un descuento a la orden especificada."
@@ -158,7 +166,7 @@ def get_order(
 # -------------------------
 @router.patch(
     "/order-items/{item_id}",
-    response_model=OrderDetail,
+    response_model=OrderResponse,
     status_code=status.HTTP_200_OK,
     summary="Actualizar cantidad de item",
     description="Actualiza la cantidad del item especificado en la orden."
@@ -170,6 +178,35 @@ def update_order_item_quantity(
     user: User = Depends(waiter_or_admin)
 ):
     return service.update_item_quantity(user.restaurant_id, item_id, quantity)
+
+# -------------------------
+# Cancelar orden
+# -------------------------
+@router.patch(
+    "/{order_id}/cancel",
+    response_model=OrderResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Cancelar orden",
+    description=(
+        "Cancela una orden y conserva "
+        "su información para auditoría."
+    )
+)
+def cancel_order(
+    order_id: int,
+    data: OrderCancel,
+    user: User = Depends(waiter_or_admin),
+    service: OrderService = Depends(
+        get_order_service
+    )
+):
+    order = service.get_order(order_id, user.restaurant_id)
+
+    return service.cancel_order(
+        order=order,
+        user_id=user.id,
+        reason=data.reason
+    )
 
 # -------------------------
 # Borrar item de orden

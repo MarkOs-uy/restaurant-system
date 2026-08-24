@@ -50,7 +50,8 @@ class KitchenService:
                 quantity=item.quantity,
                 status=item.status,
                 table_number=item.order.table.number,
-                order_id=item.order.id
+                order_id=item.order.id,
+                notes=item.notes
             )
             for item in items
         ]

@@ -2,22 +2,28 @@ from app.models.order_item import OrderItemStatus
 
 
 _ALLOWED_TRANSITIONS = {
+
     OrderItemStatus.PENDING: [
-        OrderItemStatus.SENT,
-        OrderItemStatus.CANCELLED
+        OrderItemStatus.SENT
     ],
+
     OrderItemStatus.SENT: [
         OrderItemStatus.IN_PROGRESS,
         OrderItemStatus.CANCELLED
     ],
+
     OrderItemStatus.IN_PROGRESS: [
         OrderItemStatus.READY,
         OrderItemStatus.CANCELLED
     ],
+
     OrderItemStatus.READY: [
-        OrderItemStatus.DELIVERED
+        OrderItemStatus.DELIVERED,
+        OrderItemStatus.CANCELLED
     ],
+
     OrderItemStatus.DELIVERED: [],
+
     OrderItemStatus.CANCELLED: []
 }
 

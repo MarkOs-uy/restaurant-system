@@ -3,9 +3,17 @@ Endpoints para la gestión de mesas.
 Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
 """
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import (
+    APIRouter, 
+    Depends, 
+    status,
+    Query
+)
 
-from app.dependencies.roles import waiter_or_admin, admin_only
+from app.dependencies.roles import (
+    waiter_or_admin, 
+    admin_only
+)
 
 from app.domain.table.table_service import TableService
 from app.domain.table.dependencies import get_table_service

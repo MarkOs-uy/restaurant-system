@@ -8,3 +8,4 @@ class KitchenItemOut(BaseSchema):
     status: OrderItemStatus
     table_number: int
     order_id: int
+    notes: str | None = None

@@ -1,6 +1,7 @@
 import logging
 
 from decimal import Decimal, ROUND_HALF_UP
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
@@ -186,7 +187,8 @@ class OrderService:
                     quantity=item.quantity,
                     unit_price=money(item.unit_price),
                     subtotal=money(item.quantity * item.unit_price),
-                    status=item.status
+                    status=item.status,
+                    notes=item.notes
                 )
                 for item in order.items
             ],
@@ -304,13 +306,15 @@ class OrderService:
             )
         
         previous_status = order.status
+        notes = (data.notes.strip() if data.notes else None)
 
         existing_item = (
             self.db.query(OrderItem)
             .filter(
                 OrderItem.order_id == order.id,
                 OrderItem.product_id == product.id,
-                OrderItem.status == OrderItemStatus.PENDING
+                OrderItem.status == OrderItemStatus.PENDING,
+                OrderItem.notes == notes
             )
             .first()
         )
@@ -324,7 +328,8 @@ class OrderService:
                 product_id=product.id,
                 quantity=data.quantity,
                 unit_price=product.price,
-                status=OrderItemStatus.PENDING
+                status=OrderItemStatus.PENDING,
+                notes=data.notes
             )
             self.db.add(item)        
         self.db.flush()
@@ -378,7 +383,7 @@ class OrderService:
             self.db.add(order)
             self.db.flush()
         item = self.add_item(order, data)
-        return {"order_id": order.id, "item_id": item.id}
+        return {"order_id": order.id}
 
     # -------------------------
     # Actualizar estado de la orden
@@ -407,33 +412,22 @@ class OrderService:
     # -------------------------
     # Enviar a cocina
     # -------------------------
-    def send_to_kitchen(
-        self,
-        order: Order
-    ) -> OrderResponse:
-
+    def send_to_kitchen(self, order: Order) -> OrderResponse:
         if order.status == OrderStatus.CLOSED:
-            raise DomainError(
-                "Order is closed",
-                ErrorCode.ORDER_ALREADY_CLOSED
-            )
+            raise DomainError("Order is closed", ErrorCode.ORDER_ALREADY_CLOSED)
+        
         if order.status == OrderStatus.CANCELLED:
-            raise DomainError(
-                "Order is cancelled",
-                ErrorCode.ORDER_ALREADY_CANCELLED
-            )
+            raise DomainError("Order is cancelled", ErrorCode.ORDER_ALREADY_CANCELLED)
         pending_items = [
             item
             for item in order.items
             if item.status == OrderItemStatus.PENDING
         ]
-
         if not pending_items:
             raise DomainError(
                 "No pending items to send",
                 ErrorCode.NO_PENDING_ITEMS_TO_SEND
             )
-
         previous_status = order.status
 
         # --------------------------------------------------
@@ -488,7 +482,6 @@ class OrderService:
                     target="role",
                     target_id=role.value
                 )
-
         # --------------------------------------------------
         # Un único commit:
         #
@@ -572,10 +565,7 @@ class OrderService:
         )
 
         if not payment:
-            raise DomainError(
-                "Pago no encontrado",
-                ErrorCode.PAYMENT_NOT_FOUND
-                )
+            raise DomainError("Pago no encontrado", ErrorCode.PAYMENT_NOT_FOUND)
 
         if payment.order.status == OrderStatus.CLOSED:
             raise DomainError(
@@ -619,15 +609,9 @@ class OrderService:
     # -------------------------
     def close_order(self, order: Order) -> OrderResponse:
         if order.status == OrderStatus.CLOSED:
-            raise DomainError(
-                "La orden ya está cerrada",
-                ErrorCode.ORDER_ALREADY_CLOSED
-            )
+            raise DomainError("La orden ya está cerrada", ErrorCode.ORDER_ALREADY_CLOSED)
         if order.status == OrderStatus.CANCELLED:
-            raise DomainError(
-                "La orden está cancelada",
-                ErrorCode.ORDER_ALREADY_CANCELLED
-            )
+            raise DomainError("La orden está cancelada", ErrorCode.ORDER_ALREADY_CANCELLED)
         subtotal, total, total_paid, remaining = self._calculate_totals(order)
         if remaining > 0:
             raise DomainError(
@@ -675,6 +659,210 @@ class OrderService:
             target="role",
             target_id=UserRole.CASHIER.value
         )
+        self.db.commit()
+        self.db.refresh(order)
+        return self.to_order_response(order)
+
+    # -------------------------
+    # Cancelar orden
+    # -------------------------
+    def cancel_order(self, order: Order, user_id: int, reason: str) -> OrderResponse:
+        reason = reason.strip()
+        if not reason:
+            raise DomainError(
+                "Debe indicar un motivo para cancelar la orden",
+                ErrorCode.INVALID_OPERATION,
+                context={
+                    "order_id": order.id
+                }
+            )
+
+        # --------------------------------------------------
+        # Estados finales
+        # --------------------------------------------------
+        if order.status == OrderStatus.CLOSED:
+            raise DomainError(
+                "No se puede cancelar una orden cerrada",
+                ErrorCode.ORDER_ALREADY_CLOSED,
+                context={
+                    "order_id": order.id
+                }
+            )
+
+        if order.status == OrderStatus.CANCELLED:
+            raise DomainError(
+                "La orden ya está cancelada",
+                ErrorCode.ORDER_ALREADY_CANCELLED,
+                context={
+                    "order_id": order.id
+                }
+            )
+
+        # --------------------------------------------------
+        # No permitimos cancelar una orden que ya tenga
+        # items entregados.
+        #
+        # Una devolución posterior a la entrega deberá
+        # modelarse como otra operación.
+        # --------------------------------------------------
+        delivered_items = [
+            item
+            for item in order.items
+            if item.status == OrderItemStatus.DELIVERED
+        ]
+
+        if delivered_items:
+            raise DomainError(
+                (
+                    "No se puede cancelar la orden porque "
+                    "contiene items entregados"
+                ),
+                ErrorCode.INVALID_OPERATION,
+                context={
+                    "order_id": order.id,
+                    "items": [
+                        item.id
+                        for item in delivered_items
+                    ]
+                }
+            )
+
+        # --------------------------------------------------
+        # Validación financiera
+        #
+        # La cancelación completa deja el total en cero.
+        # Por lo tanto no puede haber pagos registrados.
+        # --------------------------------------------------
+        _, _, total_paid, _ = (
+            self._calculate_totals(order)
+        )
+
+        if total_paid > Decimal("0"):
+            raise DomainError(
+                (
+                    "No se puede cancelar la orden mientras "
+                    "tenga pagos registrados"
+                ),
+                ErrorCode.INVALID_OPERATION,
+                context={
+                    "order_id": order.id,
+                    "total_paid": money(total_paid)
+                }
+            )
+
+        cancelled_at = datetime.now(timezone.utc)
+
+        # --------------------------------------------------
+        # Cancelar todos los items activos.
+        #
+        # En una cancelación completa preservamos también
+        # los PENDING porque forman parte del historial
+        # de la orden cancelada.
+        # --------------------------------------------------
+        items_to_cancel = [
+            item
+            for item in order.items
+            if item.status != OrderItemStatus.CANCELLED
+        ]
+
+        affected_station_ids = set()
+
+        for item in items_to_cancel:
+
+            item.status = OrderItemStatus.CANCELLED
+
+            item.cancelled_at = cancelled_at
+            item.cancelled_by_id = user_id
+            item.cancellation_reason = reason
+
+            if item.product.station_id is not None:
+                affected_station_ids.add(
+                    item.product.station_id
+                )
+
+        # --------------------------------------------------
+        # Cancelar orden
+        # --------------------------------------------------
+        previous_status = order.status
+
+        self._set_status(
+            order,
+            OrderStatus.CANCELLED
+        )
+
+        order.cancelled_at = cancelled_at
+        order.cancelled_by_id = user_id
+        order.cancellation_reason = reason
+
+        logger.info(
+            (
+                "Orden cancelada "
+                "order_id=%s user_id=%s reason=%s"
+            ),
+            order.id,
+            user_id,
+            reason
+        )
+
+        # ==================================================
+        # EVENTOS
+        # ==================================================
+
+        # --------------------------------------------------
+        # Cocina
+        #
+        # Un único ORDER_UPDATED por estación es suficiente
+        # para que cada estación vuelva a obtener su estado.
+        # --------------------------------------------------
+        for station_id in affected_station_ids:
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type=WSEvent.ORDER_UPDATED,
+                payload={
+                    "order_id": order.id
+                },
+                target="station",
+                target_id=str(station_id)
+            )
+
+        # --------------------------------------------------
+        # Salón / administración / caja
+        # --------------------------------------------------
+        for role in [
+            UserRole.ADMIN,
+            UserRole.WAITER,
+            UserRole.CASHIER
+        ]:
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type=WSEvent.ORDER_STATUS_CHANGED,
+                payload={
+                    "order_id": order.id,
+                    "status": order.status.value
+                },
+                target="role",
+                target_id=role.value
+            )
+
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type=WSEvent.ORDER_UPDATED,
+                payload={
+                    "order_id": order.id
+                },
+                target="role",
+                target_id=role.value
+            )
+
+        # --------------------------------------------------
+        # Un único commit:
+        #
+        # - cancelación de items
+        # - cancelación de orden
+        # - datos de auditoría
+        # - eventos Outbox
+        # todo dentro de la misma transacción.
+        # --------------------------------------------------
         self.db.commit()
         self.db.refresh(order)
         return self.to_order_response(order)
@@ -778,10 +966,7 @@ class OrderService:
             .first()
         )
         if not item:
-            raise DomainError(
-                "order item not found",
-                ErrorCode.ITEM_NOT_FOUND
-            )
+            raise DomainError("order item not found", ErrorCode.ITEM_NOT_FOUND)
         order = item.order
         if item.status != OrderItemStatus.PENDING:
             raise DomainError(

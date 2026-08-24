@@ -29,6 +29,18 @@ import { PaymentMethod } from "../types/paymentMethod"
 import { WSEvent } from "../types/webSocketEvents"
 
 
+type CancellationTarget =
+  | {
+      type: "item"
+      itemId: number
+      productName: string
+      cancelsOrder: boolean
+    }
+  | {
+      type: "order"
+    }
+
+
 /**
  * Eventos WebSocket que pueden modificar la información
  * mostrada en el detalle de una orden.
@@ -219,9 +231,19 @@ export default function OrderDetail() {
 
   const [discount, setDiscount] = useState("")
 
+  const [notes, setNotes] = useState<Record<number, string>>({})
+
+  const [openNotes, setOpenNotes] = useState<Record<number, boolean>>({})
+
   const [discountType, setDiscountType] = useState<"amount" | "percent">("amount")
 
   const updating = useRef(false)
+
+  const [cancellationTarget, setCancellationTarget] = useState<CancellationTarget | null>(null)
+
+  const [cancellationReason, setCancellationReason] = useState("")
+
+  const [cancelling, setCancelling] = useState(false)
 
   /**
    * Obtiene la orden actual desde el backend y normaliza
@@ -258,42 +280,54 @@ export default function OrderDetail() {
    */
   const addProduct = async (productId: number) => {
     const quantity = quantities[productId] || 1
+    const note = notes[productId]?.trim() || null
 
-    if (order?.status === OrderStatus.CLOSED || order?.status === OrderStatus.CANCELLED) {
+    if (order?.status === OrderStatus.CLOSED) {
       showToast("No se pueden agregar productos a una orden cerrada")
       return
     }
+
+    if (order?.status === OrderStatus.CANCELLED) {
+      showToast("No se pueden agregar productos a una orden cancelada")
+      return
+    }
+    
     if (!orderId) {
       if (!tableId) return
 
-      const data =
-        await apiFetch<AddProductToTableResponse>(
+      const data = await apiFetch<AddProductToTableResponse>(
           `/tables/${tableId}/add-product`,
           {
             method: "POST",
             body: {
               product_id: productId,
-              quantity
+              quantity,
+              notes: note
             }
           }
         )
       setQuantities(current => ({...current, [productId]: 1}))
+      setNotes(current => ({...current, [productId]: ""}))
+      setOpenNotes(current => ({...current, [productId]: false}))
+
       navigate(`/orders/${data.order_id}`)
       return
     }
 
-    await apiFetch(
-      `/orders/${orderId}/items`,
+    await apiFetch(`/orders/${orderId}/items`,
       {
         method: "POST",
         body: {
           product_id: productId,
-          quantity
+          quantity,
+          notes: note
         }
       }
     )
 
     setQuantities(current => ({...current, [productId]: 1}))
+    setNotes(current => ({...current, [productId]: ""}))
+    setOpenNotes(current => ({...current, [productId]: false}))
 
     await fetchOrder()
   }
@@ -364,22 +398,12 @@ export default function OrderDetail() {
   /**
    * Marca un ítem READY como entregado.
    */
-  const markDelivered = async (
-    itemId: number
-  ) => {
-    await apiFetch(
-      `/order-items/${itemId}/status`,
-      {
-        method: "PATCH",
-        body: {
-          status: OrderItemStatus.DELIVERED
-        }
-      }
+  const markDelivered = async (itemId: number) => {
+    await apiFetch(`/order-items/${itemId}/status`,
+      {method: "PATCH", body: {status: OrderItemStatus.DELIVERED}}
     )
-
     await fetchOrder()
   }
-
 
   /**
    * Registra un pago para la orden actual.
@@ -389,24 +413,13 @@ export default function OrderDetail() {
 
     const amount = Number(paymentAmount)
 
-    if (
-      !Number.isFinite(amount) ||
-      amount <= 0
-    ) {
+    if (!Number.isFinite(amount) || amount <= 0) {
       alert("El pago debe ser mayor a 0")
       return
     }
-
     await apiFetch(`/orders/${id}/payments`,
-      {
-        method: "POST",
-        body: {
-          amount,
-          method
-        }
-      }
+      {method: "POST", body: {amount, method}}
     )
-
     await fetchOrder()
   }
 
@@ -438,6 +451,97 @@ export default function OrderDetail() {
     await apiFetch(`/orders/${id}/send-to-kitchen`,{method: "POST"})
     await fetchOrder()
   }
+
+  /**
+   * Abre y Cierra el modal de Cancelación de items y ordenes
+   */
+  const openItemCancellation = (itemId: number, productName: string) => {
+    const activeItems = items.filter(
+      item =>
+        item.status !== OrderItemStatus.CANCELLED
+    )
+
+    setCancellationReason("")
+
+    setCancellationTarget({
+      type: "item",
+      itemId,
+      productName,
+      cancelsOrder: activeItems.length === 1
+    })
+  }
+
+  const openOrderCancellation = () => {
+    setCancellationReason("")
+    setCancellationTarget({type: "order"})
+  }
+
+  const closeCancellationModal = () => {
+    if (cancelling) return
+    setCancellationTarget(null)
+    setCancellationReason("")
+  }
+
+  /**
+   * Confirma la cancelación
+   */
+  const confirmCancellation = async () => {
+    if (!cancellationTarget) return
+
+    const reason = cancellationReason.trim()
+
+    if (!reason) {showToast("Debe indicar un motivo para la cancelación")
+      return
+    }
+
+    try {
+      setCancelling(true)
+
+      if (cancellationTarget.type === "item") {
+        await apiFetch(
+          `/order-items/${cancellationTarget.itemId}/cancel`,
+          {
+            method: "PATCH",
+            body: {
+              reason
+            }
+          }
+        )
+      } else {
+        if (!orderId) return
+
+        await apiFetch(
+          `/orders/${orderId}/cancel`,
+          {
+            method: "PATCH",
+            body: {
+              reason
+            }
+          }
+        )
+      }
+
+      setCancellationTarget(null)
+      setCancellationReason("")
+
+      await fetchOrder()
+
+    } catch {
+      // apiFetch ya mostró el error.
+    } finally {
+      setCancelling(false)
+    }
+  }
+
+  /**
+   * Estados en los que es posible cancelar el item
+   */
+  const canCancelItem = (status: OrderItemStatus): boolean =>
+    status === OrderItemStatus.SENT ||
+    status === OrderItemStatus.IN_PROGRESS ||
+    status === OrderItemStatus.READY
+
+
 
   /**
    * El catálogo no depende de la orden,
@@ -647,10 +751,22 @@ export default function OrderDetail() {
             {items.map(item => (
               <div
                 key={item.id}
-                className="order-item"
+                className={
+                  item.status === OrderItemStatus.CANCELLED
+                    ? "order-item order-item--cancelled"
+                    : "order-item"
+                }
               >
-                <div className="order-item__name">
-                  {item.product_name}
+                <div className="order-item__info">
+                  <div className="order-item__name">
+                    {item.product_name}
+                  </div>
+
+                  {item.notes && (
+                    <div className="order-item__notes">
+                      {item.notes}
+                    </div>
+                  )}
                 </div>
 
                 {item.status === OrderItemStatus.PENDING && (
@@ -673,36 +789,51 @@ export default function OrderDetail() {
                   </div>
                 )}
 
-                <span className="order-item__price">
-                  ${(item.quantity * item.unit_price).toFixed(2)}
-                </span>
+                <div className="order-item__price">
+                  <span>
+                    ${(item.quantity * item.unit_price).toFixed(2)}
+                  </span>
+                </div>
 
-                <strong
-                  className="order-item__status"
-                  style={{color: getItemStatusColor(item.status)
-                  }}
-                >
-                  {orderItemStatusLabel(item.status)}
-                </strong>
+                <div className="order-item__status">
+                  <strong
+                    style={{color: getItemStatusColor(item.status)
+                    }}
+                  >
+                    {orderItemStatusLabel(item.status)}
+                  </strong>
+                </div>
                 
-                {item.status === OrderItemStatus.PENDING && (
-                  <button
-                    type="button"
-                    className="btn btn-icon btn-danger"
-                    title="Eliminar ítem"
-                    onClick={() => {if (order) {void removeItem(order.id, item.id)}}}
-                  >
-                    ❌
-                  </button>
-                )}
-                {item.status === OrderItemStatus.READY && (
-                  <button
-                    className="btn btn-primary"
-                    onClick={() => markDelivered(item.id)}
-                  >
-                    Entregar
-                  </button>
-                )}
+                <div className="order-item__actions">
+                  {item.status === OrderItemStatus.PENDING && (
+                    <button
+                      type="button"
+                      className="btn btn-icon btn-danger"
+                      title="Eliminar ítem"
+                      onClick={() => {if (order) {void removeItem(order.id, item.id)}}}
+                    >
+                      ❌
+                    </button>
+                  )}
+
+                  {canCancelItem(item.status) && (
+                    <button
+                      className="btn btn-danger"
+                      onClick={() => openItemCancellation(item.id, item.product_name)}
+                    >
+                      Cancelar
+                    </button>
+                  )}
+
+                  {item.status === OrderItemStatus.READY && (
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => markDelivered(item.id)}
+                    >
+                      Entregar
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -904,6 +1035,19 @@ export default function OrderDetail() {
           )}
         </section>
 
+        {/* CANCELAR ORDEN */}
+        {order &&
+          order.status !== OrderStatus.CLOSED &&
+          order.status !== OrderStatus.CANCELLED && (
+            <button
+              className="btn btn-danger"
+              onClick={openOrderCancellation}
+            >
+              Cancelar orden
+            </button>
+        )}
+
+
         {/* CERRAR ORDEN SOLO SI CUMPLE REGLAS */}
         {canClose && (
           <div className="order-close-ready">
@@ -1004,6 +1148,41 @@ export default function OrderDetail() {
                       >
                         +
                       </button>
+
+                      <button
+                        type="button"
+                        className="product-note-toggle"
+                        disabled={orderLocked}
+                        onClick={() =>
+                          setOpenNotes(current => ({
+                            ...current,
+                            [product.id]: !current[product.id]
+                          }))
+                        }
+                      >
+                        {openNotes[product.id]
+                          ? "− Ocultar nota"
+                          : "+ Nota"}
+                      </button>
+
+                      {openNotes[product.id] && (
+                        <textarea
+                          className="product-notes"
+                          disabled={orderLocked}
+                          value={notes[product.id] || ""}
+                          onChange={event =>
+                            setNotes(current => ({
+                              ...current,
+                              [product.id]: event.target.value
+                            }))
+                          }
+                          placeholder="Ej.: sin mayonesa, sin cebolla..."
+                          maxLength={500}
+                          rows={2}
+                        />
+                      )}
+
+
                     </div>
                   ))}
                 </div>
@@ -1013,6 +1192,98 @@ export default function OrderDetail() {
           ))}
         </section>
       </aside>
+      
+      {/* Modal para cancelación de items y de ordenes */}
+      {cancellationTarget && (
+        <div className="modal-backdrop">
+          <div className="modal-card">
+
+            <h2>
+              {cancellationTarget.type === "item"
+                ? "Cancelar item"
+                : "Cancelar orden"}
+            </h2>
+
+            {cancellationTarget.type === "item" ? (
+              <>
+                <p>
+                  Se cancelará{" "}
+                  <strong>
+                    {cancellationTarget.productName}
+                  </strong>
+                  . El item permanecerá registrado en el
+                  historial de la orden.
+                </p>
+
+                {cancellationTarget.cancelsOrder && (
+                  <p className="cancellation-warning">
+                    Este es el último item activo. Al cancelarlo,
+                    la orden también será cancelada.
+                  </p>
+                )}
+              </>
+            ) : (
+              <p>
+                Se cancelará la orden completa.
+                Los items permanecerán registrados
+                para conservar el historial.
+              </p>
+            )}
+
+            <div className="modal-fields">
+              <label>
+                Motivo de cancelación
+
+                <textarea
+                  value={cancellationReason}
+                  onChange={event =>
+                    setCancellationReason(
+                      event.target.value
+                    )
+                  }
+                  maxLength={500}
+                  rows={4}
+                  autoFocus
+                  placeholder={
+                    cancellationTarget.type === "item"
+                      ? "Ej.: plato frío, pedido incorrecto..."
+                      : "Ej.: cliente canceló el pedido..."
+                  }
+                />
+              </label>
+            </div>
+
+            <div className="modal-actions">
+              <button
+                className="btn btn-secondary"
+                onClick={closeCancellationModal}
+                disabled={cancelling}
+              >
+                Volver
+              </button>
+
+              <button
+                className="btn btn-danger"
+                onClick={confirmCancellation}
+                disabled={
+                  cancelling ||
+                  !cancellationReason.trim()
+                }
+              >
+                {cancelling
+                  ? "Cancelando..."
+                  : cancellationTarget.type === "item"
+                    ? "Cancelar item"
+                    : "Cancelar orden"}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+
+
   </div>      
   )
 

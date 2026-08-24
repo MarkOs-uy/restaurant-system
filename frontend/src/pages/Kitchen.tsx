@@ -353,16 +353,25 @@ export default function Kitchen() {
                       }
                     >
 
-                      <div className="kitchen-item__product">
-                        <strong>
-                          {item.product_name}
-                        </strong>
+                      <div className="kitchen-item__info">
 
-                        <span>
-                          × {item.quantity}
-                        </span>
+                        <div className="kitchen-item__product">
+                          <strong>
+                            {item.product_name}
+                          </strong>
+
+                          <span>
+                            × {item.quantity}
+                          </span>
+                        </div>
+
+                        {item.notes && (
+                          <div className="kitchen-item-notes">
+                            {item.notes}
+                          </div>
+                        )}
+
                       </div>
-
 
                       <span
                         className="kitchen-item__status"

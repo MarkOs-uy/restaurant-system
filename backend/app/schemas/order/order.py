@@ -1,4 +1,5 @@
 from decimal import Decimal
+from pydantic import Field
 from app.models.order import OrderStatus
 from datetime import datetime
 from ..base import BaseSchema
@@ -6,8 +7,9 @@ from .order_item import OrderItemOut
 from .payment import PaymentOut
 
 
-class OrderDetail(BaseSchema):
+class OrderResponse(BaseSchema):
     id: int
+    table_id: int
     table_number: int
     status: OrderStatus
     created_at: datetime
@@ -19,8 +21,11 @@ class OrderDetail(BaseSchema):
     total_paid: Decimal
     remaining: Decimal
 
-class OrderResponse(OrderDetail):
-    table_id: int
-
 class OrderStatusUpdate(BaseSchema):
     status: OrderStatus
+
+class OrderCancel(BaseSchema):
+    reason: str = Field(
+        min_length=1,
+        max_length=500
+    )

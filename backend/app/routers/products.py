@@ -10,7 +10,10 @@ from fastapi import(
     Query
 )
 
-from app.dependencies.roles import admin_only, waiter_or_admin
+from app.dependencies.roles import (
+    admin_only, 
+    waiter_or_admin
+)
 
 from app.domain.product.dependencies import get_product_service
 from app.domain.product.product_service import ProductService

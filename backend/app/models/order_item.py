@@ -6,7 +6,9 @@ from sqlalchemy import (
     String,
     Enum,
     Identity,
-    Index
+    Index,
+    DateTime,
+    Text
 )
 from sqlalchemy.orm import relationship
 import enum
@@ -68,6 +70,22 @@ class OrderItem(Base):
 
     notes = Column(
         String,
+        nullable=True
+    )
+
+    cancelled_at = Column(
+        DateTime(timezone=True),
+        nullable=True
+    )
+
+    cancelled_by_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=True
+    )
+
+    cancellation_reason = Column(
+        Text,
         nullable=True
     )
 

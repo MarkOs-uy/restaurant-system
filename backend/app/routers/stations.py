@@ -10,7 +10,10 @@ from fastapi import (
     Query
 )
 
-from app.dependencies.roles import admin_only, kitchen_or_admin
+from app.dependencies.roles import (
+    admin_only, 
+    kitchen_or_admin
+)
 
 from app.domain.stations.dependencies import get_station_service
 from app.domain.stations.station_service import StationService

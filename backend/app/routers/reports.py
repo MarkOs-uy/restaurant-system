@@ -4,7 +4,12 @@ Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
 """
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import (
+    APIRouter, 
+    Depends, 
+    status,
+    Query
+)
 
 from app.dependencies.roles import admin_only
 

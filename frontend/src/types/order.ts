@@ -23,6 +23,7 @@ export interface OrderDetailItem {
   quantity: number
   unit_price: number
   status: OrderItemStatus
+  notes?: string | null
 }
 
 

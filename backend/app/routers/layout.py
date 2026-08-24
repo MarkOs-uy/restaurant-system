@@ -3,9 +3,18 @@ Endpoints para la gestión de la layout del restaurant.
 Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
 """
 
-from fastapi import APIRouter, Depends, File, UploadFile, status
+from fastapi import (
+    APIRouter, 
+    Depends, 
+    status,
+    File,
+    UploadFile
+)
 
-from app.dependencies.roles import waiter_or_admin, admin_only
+from app.dependencies.roles import (
+    waiter_or_admin, 
+    admin_only
+)
 
 from app.domain.layout.dependencies import get_layout_service
 from app.domain.layout.layout_service import LayoutService

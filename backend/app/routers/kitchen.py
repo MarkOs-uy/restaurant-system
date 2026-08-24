@@ -3,7 +3,11 @@ Endpoints para la gestión de la cocina.
 Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
 """
 
-from fastapi import APIRouter, Depends, status
+from fastapi import (
+    APIRouter, 
+    Depends, 
+    status
+)
 
 from app.dependencies.roles import kitchen_or_admin
 

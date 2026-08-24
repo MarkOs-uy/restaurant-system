@@ -9,7 +9,8 @@ from sqlalchemy import (
     DateTime, 
     Enum, 
     Index, 
-    Identity
+    Identity,
+    Text
 )
 from sqlalchemy.sql import func
 from app.db.base_class import Base
@@ -54,6 +55,23 @@ class Order(Base):
         nullable=True
     )
     discount = Column(Numeric(10, 2), nullable=False, default=0)
+
+    cancelled_at = Column(
+        DateTime(timezone=True),
+        nullable=True
+    )
+
+    cancelled_by_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=True
+    )
+
+    cancellation_reason = Column(
+        Text,
+        nullable=True
+    )
+    
     external_id = Column(
         String,
         unique=True,
