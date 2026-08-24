@@ -67,9 +67,9 @@ class CashMovement(Base):
     )
 
     created_at = Column(
-        DateTime,
-        nullable=False,
-        server_default=func.now()
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False
     )
 
     __table_args__ = (

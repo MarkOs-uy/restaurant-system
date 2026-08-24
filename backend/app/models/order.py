@@ -29,7 +29,7 @@ class OrderStatus(str, enum.Enum):
 class Order(Base):
     __tablename__ = "orders"
 
-    id = Column(Integer, Identity(), primary_key=True, index=True)
+    id = Column(Integer, Identity(), primary_key=True)
     restaurant_id = Column(
         Integer,
         ForeignKey("restaurants.id"),
