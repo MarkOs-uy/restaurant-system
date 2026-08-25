@@ -27,10 +27,9 @@ cd "$APP_DIR"
 echo "Deteniendo POS Restaurant..."
 
 
-if (
-  command -v systemctl >/dev/null 2>&1
+if command -v systemctl >/dev/null 2>&1 \
   && systemctl cat "$SERVICE_NAME" >/dev/null 2>&1
-); then
+then
 
   run_privileged systemctl stop "$SERVICE_NAME"
 
