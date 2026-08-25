@@ -8,8 +8,9 @@ import { showToast } from "../utils/showToast"
 import { CashMovementType,
   OrderStatus,
   PaymentMethod,
-  WSEvent,  
-   } from "../types"
+} from "../types"
+
+import { WSEvent } from "../types/webSocketEvents"
 
 import type { 
   CashRegisterDashboard, 

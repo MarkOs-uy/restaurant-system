@@ -1,4 +1,7 @@
-import type { Product } from "./product"
+import type {
+  Product,
+  RawProduct
+} from "./product"
 
 /**
  * Interface de categorías
@@ -23,11 +26,6 @@ export interface CategoryWithProducts {
   active: boolean
   products: Product[]
 }
-
-export type RawProduct =
-  Omit<Product, "price"> & {
-    price: unknown
-  }
 
 export type RawCategoryWithProducts =
   Omit<CategoryWithProducts, "products"> & {

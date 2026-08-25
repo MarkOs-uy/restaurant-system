@@ -19,7 +19,7 @@ import type {
   CategoryWithProducts,
   RawProduct,
   RawCategoryWithProducts
-} from "../types/category"
+} from "../types/"
 
 import type { Product } from "../types/product"
 

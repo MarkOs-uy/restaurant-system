@@ -45,10 +45,14 @@ function extractApiError(error: unknown): ApiError {
                 ? err.message
                 : "Error inesperado"
 
+    const rawContext = err.response?.data?.context
+
     return {
         code,
         message,
-        context: err.response?.data?.context,
+        context: isRecord(rawContext)
+            ? rawContext
+            : undefined,
         status: err.response?.status
     }
 }
@@ -66,6 +70,16 @@ function isErrorCode(value: unknown): value is ErrorCode {
         )
     )
 }
+
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return (
+        typeof value === "object" &&
+        value !== null &&
+        !Array.isArray(value)
+    )
+}
+
 
 // --------------------------------------------------------------------------------------
 // Procesa un error de API y muestra al usuario el mensaje correspondiente.

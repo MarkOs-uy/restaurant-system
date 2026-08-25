@@ -340,23 +340,6 @@ export default function BackupsPage() {
     }
   }
 
-
-  function frequencyLabel(frequency: BackupFrequency): string {
-    switch (frequency) {
-      case BackupFrequency.DAILY:
-        return "Diario"
-
-      case BackupFrequency.WEEKLY:
-        return "Semanal"
-
-      case BackupFrequency.MONTHLY:
-        return "Mensual"
-
-      case BackupFrequency.MANUAL:
-        return "Manual"
-    }
-  }
-
   function backupTypeLabel(
     type: BackupType
   ): string {
