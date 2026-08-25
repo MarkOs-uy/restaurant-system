@@ -428,6 +428,7 @@ systemctl daemon-reload
 systemctl enable pos-zeroconf >/dev/null
 systemctl restart pos-zeroconf
 systemctl enable pos-restaurant >/dev/null
+systemctl start pos-restaurant
 success "Servicios systemd registrados"
 
 section "Creando accesos directos"

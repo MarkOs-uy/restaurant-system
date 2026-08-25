@@ -26,7 +26,6 @@ cd "$APP_DIR"
 
 echo "Deteniendo POS Restaurant..."
 
-
 if command -v systemctl >/dev/null 2>&1 \
   && systemctl cat "$SERVICE_NAME" >/dev/null 2>&1
 then
@@ -37,10 +36,11 @@ then
     run_privileged systemctl stop "$ZEROCONF_SERVICE"
   fi
 
-else
-  compose down
 fi
 
+# Garantiza que los contenedores queden realmente detenidos
+# aunque hayan sido iniciados fuera de systemd.
+compose down
 
 echo "Servidor detenido."
 echo "Los datos y backups se conservan."
