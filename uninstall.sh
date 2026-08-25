@@ -108,12 +108,11 @@ if command -v systemctl >/dev/null 2>&1; then
   systemctl disable "$SERVICE_NAME" >/dev/null 2>&1 || true
 fi
 
-if (
-  command -v docker >/dev/null 2>&1
-  && [ -f "${APP_DIR}/${COMPOSE_FILE}" ]
-); then
-  cd "$APP_DIR"
-  compose down || true
+if command -v docker >/dev/null 2>&1; then
+  if [ -f "${APP_DIR}/${COMPOSE_FILE}" ]; then
+    cd "$APP_DIR"
+    compose down || true
+  fi
 fi
 success "Servicios detenidos"
 
