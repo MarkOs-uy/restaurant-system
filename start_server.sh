@@ -58,10 +58,9 @@ cd "$APP_DIR"
 echo "Iniciando POS Restaurant..."
 
 
-if (
-  command -v systemctl >/dev/null 2>&1
+if command -v systemctl >/dev/null 2>&1 \
   && systemctl cat "$SERVICE_NAME" >/dev/null 2>&1
-); then
+then
 
   run_privileged systemctl start docker
   run_privileged systemctl restart "$SERVICE_NAME"
