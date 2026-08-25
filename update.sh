@@ -6,6 +6,7 @@ COMPOSE_FILE="docker-compose.prod.yml"
 SERVICE_NAME="pos-restaurant"
 ZEROCONF_SERVICE="pos-zeroconf"
 BACKUP_DIR="${APP_DIR}/backups/manual-updates"
+PRE_UPDATE_BACKUPS_MAX=10
 
 if [ -t 1 ]; then
   RED=$'\033[31m'
@@ -70,26 +71,71 @@ wait_for_backend() {
   [ "$ready" -eq 1 ] || fail "El backend no quedo listo despues de actualizar. Revisa: docker compose -f ${COMPOSE_FILE} logs backend"
 }
 
-make_database_backup() {
-  if ! compose ps db >/dev/null 2>&1; then
-    warn "No pude consultar el contenedor de base de datos; omito backup previo."
-    return
-  fi
+wait_for_frontend() {
+  local ready=0
 
-  if ! compose exec -T db pg_isready >/dev/null 2>&1; then
-    warn "La base de datos no esta lista; omito backup previo."
-    return
+  for _ in {1..30}; do
+    if curl -fsS \
+      http://127.0.0.1/ \
+      >/dev/null 2>&1
+    then
+      ready=1
+      break
+    fi
+
+    sleep 1
+  done
+
+  [ "$ready" -eq 1 ] || \
+    fail "El frontend no quedo listo despues de actualizar. Revisa: docker compose -f ${COMPOSE_FILE} logs frontend"
+}
+
+make_database_backup() {
+  if ! compose exec -T db sh -c \
+    'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+    >/dev/null 2>&1
+  then
+    fail "La base de datos no esta disponible. No se actualizara sin backup previo."
   fi
 
   mkdir -p "$BACKUP_DIR"
-  local backup_file="${BACKUP_DIR}/pre-update-$(date +%Y%m%d-%H%M%S).sql.gz"
 
-  if compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' | gzip > "$backup_file"; then
+  local backup_file
+  backup_file="${BACKUP_DIR}/pre-update-$(date +%Y%m%d-%H%M%S).sql.gz"
+
+  if compose exec -T db sh -c \
+    'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' \
+    | gzip > "$backup_file"
+  then
     success "Backup previo creado: ${backup_file}"
+    cleanup_update_backups
   else
     rm -f "$backup_file"
-    warn "No pude crear backup previo; continuo con la actualizacion."
+
+    fail "No se pudo crear el backup previo. La actualizacion fue cancelada."
   fi
+}
+
+cleanup_update_backups() {
+  [ -d "$BACKUP_DIR" ] || return
+
+  mapfile -t backups < <(
+    find "$BACKUP_DIR" \
+      -maxdepth 1 \
+      -type f \
+      -name 'pre-update-*.sql.gz' \
+      -printf '%T@ %p\n' \
+      | sort -rn \
+      | cut -d' ' -f2-
+  )
+
+  if [ "${#backups[@]}" -le "$PRE_UPDATE_BACKUPS_MAX" ]; then
+    return
+  fi
+
+  for backup in "${backups[@]:$PRE_UPDATE_BACKUPS_MAX}"; do
+    rm -f -- "$backup"
+  done
 }
 
 printf "%sPOS Restaurant - actualizador%s\n" "$BOLD" "$RESET"
@@ -139,31 +185,34 @@ section "Deteniendo servicios"
 if service_exists "$ZEROCONF_SERVICE"; then
   run_privileged systemctl stop "$ZEROCONF_SERVICE" || true
 fi
-
 if service_exists "$SERVICE_NAME"; then
   run_privileged systemctl stop "$SERVICE_NAME" || true
-else
-  compose down || true
 fi
+compose down --remove-orphans
 success "Servicios detenidos"
 
 section "Reconstruyendo contenedores"
-compose up -d --build --remove-orphans
-success "Contenedores reconstruidos"
+compose build
+success "Imagenes reconstruidas"
 
-section "Reiniciando servicios"
+
+section "Iniciando servicios"
 if service_exists "$SERVICE_NAME"; then
   run_privileged systemctl start "$SERVICE_NAME"
+else
+  compose up -d
 fi
-
 if service_exists "$ZEROCONF_SERVICE"; then
   run_privileged systemctl start "$ZEROCONF_SERVICE"
 fi
-success "Servicios reiniciados"
+success "Servicios iniciados"
 
-section "Verificando backend"
+
+section "Verificando servicios"
 wait_for_backend
 success "Backend responde en /health"
+wait_for_frontend
+success "Frontend responde en puerto 80"
 
 printf "\n%sActualizacion completada.%s\n" "$GREEN" "$RESET"
 printf "Version instalada: %s\n" "$NEW_COMMIT"

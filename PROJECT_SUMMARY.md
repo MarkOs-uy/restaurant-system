@@ -1,5 +1,5 @@
 # 📊 Project Summary
-Generated: 2026-08-19 15:59:21.818450
+Generated: 2026-08-24 14:24:08.296872
 
 ## 📁 Estructura del proyecto
 
@@ -8,33 +8,16 @@ Generated: 2026-08-19 15:59:21.818450
   - analyze_project.py
   - .agents/
   - .devcontainer/
+  - .github/
+    - workflows/
   - backend/
+    - .pytest_cache/
+      - v/
+        - cache/
     - alembic/
       - env.py
       - versions/
-        - 0d21e3868b2f_add_draft_status_to_orderstatus.py
-        - 1b3cb23f2af7_add_backup_settings.py
-        - 27cc3e563d72_add_more_and_more_backup_settings.py
-        - 50f5f9de1220_add_table_shape.py
-        - 530c9b9f2a9f_initial_schema.py
-        - 5aa86605f254_add_discount_to_orders.py
-        - 6ba12f28852f_cambios_en_cashregister.py
-        - 6e40084bfae8_create_event_outbox.py
-        - 72a2554e30d4_rename_users_name_to_users_username.py
-        - 789ad8c3f1b5_auditoria.py
-        - 7b0b567ffe9e_add_discount_to_orders.py
-        - 7fd07db91f0d_refactor_restaurant_layout_structure.py
-        - 85d684a75027_add_more_backup_settings.py
-        - 900c4d6546a2_creando_tabla_de_eventos.py
-        - 9607a137eec7_add_password_to_user.py
-        - a4b707b32039_restaurant_layout.py
-        - a5fb39b05ac8_category_active_and_product_station_.py
-        - b30663f913d9_add_cash_register_audit_fields.py
-        - ca4a5b4c9e74_eliminar_retention_days_y_agregar_.py
-        - e2398672eb07_agregar_índice_a_tabla_de_eventos_por_.py
-        - f2b920bbec2b_align_remaining_backend_model.py
-        - fa7705341950_add_table_coordinates.py
-        - fdb697085b8d_add_more_and_more_and_more_backup_.py
+        - f186e0156a8f_initial_schema.py
     - app/
       - main.py
       - restore_pending.py
@@ -174,6 +157,17 @@ Generated: 2026-08-19 15:59:21.818450
       - restaurant_1/
         - automatic/
     - docs/
+    - tests/
+      - conftest.py
+      - __init__.py
+      - unit/
+        - factories.py
+        - test_auth_and_permissions.py
+        - test_backup_service.py
+        - test_cash_register_service.py
+        - test_order_service.py
+        - test_security.py
+        - __init__.py
     - uploads/
       - layouts/
         - 1/
@@ -437,300 +431,7 @@ else:
 
 ---
 
-### .\backend\alembic\versions\0d21e3868b2f_add_draft_status_to_orderstatus.py
-
-**Funciones (2):**
-- upgrade
-- downgrade
-
-**Clases (0):**
-
-**Imports (4):**
-- typing.Sequence
-- typing.Union
-- alembic.op
-- sqlalchemy
-
-```python
-"""add draft status to orderstatus
-
-Revision ID: 0d21e3868b2f
-Revises: 5aa86605f254
-Create Date: 2026-03-22 15:34:58.319184
-
-"""
-from typing import Sequence, Union
-
-from alembic import op
-import sqlalchemy as sa
-
-
-# revision identifiers, used by Alembic.
-revision: str = '0d21e3868b2f'
-down_revision: Union[str, Sequence[str], None] = '5aa86605f254'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
-
-
-def upgrade() -> None:
-    op.execute("ALTER TYPE orderstatus ADD VALUE 'DRAFT'")
-    pass
-
-
-def downgrade() -> None:
-    """Downgrade schema."""
-    pass
-
-```
-
----
-
-### .\backend\alembic\versions\1b3cb23f2af7_add_backup_settings.py
-
-**Funciones (2):**
-- upgrade
-- downgrade
-
-**Clases (0):**
-
-**Imports (4):**
-- typing.Sequence
-- typing.Union
-- alembic.op
-- sqlalchemy
-
-```python
-"""add backup settings
-
-Revision ID: 1b3cb23f2af7
-Revises: 72a2554e30d4
-Create Date: 2026-06-17 16:53:52.703166
-
-"""
-from typing import Sequence, Union
-
-from alembic import op
-import sqlalchemy as sa
-
-
-# revision identifiers, used by Alembic.
-revision: str = '1b3cb23f2af7'
-down_revision: Union[str, Sequence[str], None] = '72a2554e30d4'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
-
-
-def upgrade() -> None:
-    op.create_table(
-        "system_settings",
-
-        sa.Column(
-            "restaurant_id",
-            sa.Integer(),
-            nullable=False
-        ),
-
-        sa.Column("smtp_host", sa.String(), nullable=True),
-        sa.Column("smtp_port", sa.Integer(), nullable=True),
-        sa.Column("smtp_user", sa.String(), nullable=True),
-        sa.Column("smtp_password", sa.String(), nullable=True),
-        sa.Column("smtp_from", sa.String(), nullable=True),
-
-        sa.Column(
-            "smtp_use_tls",
-            sa.Boolean(),
-            nullable=False,
-            server_default=sa.true()
-        ),
-
-        sa.Column("backup_email", sa.String(), nullable=True),
-
-        sa.ForeignKeyConstraint(
-            ["restaurant_id"],
-            ["restaurants.id"],
-            ondelete="CASCADE"
-        ),
-
-        sa.PrimaryKeyConstraint("restaurant_id")
-    )
-
-    op.create_index(
-        "ix_order_items_order_status",
-        "order_items",
-        ["order_id", "status"]
-    )
-
-    op.alter_column(
-        "orders",
-        "closed_at",
-        existing_type=sa.DateTime(),
-        type_=sa.DateTime(timezone=True),
-        existing_nullable=True
-    )
-
-
-
-def downgrade() -> None:
-
-    op.alter_column(
-        "orders",
-        "closed_at",
-        existing_type=sa.DateTime(timezone=True),
-        type_=sa.DateTime(),
-        existing_nullable=True
-    )
-
-    op.drop_index(
-        "ix_order_items_order_status",
-        table_name="order_items"
-    )
-
-    op.drop_table("system_settings")
-
-```
-
----
-
-### .\backend\alembic\versions\27cc3e563d72_add_more_and_more_backup_settings.py
-
-**Funciones (2):**
-- upgrade
-- downgrade
-
-**Clases (0):**
-
-**Imports (4):**
-- typing.Sequence
-- typing.Union
-- alembic.op
-- sqlalchemy
-
-```python
-"""add more and more backup settings
-
-Revision ID: 27cc3e563d72
-Revises: 85d684a75027
-Create Date: 2026-06-28 20:33:57.475524
-
-"""
-from typing import Sequence, Union
-
-from alembic import op
-import sqlalchemy as sa
-
-
-# revision identifiers, used by Alembic.
-revision: str = '27cc3e563d72'
-down_revision: Union[str, Sequence[str], None] = '85d684a75027'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
-
-
-def upgrade():
-
-    op.add_column(
-        "system_settings",
-        sa.Column(
-            "last_automatic_backup_at",
-            sa.DateTime(timezone=True),
-            nullable=True,
-        ),
-    )
-
-    op.add_column(
-        "system_settings",
-        sa.Column(
-            "next_automatic_backup_at",
-            sa.DateTime(timezone=True),
-            nullable=True,
-        ),
-    )
-
-    op.add_column(
-        "system_settings",
-        sa.Column(
-            "last_backup_result",
-            sa.String(),
-            nullable=True,
-        ),
-    )
-
-    op.drop_column("system_settings", "backup_next_run")
-    op.drop_column("system_settings", "backup_last_run")
-
-def downgrade():
-
-    op.drop_column(
-        "system_settings",
-        "next_automatic_backup_at",
-    )
-
-    op.drop_column(
-        "system_settings",
-        "last_automatic_backup_at",
-    )
-
-    op.drop_column(
-        "system_settings",
-        "last_backup_result",
-    )
-```
-
----
-
-### .\backend\alembic\versions\50f5f9de1220_add_table_shape.py
-
-**Funciones (2):**
-- upgrade
-- downgrade
-
-**Clases (0):**
-
-**Imports (4):**
-- typing.Sequence
-- typing.Union
-- alembic.op
-- sqlalchemy
-
-```python
-"""add table shape
-
-Revision ID: 50f5f9de1220
-Revises: fa7705341950
-Create Date: 2026-03-15 02:51:03.395475
-
-"""
-from typing import Sequence, Union
-
-from alembic import op
-import sqlalchemy as sa
-
-
-# revision identifiers, used by Alembic.
-revision: str = '50f5f9de1220'
-down_revision: Union[str, Sequence[str], None] = 'fa7705341950'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
-
-
-def upgrade() -> None:
-    """Upgrade schema."""
-    # ### commands auto generated by Alembic - please adjust! ###
-    op.add_column('tables', sa.Column('shape', sa.String(), nullable=True))
-    # ### end Alembic commands ###
-
-
-def downgrade() -> None:
-    """Downgrade schema."""
-    # ### commands auto generated by Alembic - please adjust! ###
-    op.drop_column('tables', 'shape')
-    # ### end Alembic commands ###
-
-```
-
----
-
-### .\backend\alembic\versions\530c9b9f2a9f_initial_schema.py
+### .\backend\alembic\versions\f186e0156a8f_initial_schema.py
 
 **Funciones (2):**
 - upgrade
@@ -747,9 +448,9 @@ def downgrade() -> None:
 ```python
 """initial schema
 
-Revision ID: 530c9b9f2a9f
+Revision ID: f186e0156a8f
 Revises: 
-Create Date: 2026-02-22 21:55:21.520913
+Create Date: 2026-08-24 16:20:53.715467
 
 """
 from typing import Sequence, Union
@@ -759,7 +460,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '530c9b9f2a9f'
+revision: str = 'f186e0156a8f'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -769,7 +470,7 @@ def upgrade() -> None:
     """Upgrade schema."""
     # ### commands auto generated by Alembic - please adjust! ###
     op.create_table('restaurants',
-    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('id', sa.Integer(), sa.Identity(always=False), nullable=False),
     sa.Column('name', sa.String(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('active', sa.Boolean(), nullable=False),
@@ -778,88 +479,182 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_restaurants_external_id'), 'restaurants', ['external_id'], unique=True)
-    op.create_index(op.f('ix_restaurants_id'), 'restaurants', ['id'], unique=False)
-    op.create_table('cash_registers',
-    sa.Column('id', sa.Integer(), nullable=False),
+    op.create_table('categories',
+    sa.Column('id', sa.Integer(), sa.Identity(always=False), nullable=False),
+    sa.Column('name', sa.String(), nullable=False),
+    sa.Column('active', sa.Boolean(), nullable=False),
     sa.Column('restaurant_id', sa.Integer(), nullable=False),
-    sa.Column('opened_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
+    sa.ForeignKeyConstraint(['restaurant_id'], ['restaurants.id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('restaurant_id', 'name', name='uq_category_name_per_restaurant')
+    )
+    op.create_table('event_outbox',
+    sa.Column('id', sa.Integer(), sa.Identity(always=False), nullable=False),
+    sa.Column('restaurant_id', sa.Integer(), nullable=False),
+    sa.Column('event_type', sa.String(), nullable=False),
+    sa.Column('payload', sa.JSON(), nullable=False),
+    sa.Column('target', sa.String(), nullable=False),
+    sa.Column('target_id', sa.String(), nullable=True),
+    sa.Column('status', sa.String(), nullable=False),
+    sa.Column('retries', sa.Integer(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('processed_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('last_error', sa.String(), nullable=True),
+    sa.ForeignKeyConstraint(['restaurant_id'], ['restaurants.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index('idx_event_outbox_cleanup', 'event_outbox', ['status', 'processed_at'], unique=False)
+    op.create_index('idx_event_outbox_failed_cleanup', 'event_outbox', ['status', 'retries', 'created_at'], unique=False)
+    op.create_index('ix_event_outbox_created', 'event_outbox', ['created_at'], unique=False)
+    op.create_index('ix_event_outbox_event_type', 'event_outbox', ['event_type'], unique=False)
+    op.create_index('ix_event_outbox_restaurant', 'event_outbox', ['restaurant_id'], unique=False)
+    op.create_index('ix_event_outbox_status', 'event_outbox', ['status'], unique=False)
+    op.create_table('production_stations',
+    sa.Column('id', sa.Integer(), sa.Identity(always=False), nullable=False),
+    sa.Column('restaurant_id', sa.Integer(), nullable=False),
+    sa.Column('name', sa.String(), nullable=False),
+    sa.Column('active', sa.Boolean(), nullable=False),
+    sa.ForeignKeyConstraint(['restaurant_id'], ['restaurants.id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('restaurant_id', 'name', name='uq_station_name_per_restaurant')
+    )
+    op.create_table('restaurant_layout',
+    sa.Column('restaurant_id', sa.Integer(), nullable=False),
+    sa.Column('width', sa.Integer(), nullable=False),
+    sa.Column('height', sa.Integer(), nullable=False),
+    sa.Column('grid_size', sa.Integer(), nullable=False),
+    sa.Column('snap_to_grid', sa.Boolean(), nullable=False),
+    sa.Column('background_image', sa.String(), nullable=True),
+    sa.ForeignKeyConstraint(['restaurant_id'], ['restaurants.id'], ),
+    sa.PrimaryKeyConstraint('restaurant_id')
+    )
+    op.create_table('system_settings',
+    sa.Column('restaurant_id', sa.Integer(), nullable=False),
+    sa.Column('smtp_host', sa.String(), nullable=True),
+    sa.Column('smtp_port', sa.Integer(), nullable=False),
+    sa.Column('smtp_user', sa.String(), nullable=True),
+    sa.Column('smtp_password', sa.String(), nullable=True),
+    sa.Column('smtp_from', sa.String(), nullable=True),
+    sa.Column('smtp_use_tls', sa.Boolean(), nullable=False),
+    sa.Column('backup_email', sa.String(), nullable=True),
+    sa.Column('backup_frequency', sa.Enum('manual', 'daily', 'weekly', 'monthly', name='backupfrequency', native_enum=False, length=20), nullable=False),
+    sa.Column('backup_retention_daily', sa.Integer(), nullable=False),
+    sa.Column('backup_retention_weekly', sa.Integer(), nullable=False),
+    sa.Column('backup_retention_monthly', sa.Integer(), nullable=False),
+    sa.Column('backup_time', sa.Time(), nullable=False),
+    sa.Column('backup_weekday', sa.Integer(), nullable=True),
+    sa.Column('backup_monthday', sa.Integer(), nullable=True),
+    sa.Column('backup_enabled', sa.Boolean(), nullable=False),
+    sa.Column('last_automatic_backup_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('next_automatic_backup_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('last_backup_result', sa.String(), nullable=True),
+    sa.Column('backup_keep_local', sa.Boolean(), nullable=False),
+    sa.Column('backup_send_email', sa.Boolean(), nullable=False),
+    sa.Column('backup_timezone', sa.String(), nullable=False),
+    sa.ForeignKeyConstraint(['restaurant_id'], ['restaurants.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('restaurant_id')
+    )
+    op.create_table('tables',
+    sa.Column('id', sa.Integer(), sa.Identity(always=False), nullable=False),
+    sa.Column('restaurant_id', sa.Integer(), nullable=False),
+    sa.Column('number', sa.Integer(), nullable=False),
+    sa.Column('active', sa.Boolean(), nullable=False),
+    sa.Column('x', sa.Integer(), nullable=False),
+    sa.Column('y', sa.Integer(), nullable=False),
+    sa.Column('capacity', sa.Integer(), nullable=False),
+    sa.Column('shape', sa.String(), nullable=False),
+    sa.Column('external_id', sa.String(), nullable=False),
+    sa.ForeignKeyConstraint(['restaurant_id'], ['restaurants.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('restaurant_id', 'external_id', name='uq_table_external_per_restaurant'),
+    sa.UniqueConstraint('restaurant_id', 'number', name='uq_table_number_per_restaurant')
+    )
+    op.create_index('ix_table_restaurant_active', 'tables', ['restaurant_id', 'active'], unique=False)
+    op.create_index(op.f('ix_tables_restaurant_id'), 'tables', ['restaurant_id'], unique=False)
+    op.create_table('users',
+    sa.Column('id', sa.Integer(), sa.Identity(always=False), nullable=False),
+    sa.Column('restaurant_id', sa.Integer(), nullable=False),
+    sa.Column('username', sa.String(), nullable=False),
+    sa.Column('role', sa.Enum('ADMIN', 'WAITER', 'KITCHEN', 'CASHIER', name='userrole'), nullable=False),
+    sa.Column('password_hash', sa.String(), nullable=False),
+    sa.Column('active', sa.Boolean(), nullable=False),
+    sa.ForeignKeyConstraint(['restaurant_id'], ['restaurants.id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('restaurant_id', 'username', name='uq_user_username_per_restaurant')
+    )
+    op.create_index(op.f('ix_users_restaurant_id'), 'users', ['restaurant_id'], unique=False)
+    op.create_table('cash_registers',
+    sa.Column('id', sa.Integer(), sa.Identity(always=False), nullable=False),
+    sa.Column('restaurant_id', sa.Integer(), nullable=False),
+    sa.Column('is_open', sa.Boolean(), nullable=False),
+    sa.Column('opened_by_id', sa.Integer(), nullable=False),
+    sa.Column('closed_by_id', sa.Integer(), nullable=True),
+    sa.Column('opened_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('closed_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('opening_amount', sa.Numeric(precision=10, scale=2), nullable=False),
     sa.Column('closing_amount', sa.Numeric(precision=10, scale=2), nullable=True),
+    sa.Column('expected_cash', sa.Numeric(precision=10, scale=2), nullable=True),
+    sa.Column('counted_cash', sa.Numeric(precision=10, scale=2), nullable=True),
+    sa.Column('difference', sa.Numeric(precision=10, scale=2), nullable=True),
+    sa.Column('total_sales', sa.Numeric(precision=10, scale=2), nullable=True),
+    sa.Column('payments_snapshot', sa.JSON(), nullable=True),
+    sa.ForeignKeyConstraint(['closed_by_id'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['opened_by_id'], ['users.id'], ),
     sa.ForeignKeyConstraint(['restaurant_id'], ['restaurants.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_cash_registers_id'), 'cash_registers', ['id'], unique=False)
     op.create_index(op.f('ix_cash_registers_restaurant_id'), 'cash_registers', ['restaurant_id'], unique=False)
-    op.create_table('categories',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('name', sa.String(), nullable=False),
-    sa.Column('restaurant_id', sa.Integer(), nullable=False),
-    sa.ForeignKeyConstraint(['restaurant_id'], ['restaurants.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_table('production_stations',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('restaurant_id', sa.Integer(), nullable=False),
-    sa.Column('name', sa.String(), nullable=False),
-    sa.Column('active', sa.Boolean(), nullable=True),
-    sa.ForeignKeyConstraint(['restaurant_id'], ['restaurants.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_table('tables',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('restaurant_id', sa.Integer(), nullable=False),
-    sa.Column('number', sa.Integer(), nullable=False),
-    sa.Column('active', sa.Boolean(), nullable=True),
-    sa.Column('external_id', sa.String(), nullable=True),
-    sa.ForeignKeyConstraint(['restaurant_id'], ['restaurants.id'], ),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('number')
-    )
-    op.create_index(op.f('ix_tables_external_id'), 'tables', ['external_id'], unique=True)
-    op.create_index(op.f('ix_tables_id'), 'tables', ['id'], unique=False)
-    op.create_index(op.f('ix_tables_restaurant_id'), 'tables', ['restaurant_id'], unique=False)
-    op.create_table('users',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('restaurant_id', sa.Integer(), nullable=False),
-    sa.Column('name', sa.String(), nullable=False),
-    sa.Column('role', sa.Enum('ADMIN', 'WAITER', 'KITCHEN', 'CASHIER', name='userrole'), nullable=False),
-    sa.Column('password_hash', sa.String(), nullable=False),
-    sa.Column('active', sa.Boolean(), nullable=True),
-    sa.ForeignKeyConstraint(['restaurant_id'], ['restaurants.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
     op.create_table('orders',
-    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('id', sa.Integer(), sa.Identity(always=False), nullable=False),
     sa.Column('restaurant_id', sa.Integer(), nullable=False),
     sa.Column('table_id', sa.Integer(), nullable=False),
-    sa.Column('status', sa.Enum('OPEN', 'SENT', 'IN_PROGRESS', 'READY', 'CLOSED', 'CANCELLED', name='orderstatus'), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
-    sa.Column('closed_at', sa.DateTime(), nullable=True),
+    sa.Column('status', sa.Enum('DRAFT', 'OPEN', 'SENT', 'IN_PROGRESS', 'READY', 'CLOSED', 'CANCELLED', name='orderstatus'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('closed_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('discount', sa.Numeric(precision=10, scale=2), nullable=False),
+    sa.Column('cancelled_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('cancelled_by_id', sa.Integer(), nullable=True),
+    sa.Column('cancellation_reason', sa.Text(), nullable=True),
     sa.Column('external_id', sa.String(), nullable=True),
+    sa.ForeignKeyConstraint(['cancelled_by_id'], ['users.id'], ),
     sa.ForeignKeyConstraint(['restaurant_id'], ['restaurants.id'], ),
     sa.ForeignKeyConstraint(['table_id'], ['tables.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_orders_external_id'), 'orders', ['external_id'], unique=True)
-    op.create_index(op.f('ix_orders_id'), 'orders', ['id'], unique=False)
     op.create_index(op.f('ix_orders_restaurant_id'), 'orders', ['restaurant_id'], unique=False)
+    op.create_index('ix_orders_restaurant_status', 'orders', ['restaurant_id', 'status'], unique=False)
     op.create_table('products',
-    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('id', sa.Integer(), sa.Identity(always=False), nullable=False),
     sa.Column('restaurant_id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(), nullable=False),
     sa.Column('price', sa.Numeric(precision=10, scale=2), nullable=False),
-    sa.Column('active', sa.Boolean(), nullable=True),
-    sa.Column('station_id', sa.Integer(), nullable=True),
-    sa.Column('category_id', sa.Integer(), nullable=True),
+    sa.Column('active', sa.Boolean(), nullable=False),
+    sa.Column('station_id', sa.Integer(), nullable=False),
+    sa.Column('category_id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['category_id'], ['categories.id'], ),
     sa.ForeignKeyConstraint(['restaurant_id'], ['restaurants.id'], ),
     sa.ForeignKeyConstraint(['station_id'], ['production_stations.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('restaurant_id', 'name', name='uq_product_name_per_restaurant')
     )
     op.create_index(op.f('ix_products_restaurant_id'), 'products', ['restaurant_id'], unique=False)
+    op.create_table('cash_movements',
+    sa.Column('id', sa.Integer(), sa.Identity(always=False), nullable=False),
+    sa.Column('cash_register_id', sa.Integer(), nullable=False),
+    sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.Column('type', sa.Enum('cash_in', 'cash_out', name='cashmovementtype', native_enum=False, length=20), nullable=False),
+    sa.Column('amount', sa.Numeric(precision=10, scale=2), nullable=False),
+    sa.Column('reason', sa.String(length=255), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['cash_register_id'], ['cash_registers.id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index('ix_cash_movements_register', 'cash_movements', ['cash_register_id'], unique=False)
+    op.create_index('ix_cash_movements_register_type', 'cash_movements', ['cash_register_id', 'type'], unique=False)
     op.create_table('order_items',
-    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('id', sa.Integer(), sa.Identity(always=False), nullable=False),
     sa.Column('restaurant_id', sa.Integer(), nullable=False),
     sa.Column('order_id', sa.Integer(), nullable=False),
     sa.Column('product_id', sa.Integer(), nullable=False),
@@ -867,14 +662,19 @@ def upgrade() -> None:
     sa.Column('unit_price', sa.Numeric(precision=10, scale=2), nullable=False),
     sa.Column('status', sa.Enum('PENDING', 'SENT', 'IN_PROGRESS', 'READY', 'DELIVERED', 'CANCELLED', name='orderitemstatus'), nullable=False),
     sa.Column('notes', sa.String(), nullable=True),
+    sa.Column('cancelled_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('cancelled_by_id', sa.Integer(), nullable=True),
+    sa.Column('cancellation_reason', sa.Text(), nullable=True),
+    sa.ForeignKeyConstraint(['cancelled_by_id'], ['users.id'], ),
     sa.ForeignKeyConstraint(['order_id'], ['orders.id'], ),
     sa.ForeignKeyConstraint(['product_id'], ['products.id'], ),
     sa.ForeignKeyConstraint(['restaurant_id'], ['restaurants.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_index('ix_order_items_order_status', 'order_items', ['order_id', 'status'], unique=False)
     op.create_index(op.f('ix_order_items_restaurant_id'), 'order_items', ['restaurant_id'], unique=False)
     op.create_table('payments',
-    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('id', sa.Integer(), sa.Identity(always=False), nullable=False),
     sa.Column('restaurant_id', sa.Integer(), nullable=False),
     sa.Column('order_id', sa.Integer(), nullable=False),
     sa.Column('method', sa.Enum('CASH', 'CARD', 'TRANSFER', 'OTHER', name='paymentmethod'), nullable=False),
@@ -895,1663 +695,61 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_payments_restaurant_id'), table_name='payments')
     op.drop_table('payments')
     op.drop_index(op.f('ix_order_items_restaurant_id'), table_name='order_items')
+    op.drop_index('ix_order_items_order_status', table_name='order_items')
     op.drop_table('order_items')
+    op.drop_index('ix_cash_movements_register_type', table_name='cash_movements')
+    op.drop_index('ix_cash_movements_register', table_name='cash_movements')
+    op.drop_table('cash_movements')
     op.drop_index(op.f('ix_products_restaurant_id'), table_name='products')
     op.drop_table('products')
+    op.drop_index('ix_orders_restaurant_status', table_name='orders')
     op.drop_index(op.f('ix_orders_restaurant_id'), table_name='orders')
-    op.drop_index(op.f('ix_orders_id'), table_name='orders')
     op.drop_index(op.f('ix_orders_external_id'), table_name='orders')
     op.drop_table('orders')
+    op.drop_index(op.f('ix_cash_registers_restaurant_id'), table_name='cash_registers')
+    op.drop_table('cash_registers')
+    op.drop_index(op.f('ix_users_restaurant_id'), table_name='users')
     op.drop_table('users')
     op.drop_index(op.f('ix_tables_restaurant_id'), table_name='tables')
-    op.drop_index(op.f('ix_tables_id'), table_name='tables')
-    op.drop_index(op.f('ix_tables_external_id'), table_name='tables')
+    op.drop_index('ix_table_restaurant_active', table_name='tables')
     op.drop_table('tables')
+    op.drop_table('system_settings')
+    op.drop_table('restaurant_layout')
     op.drop_table('production_stations')
+    op.drop_index('ix_event_outbox_status', table_name='event_outbox')
+    op.drop_index('ix_event_outbox_restaurant', table_name='event_outbox')
+    op.drop_index('ix_event_outbox_event_type', table_name='event_outbox')
+    op.drop_index('ix_event_outbox_created', table_name='event_outbox')
+    op.drop_index('idx_event_outbox_failed_cleanup', table_name='event_outbox')
+    op.drop_index('idx_event_outbox_cleanup', table_name='event_outbox')
+    op.drop_table('event_outbox')
     op.drop_table('categories')
-    op.drop_index(op.f('ix_cash_registers_restaurant_id'), table_name='cash_registers')
-    op.drop_index(op.f('ix_cash_registers_id'), table_name='cash_registers')
-    op.drop_table('cash_registers')
-    op.drop_index(op.f('ix_restaurants_id'), table_name='restaurants')
     op.drop_index(op.f('ix_restaurants_external_id'), table_name='restaurants')
     op.drop_table('restaurants')
-    # ### end Alembic commands ###
 
-```
-
----
-
-### .\backend\alembic\versions\5aa86605f254_add_discount_to_orders.py
-
-**Funciones (2):**
-- upgrade
-- downgrade
-
-**Clases (0):**
-
-**Imports (4):**
-- typing.Sequence
-- typing.Union
-- alembic.op
-- sqlalchemy
-
-```python
-"""add discount to orders
-
-Revision ID: 5aa86605f254
-Revises: 7b0b567ffe9e
-Create Date: 2026-03-18 18:02:40.042295
-
-"""
-from typing import Sequence, Union
-
-from alembic import op
-import sqlalchemy as sa
-
-
-# revision identifiers, used by Alembic.
-revision: str = '5aa86605f254'
-down_revision: Union[str, Sequence[str], None] = '7b0b567ffe9e'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
-
-
-def upgrade() -> None:
-    op.add_column(
-        'orders',
-        sa.Column('discount', sa.Numeric(10, 2), nullable=False, server_default="0")
-    )
-    
-    op.alter_column('orders', 'discount', server_default=None)
-
-
-def downgrade() -> None:
-    op.drop_column('orders', 'discount')
-
-```
-
----
-
-### .\backend\alembic\versions\6ba12f28852f_cambios_en_cashregister.py
-
-**Funciones (2):**
-- upgrade
-- downgrade
-
-**Clases (0):**
-
-**Imports (4):**
-- typing.Sequence
-- typing.Union
-- alembic.op
-- sqlalchemy
-
-```python
-"""cambios en cashregister
-
-Revision ID: 6ba12f28852f
-Revises: 7fd07db91f0d
-Create Date: 2026-03-31 03:06:33.845028
-
-"""
-from typing import Sequence, Union
-
-from alembic import op
-import sqlalchemy as sa
-
-
-# revision identifiers, used by Alembic.
-revision: str = '6ba12f28852f'
-down_revision: Union[str, Sequence[str], None] = '7fd07db91f0d'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
-
-
-def upgrade() -> None:
-    op.add_column(
-        "cash_registers",
-        sa.Column("expected_cash", sa.Numeric(10,2), nullable=True)
+    # --------------------------------------------------
+    # Eliminar ENUM nativos de PostgreSQL.
+    #
+    # Al eliminar las tablas PostgreSQL no elimina
+    # automáticamente los tipos ENUM asociados.
+    # --------------------------------------------------
+    op.execute(
+        "DROP TYPE IF EXISTS paymentmethod"
     )
 
-    op.add_column(
-        "cash_registers",
-        sa.Column("counted_cash", sa.Numeric(10,2), nullable=True)
+    op.execute(
+        "DROP TYPE IF EXISTS orderitemstatus"
     )
 
-    op.add_column(
-        "cash_registers",
-        sa.Column("difference", sa.Numeric(10,2), nullable=True)
+    op.execute(
+        "DROP TYPE IF EXISTS orderstatus"
     )
 
-    op.add_column(
-        "cash_registers",
-        sa.Column("total_sales", sa.Numeric(10,2), nullable=True)
-    )
-
-    op.add_column(
-        "cash_registers",
-        sa.Column("payments_snapshot", sa.JSON(), nullable=True)
-    )
-
-    op.create_table(
-        "cash_movements",
-
-        sa.Column(
-            "id",
-            sa.Integer(),
-            primary_key=True
-        ),
-
-        sa.Column(
-            "cash_register_id",
-            sa.Integer(),
-            sa.ForeignKey("cash_registers.id"),
-            nullable=False
-        ),
-
-        sa.Column(
-            "user_id",
-            sa.Integer(),
-            sa.ForeignKey("users.id"),
-            nullable=False
-        ),
-
-        sa.Column(
-            "type",
-            sa.String(length=20),
-            nullable=False
-        ),
-
-        sa.Column(
-            "amount",
-            sa.Numeric(10,2),
-            nullable=False
-        ),
-
-        sa.Column(
-            "reason",
-            sa.String(length=255),
-            nullable=True
-        ),
-
-        sa.Column(
-            "created_at",
-            sa.DateTime(),
-            server_default=sa.func.now(),
-            nullable=False
-        )
-    )
-
-    op.create_index(
-        "ix_cash_movements_register",
-        "cash_movements",
-        ["cash_register_id"]
-    )
-
-    op.create_index(
-        "ix_cash_movements_register_type",
-        "cash_movements",
-        ["cash_register_id", "type"]
-    )
-
-
-def downgrade() -> None:
-    op.drop_index("ix_cash_movements_register_type", table_name="cash_movements")
-    op.drop_index("ix_cash_movements_register", table_name="cash_movements")
-
-    op.drop_table("cash_movements")
-
-    op.drop_column("cash_registers", "payments_snapshot")
-    op.drop_column("cash_registers", "total_sales")
-    op.drop_column("cash_registers", "difference")
-    op.drop_column("cash_registers", "counted_cash")
-    op.drop_column("cash_registers", "expected_cash")
-```
-
----
-
-### .\backend\alembic\versions\6e40084bfae8_create_event_outbox.py
-
-**Funciones (2):**
-- upgrade
-- downgrade
-
-**Clases (0):**
-
-**Imports (4):**
-- typing.Sequence
-- typing.Union
-- alembic.op
-- sqlalchemy
-
-```python
-"""create event_outbox
-
-Revision ID: 6e40084bfae8
-Revises: 6ba12f28852f
-Create Date: 2026-05-05 18:52:54.136588
-
-"""
-from typing import Sequence, Union
-
-from alembic import op
-import sqlalchemy as sa
-
-
-# revision identifiers, used by Alembic.
-revision: str = '6e40084bfae8'
-down_revision: Union[str, Sequence[str], None] = '6ba12f28852f'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
-
-
-def upgrade():
-
-    # =============================
-    # CREAR TABLA EVENT_OUTBOX
-    # =============================
-
-    op.create_table(
-        "event_outbox",
-
-        sa.Column("id", sa.Integer(), primary_key=True),
-
-        sa.Column(
-            "restaurant_id",
-            sa.Integer(),
-            sa.ForeignKey("restaurants.id"),
-            nullable=False
-        ),
-
-        sa.Column(
-            "event_type",
-            sa.String(),
-            nullable=False
-        ),
-
-        sa.Column(
-            "payload",
-            sa.JSON(),
-            nullable=False
-        ),
-
-        sa.Column(
-            "target",
-            sa.String(),
-            nullable=False
-        ),
-
-        sa.Column(
-            "target_id",
-            sa.String(),
-            nullable=True
-        ),
-
-        sa.Column(
-            "status",
-            sa.String(),
-            nullable=False,
-            server_default="pending"
-        ),
-
-        sa.Column(
-            "retries",
-            sa.Integer(),
-            nullable=False,
-            server_default="0"
-        ),
-
-        sa.Column(
-            "created_at",
-            sa.DateTime(timezone=True),
-            server_default=sa.func.now(),
-            nullable=False
-        ),
-
-        sa.Column(
-            "processed_at",
-            sa.DateTime(timezone=True),
-            nullable=True
-        ),
-
-        sa.Column(
-            "last_error",
-            sa.String(),
-            nullable=True
-        ),
-    )
-
-
-    # =============================
-    # INDEXES
-    # =============================
-
-    op.create_index(
-        "ix_event_outbox_restaurant",
-        "event_outbox",
-        ["restaurant_id"]
-    )
-
-    op.create_index(
-        "ix_event_outbox_status",
-        "event_outbox",
-        ["status"]
-    )
-
-    op.create_index(
-        "ix_event_outbox_created",
-        "event_outbox",
-        ["created_at"]
-    )
-
-    op.create_index(
-        "ix_event_outbox_event_type",
-        "event_outbox",
-        ["event_type"]
-    )
-
-    # --------------------------------------
-    # Índice para cleanup de eventos enviados
-    # --------------------------------------
-
-    op.create_index(
-        "idx_event_outbox_cleanup",
-        "event_outbox",
-        ["status", "processed_at"]
-    )
-
-    # --------------------------------------
-    # Índice para cleanup de eventos fallidos
-    # --------------------------------------
-
-    op.create_index(
-        "idx_event_outbox_failed_cleanup",
-        "event_outbox",
-        ["status", "retries", "created_at"]
-    )
-
-
-    # =============================
-    # ELIMINAR DOMAIN_EVENTS
-    # =============================
-
-    op.drop_table("domain_events")
-
-
-def downgrade():
-
-    # =============================
-    # RECREAR DOMAIN_EVENTS
-    # =============================
-
-    op.create_table(
-        "domain_events",
-
-        sa.Column("id", sa.Integer(), primary_key=True),
-
-        sa.Column(
-            "restaurant_id",
-            sa.Integer(),
-            sa.ForeignKey("restaurants.id"),
-            nullable=False
-        ),
-
-        sa.Column(
-            "event_type",
-            sa.String(),
-            nullable=True
-        ),
-
-        sa.Column(
-            "payload",
-            sa.JSON(),
-            nullable=False
-        ),
-
-        sa.Column(
-            "created_at",
-            sa.DateTime(timezone=True),
-            server_default=sa.func.now(),
-            nullable=False
-        ),
-    )
-
-
-    # =============================
-    # ELIMINAR EVENT_OUTBOX
-    # =============================
-
-    op.drop_index("ix_event_outbox_event_type", table_name="event_outbox")
-    op.drop_index("ix_event_outbox_created", table_name="event_outbox")
-    op.drop_index("ix_event_outbox_status", table_name="event_outbox")
-    op.drop_index("ix_event_outbox_restaurant", table_name="event_outbox")
-
-    op.drop_table("event_outbox")
-```
-
----
-
-### .\backend\alembic\versions\72a2554e30d4_rename_users_name_to_users_username.py
-
-**Funciones (2):**
-- upgrade
-- downgrade
-
-**Clases (0):**
-
-**Imports (4):**
-- typing.Sequence
-- typing.Union
-- alembic.op
-- sqlalchemy
-
-```python
-"""rename users.name to users.username
-
-Revision ID: 72a2554e30d4
-Revises: 6e40084bfae8
-Create Date: 2026-05-20 21:50:28.197239
-
-"""
-from typing import Sequence, Union
-
-from alembic import op
-import sqlalchemy as sa
-
-
-# revision identifiers, used by Alembic.
-revision: str = '72a2554e30d4'
-down_revision: Union[str, Sequence[str], None] = '6e40084bfae8'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
-
-
-def upgrade() -> None:
-    op.alter_column('users', 'name', new_column_name='username')
-
-def downgrade() -> None:
-    op.alter_column('users', 'username', new_column_name='name')
-
-```
-
----
-
-### .\backend\alembic\versions\789ad8c3f1b5_auditoria.py
-
-**Funciones (2):**
-- upgrade
-- downgrade
-
-**Clases (0):**
-
-**Imports (5):**
-- typing.Sequence
-- typing.Union
-- alembic.op
-- sqlalchemy
-- sqlalchemy.dialects.postgresql
-
-```python
-"""auditoria
-
-Revision ID: 789ad8c3f1b5
-Revises: a5fb39b05ac8
-Create Date: 2026-08-12 03:21:56.691752
-
-"""
-from typing import Sequence, Union
-
-from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
-
-# revision identifiers, used by Alembic.
-revision: str = '789ad8c3f1b5'
-down_revision: Union[str, Sequence[str], None] = 'a5fb39b05ac8'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
-
-
-def upgrade() -> None:
-    """Upgrade schema."""
-
-    # Las órdenes siempre deben tener fecha de creación.
-    op.alter_column(
-        "orders",
-        "created_at",
-        existing_type=postgresql.TIMESTAMP(timezone=True),
-        nullable=False,
-        existing_server_default=sa.text("now()")
-    )
-
-    # El layout siempre debe tener configuración de grilla y snap.
-    op.alter_column(
-        "restaurant_layout",
-        "grid_size",
-        existing_type=sa.INTEGER(),
-        nullable=False,
-        existing_server_default=sa.text("40")
-    )
-
-    op.alter_column(
-        "restaurant_layout",
-        "snap_to_grid",
-        existing_type=sa.BOOLEAN(),
-        nullable=False,
-        existing_server_default=sa.text("true")
-    )
-
-    # restaurant_id ya es PRIMARY KEY, por lo que este UNIQUE es redundante.
-    op.drop_constraint(
-        "restaurant_layout_restaurant_id_key",
-        "restaurant_layout",
-        type_="unique"
-    )
-
-    # Toda configuración persistida debe tener puerto SMTP definido.
-    op.alter_column(
-        "system_settings",
-        "smtp_port",
-        existing_type=sa.INTEGER(),
-        nullable=False
+    op.execute(
+        "DROP TYPE IF EXISTS userrole"
     )
     # ### end Alembic commands ###
 
-
-def downgrade() -> None:
-    """Downgrade schema."""
-    # ### commands auto generated by Alembic - please adjust! ###
-    op.alter_column('system_settings', 'smtp_port',
-               existing_type=sa.INTEGER(),
-               nullable=True)
-    op.create_unique_constraint(op.f('restaurant_layout_restaurant_id_key'), 'restaurant_layout', ['restaurant_id'], postgresql_nulls_not_distinct=False)
-    op.alter_column('restaurant_layout', 'snap_to_grid',
-               existing_type=sa.BOOLEAN(),
-               nullable=True,
-               existing_server_default=sa.text('true'))
-    op.alter_column('restaurant_layout', 'grid_size',
-               existing_type=sa.INTEGER(),
-               nullable=True,
-               existing_server_default=sa.text('40'))
-    op.alter_column('orders', 'created_at',
-               existing_type=postgresql.TIMESTAMP(timezone=True),
-               nullable=True,
-               existing_server_default=sa.text('now()'))
-    # ### end Alembic commands ###
-
-```
-
----
-
-### .\backend\alembic\versions\7b0b567ffe9e_add_discount_to_orders.py
-
-**Funciones (2):**
-- upgrade
-- downgrade
-
-**Clases (0):**
-
-**Imports (4):**
-- typing.Sequence
-- typing.Union
-- alembic.op
-- sqlalchemy
-
-```python
-"""add discount to orders
-
-Revision ID: 7b0b567ffe9e
-Revises: 50f5f9de1220
-Create Date: 2026-03-18 18:02:00.580785
-
-"""
-from typing import Sequence, Union
-
-from alembic import op
-import sqlalchemy as sa
-
-
-# revision identifiers, used by Alembic.
-revision: str = '7b0b567ffe9e'
-down_revision: Union[str, Sequence[str], None] = '50f5f9de1220'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
-
-
-def upgrade() -> None:
-    """Upgrade schema."""
-    pass
-
-
-def downgrade() -> None:
-    """Downgrade schema."""
-    pass
-
-```
-
----
-
-### .\backend\alembic\versions\7fd07db91f0d_refactor_restaurant_layout_structure.py
-
-**Funciones (2):**
-- upgrade
-- downgrade
-
-**Clases (0):**
-
-**Imports (4):**
-- typing.Sequence
-- typing.Union
-- alembic.op
-- sqlalchemy
-
-```python
-"""refactor restaurant_layout structure
-
-Revision ID: 7fd07db91f0d
-Revises: a4b707b32039
-Create Date: 2026-03-30 02:44:25.946302
-
-"""
-from typing import Sequence, Union
-
-from alembic import op
-import sqlalchemy as sa
-
-
-# revision identifiers, used by Alembic.
-revision: str = '7fd07db91f0d'
-down_revision: Union[str, Sequence[str], None] = 'a4b707b32039'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
-
-
-def upgrade():
-
-    # eliminar PK actual
-    op.drop_constraint(
-        "restaurant_layout_pkey",
-        "restaurant_layout",
-        type_="primary"
-    )
-
-    # eliminar columna id
-    op.drop_column("restaurant_layout", "id")
-
-    # convertir restaurant_id en PK
-    op.create_primary_key(
-        "restaurant_layout_pkey",
-        "restaurant_layout",
-        ["restaurant_id"]
-    )
-
-    # nuevos campos
-    op.add_column(
-        "restaurant_layout",
-        sa.Column("grid_size", sa.Integer(), server_default="40")
-    )
-
-    op.add_column(
-        "restaurant_layout",
-        sa.Column("snap_to_grid", sa.Boolean(), server_default="true")
-    )
-
-    op.add_column(
-        "restaurant_layout",
-        sa.Column("background_image", sa.String(), nullable=True)
-    )
-
-
-def downgrade():
-
-    op.drop_column("restaurant_layout", "background_image")
-    op.drop_column("restaurant_layout", "snap_to_grid")
-    op.drop_column("restaurant_layout", "grid_size")
-
-    op.drop_constraint(
-        "restaurant_layout_pkey",
-        "restaurant_layout",
-        type_="primary"
-    )
-
-    op.add_column(
-        "restaurant_layout",
-        sa.Column("id", sa.Integer(), primary_key=True)
-    )
-
-    op.create_primary_key(
-        "restaurant_layout_pkey",
-        "restaurant_layout",
-        ["id"]
-    )
-```
-
----
-
-### .\backend\alembic\versions\85d684a75027_add_more_backup_settings.py
-
-**Funciones (2):**
-- upgrade
-- downgrade
-
-**Clases (0):**
-
-**Imports (4):**
-- typing.Sequence
-- typing.Union
-- alembic.op
-- sqlalchemy
-
-```python
-"""add more backup settings
-
-Revision ID: 85d684a75027
-Revises: 1b3cb23f2af7
-Create Date: 2026-06-28 16:38:19.706936
-
-"""
-from typing import Sequence, Union
-
-from alembic import op
-import sqlalchemy as sa
-
-
-# revision identifiers, used by Alembic.
-revision: str = '85d684a75027'
-down_revision: Union[str, Sequence[str], None] = '1b3cb23f2af7'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
-
-
-def upgrade():
-
-    op.add_column(
-        "system_settings",
-        sa.Column(
-            "backup_frequency",
-            sa.String(),
-            nullable=False,
-            server_default="manual"
-        )
-    )
-
-    op.add_column(
-        "system_settings",
-        sa.Column(
-            "backup_retention_days",
-            sa.Integer(),
-            nullable=False,
-            server_default="30"
-        )
-    )
-
-    op.add_column(
-        "system_settings",
-        sa.Column(
-            "backup_enabled",
-            sa.Boolean(),
-            nullable=False,
-            server_default=sa.true()
-        )
-    )
-
-    op.add_column(
-        "system_settings",
-        sa.Column(
-            "backup_last_run",
-            sa.DateTime(timezone=True),
-            nullable=True
-        )
-    )
-
-    op.add_column(
-        "system_settings",
-        sa.Column(
-            "backup_next_run",
-            sa.DateTime(timezone=True),
-            nullable=True
-        )
-    )
-
-
-def downgrade():
-
-    op.drop_column("system_settings", "backup_next_run")
-    op.drop_column("system_settings", "backup_last_run")
-    op.drop_column("system_settings", "backup_enabled")
-    op.drop_column("system_settings", "backup_retention_days")
-    op.drop_column("system_settings", "backup_frequency")
-
-```
-
----
-
-### .\backend\alembic\versions\900c4d6546a2_creando_tabla_de_eventos.py
-
-**Funciones (2):**
-- upgrade
-- downgrade
-
-**Clases (0):**
-
-**Imports (4):**
-- typing.Sequence
-- typing.Union
-- alembic.op
-- sqlalchemy
-
-```python
-"""creando tabla de eventos
-
-Revision ID: 900c4d6546a2
-Revises: 0d21e3868b2f
-Create Date: 2026-03-26 17:33:05.954838
-
-"""
-from typing import Sequence, Union
-
-from alembic import op
-import sqlalchemy as sa
-
-
-# revision identifiers, used by Alembic.
-revision: str = '900c4d6546a2'
-down_revision: Union[str, Sequence[str], None] = '0d21e3868b2f'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
-
-
-def upgrade():
-    op.create_table(
-        "domain_events",
-        sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column("restaurant_id", sa.Integer(), nullable=False),
-        sa.Column("event_type", sa.String(), nullable=False),
-        sa.Column("payload", sa.JSON(), nullable=True),
-        sa.Column(
-            "created_at",
-            sa.DateTime(),
-            server_default=sa.func.now(),
-            nullable=False
-        )
-    )
-
-
-def downgrade() -> None:
-    """Downgrade schema."""
-    op.drop_table("domain_events")
-
-```
-
----
-
-### .\backend\alembic\versions\9607a137eec7_add_password_to_user.py
-
-**Funciones (2):**
-- upgrade
-- downgrade
-
-**Clases (0):**
-
-**Imports (4):**
-- typing.Sequence
-- typing.Union
-- alembic.op
-- sqlalchemy
-
-```python
-"""add password to user
-
-Revision ID: 9607a137eec7
-Revises: 530c9b9f2a9f
-Create Date: 2026-02-24 02:31:41.038535
-
-"""
-from typing import Sequence, Union
-
-from alembic import op
-import sqlalchemy as sa
-
-
-# revision identifiers, used by Alembic.
-revision: str = '9607a137eec7'
-down_revision: Union[str, Sequence[str], None] = '530c9b9f2a9f'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
-
-
-def upgrade() -> None:
-    """Upgrade schema."""
-    # ### commands auto generated by Alembic - please adjust! ###
-    pass
-    # ### end Alembic commands ###
-
-
-def downgrade() -> None:
-    """Downgrade schema."""
-    # ### commands auto generated by Alembic - please adjust! ###
-    pass
-    # ### end Alembic commands ###
-
-```
-
----
-
-### .\backend\alembic\versions\a4b707b32039_restaurant_layout.py
-
-**Funciones (2):**
-- upgrade
-- downgrade
-
-**Clases (0):**
-
-**Imports (4):**
-- typing.Sequence
-- typing.Union
-- alembic.op
-- sqlalchemy
-
-```python
-"""restaurant layout
-
-Revision ID: a4b707b32039
-Revises: e2398672eb07
-Create Date: 2026-03-30 02:10:53.189414
-
-"""
-from typing import Sequence, Union
-
-from alembic import op
-import sqlalchemy as sa
-
-
-# revision identifiers, used by Alembic.
-revision: str = 'a4b707b32039'
-down_revision: Union[str, Sequence[str], None] = 'e2398672eb07'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
-
-
-def upgrade() -> None:
-    """Upgrade schema."""
-    # ### commands auto generated by Alembic - please adjust! ###
-    op.drop_index(op.f('idx_domain_events_restaurant'), table_name='domain_events')
-    op.create_index(op.f('ix_domain_events_id'), 'domain_events', ['id'], unique=False)
-    op.create_index(op.f('ix_domain_events_restaurant_id'), 'domain_events', ['restaurant_id'], unique=False)
-    op.create_foreign_key(
-    "fk_domain_events_restaurant",
-    "domain_events",
-    "restaurants",
-    ["restaurant_id"],
-    ["id"]
-)
-    op.create_table(
-        "restaurant_layout",
-        sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column("restaurant_id", sa.Integer(), sa.ForeignKey("restaurants.id"), nullable=False, unique=True),
-        sa.Column("width", sa.Integer(), nullable=False, server_default="900"),
-        sa.Column("height", sa.Integer(), nullable=False, server_default="500"),
-    )
-
-
-def downgrade() -> None:
-    """Downgrade schema."""
-    # ### commands auto generated by Alembic - please adjust! ###
-    op.drop_constraint("fk_domain_events_restaurant", "domain_events", type_="foreignkey")
-    op.drop_index(op.f('ix_domain_events_restaurant_id'), table_name='domain_events')
-    op.drop_index(op.f('ix_domain_events_id'), table_name='domain_events')
-    op.create_index(op.f('idx_domain_events_restaurant'), 'domain_events', ['restaurant_id'], unique=False)
-    op.drop_table("restaurant_layout")
-
-```
-
----
-
-### .\backend\alembic\versions\a5fb39b05ac8_category_active_and_product_station_.py
-
-**Funciones (2):**
-- upgrade
-- downgrade
-
-**Clases (0):**
-
-**Imports (5):**
-- typing.Sequence
-- typing.Union
-- alembic.op
-- sqlalchemy
-- sqlalchemy.dialects.postgresql
-
-```python
-"""category active and product station constraints(2)
-
-Revision ID: a5fb39b05ac8
-Revises: ca4a5b4c9e74
-Create Date: 2026-08-12 02:20:46.787954
-
-"""
-from typing import Sequence, Union
-
-from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
-
-# revision identifiers, used by Alembic.
-revision: str = 'a5fb39b05ac8'
-down_revision: Union[str, Sequence[str], None] = 'ca4a5b4c9e74'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
-
-
-def upgrade() -> None:
-    """Upgrade schema."""
-
-    # -------------------------------------------------------------------------
-    # Agrega baja lógica a categorías.
-    # Las categorías existentes se consideran activas.
-    # -------------------------------------------------------------------------
-    op.add_column(
-        "categories",
-        sa.Column(
-            "active",
-            sa.Boolean(),
-            nullable=False,
-            server_default=sa.true()
-        )
-    )
-
-    # El default se utiliza únicamente para migrar las filas existentes.
-    op.alter_column(
-        "categories",
-        "active",
-        server_default=None
-    )
-
-    # -------------------------------------------------------------------------
-    # Las estaciones siempre deben tener un estado activo/inactivo definido.
-    # -------------------------------------------------------------------------
-    op.alter_column(
-        "production_stations",
-        "active",
-        existing_type=sa.BOOLEAN(),
-        nullable=False
-    )
-
-    # -------------------------------------------------------------------------
-    # Los productos siempre deben tener estado, categoría y estación.
-    # -------------------------------------------------------------------------
-    op.alter_column(
-        "products",
-        "active",
-        existing_type=sa.BOOLEAN(),
-        nullable=False
-    )
-
-    op.alter_column(
-        "products",
-        "station_id",
-        existing_type=sa.INTEGER(),
-        nullable=False
-    )
-
-    op.alter_column(
-        "products",
-        "category_id",
-        existing_type=sa.INTEGER(),
-        nullable=False
-    )
-
-
-def downgrade() -> None:
-    """Downgrade schema."""
-
-    op.alter_column(
-        "products",
-        "category_id",
-        existing_type=sa.INTEGER(),
-        nullable=True
-    )
-
-    op.alter_column(
-        "products",
-        "station_id",
-        existing_type=sa.INTEGER(),
-        nullable=True
-    )
-
-    op.alter_column(
-        "products",
-        "active",
-        existing_type=sa.BOOLEAN(),
-        nullable=True
-    )
-
-    op.alter_column(
-        "production_stations",
-        "active",
-        existing_type=sa.BOOLEAN(),
-        nullable=True
-    )
-
-    op.drop_column(
-        "categories",
-        "active"
-    )
-```
-
----
-
-### .\backend\alembic\versions\b30663f913d9_add_cash_register_audit_fields.py
-
-**Funciones (2):**
-- upgrade
-- downgrade
-
-**Clases (0):**
-
-**Imports (4):**
-- typing.Sequence
-- typing.Union
-- alembic.op
-- sqlalchemy
-
-```python
-"""add cash_register audit fields
-
-Revision ID: b30663f913d9
-Revises: 9607a137eec7
-Create Date: 2026-03-01 21:47:58.915981
-
-"""
-from typing import Sequence, Union
-
-from alembic import op
-import sqlalchemy as sa
-
-
-# revision identifiers, used by Alembic.
-revision: str = 'b30663f913d9'
-down_revision: Union[str, Sequence[str], None] = '9607a137eec7'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
-
-
-def upgrade() -> None:
-    """Upgrade schema."""
-    # ### commands auto generated by Alembic - please adjust! ###
-    op.add_column('cash_registers', sa.Column('is_open', sa.Boolean(), nullable=False))
-    op.add_column('cash_registers', sa.Column('opened_by_id', sa.Integer(), nullable=True))
-    op.add_column('cash_registers', sa.Column('closed_by_id', sa.Integer(), nullable=True))
-    op.drop_index(op.f('ix_cash_registers_id'), table_name='cash_registers')
-    op.create_foreign_key(None, 'cash_registers', 'users', ['opened_by_id'], ['id'])
-    op.create_foreign_key(None, 'cash_registers', 'users', ['closed_by_id'], ['id'])
-    op.create_unique_constraint('uq_category_name_per_restaurant', 'categories', ['restaurant_id', 'name'])
-    op.create_index('ix_orders_restaurant_status', 'orders', ['restaurant_id', 'status'], unique=False)
-    op.create_unique_constraint('uq_station_name_per_restaurant', 'production_stations', ['restaurant_id', 'name'])
-    op.create_unique_constraint('uq_product_name_per_restaurant', 'products', ['restaurant_id', 'name'])
-    op.alter_column('tables', 'active',
-               existing_type=sa.BOOLEAN(),
-               nullable=False)
-    op.alter_column('tables', 'external_id',
-               existing_type=sa.VARCHAR(),
-               nullable=False)
-    op.drop_index(op.f('ix_tables_external_id'), table_name='tables')
-    op.drop_constraint(op.f('tables_number_key'), 'tables', type_='unique')
-    op.create_index('ix_table_restaurant_active', 'tables', ['restaurant_id', 'active'], unique=False)
-    op.create_unique_constraint('uq_table_external_per_restaurant', 'tables', ['restaurant_id', 'external_id'])
-    op.create_unique_constraint('uq_table_number_per_restaurant', 'tables', ['restaurant_id', 'number'])
-    op.drop_constraint(op.f('tables_restaurant_id_fkey'), 'tables', type_='foreignkey')
-    op.create_foreign_key(None, 'tables', 'restaurants', ['restaurant_id'], ['id'], ondelete='CASCADE')
-    # ### end Alembic commands ###
-
-
-def downgrade() -> None:
-    """Downgrade schema."""
-    # ### commands auto generated by Alembic - please adjust! ###
-    op.drop_constraint(None, 'tables', type_='foreignkey')
-    op.create_foreign_key(op.f('tables_restaurant_id_fkey'), 'tables', 'restaurants', ['restaurant_id'], ['id'])
-    op.drop_constraint('uq_table_number_per_restaurant', 'tables', type_='unique')
-    op.drop_constraint('uq_table_external_per_restaurant', 'tables', type_='unique')
-    op.drop_index('ix_table_restaurant_active', table_name='tables')
-    op.create_unique_constraint(op.f('tables_number_key'), 'tables', ['number'], postgresql_nulls_not_distinct=False)
-    op.create_index(op.f('ix_tables_external_id'), 'tables', ['external_id'], unique=True)
-    op.alter_column('tables', 'external_id',
-               existing_type=sa.VARCHAR(),
-               nullable=True)
-    op.alter_column('tables', 'active',
-               existing_type=sa.BOOLEAN(),
-               nullable=True)
-    op.drop_constraint('uq_product_name_per_restaurant', 'products', type_='unique')
-    op.drop_constraint('uq_station_name_per_restaurant', 'production_stations', type_='unique')
-    op.drop_index('ix_orders_restaurant_status', table_name='orders')
-    op.drop_constraint('uq_category_name_per_restaurant', 'categories', type_='unique')
-    op.drop_constraint(None, 'cash_registers', type_='foreignkey')
-    op.drop_constraint(None, 'cash_registers', type_='foreignkey')
-    op.create_index(op.f('ix_cash_registers_id'), 'cash_registers', ['id'], unique=False)
-    op.drop_column('cash_registers', 'closed_by_id')
-    op.drop_column('cash_registers', 'opened_by_id')
-    op.drop_column('cash_registers', 'is_open')
-    # ### end Alembic commands ###
-
-```
-
----
-
-### .\backend\alembic\versions\ca4a5b4c9e74_eliminar_retention_days_y_agregar_.py
-
-**Funciones (2):**
-- upgrade
-- downgrade
-
-**Clases (0):**
-
-**Imports (4):**
-- typing.Sequence
-- typing.Union
-- alembic.op
-- sqlalchemy
-
-```python
-"""eliminar retention days y agregar retention daily, weekly y monthly en system_settings
-
-Revision ID: ca4a5b4c9e74
-Revises: fdb697085b8d
-Create Date: 2026-07-18 17:04:07.755058
-
-"""
-from typing import Sequence, Union
-
-from alembic import op
-import sqlalchemy as sa
-
-
-# revision identifiers, used by Alembic.
-revision: str = 'ca4a5b4c9e74'
-down_revision: Union[str, Sequence[str], None] = 'fdb697085b8d'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
-
-
-def upgrade() -> None:
-    op.add_column(
-        "system_settings",
-        sa.Column(
-            "backup_retention_daily",
-            sa.Integer(),
-            nullable=False,
-            server_default="30"
-        )
-    )
-    op.add_column(
-        "system_settings",
-        sa.Column(
-            "backup_retention_weekly",
-            sa.Integer(),
-            nullable=False,
-            server_default="12"
-        )
-    )
-    op.add_column(
-        "system_settings",
-        sa.Column(
-            "backup_retention_monthly",
-            sa.Integer(),
-            nullable=False,
-            server_default="24"
-        )
-    )
-
-    op.drop_column("system_settings", "backup_retention_days")
-
-def downgrade() -> None:
-    op.add_column(
-        "system_settings",
-        sa.Column(
-            "backup_retention_days",
-            sa.Integer(),
-            nullable=False,
-            server_default="30"
-        )
-    )
-
-    op.drop_column("system_settings", "backup_retention_daily")
-    op.drop_column("system_settings", "backup_retention_weekly")
-    op.drop_column("system_settings", "backup_retention_monthly")
-
-```
-
----
-
-### .\backend\alembic\versions\e2398672eb07_agregar_índice_a_tabla_de_eventos_por_.py
-
-**Funciones (2):**
-- upgrade
-- downgrade
-
-**Clases (0):**
-
-**Imports (4):**
-- typing.Sequence
-- typing.Union
-- alembic.op
-- sqlalchemy
-
-```python
-"""agregar índice a tabla de eventos por restaurant_id
-
-Revision ID: e2398672eb07
-Revises: 900c4d6546a2
-Create Date: 2026-03-26 17:46:46.648977
-
-"""
-from typing import Sequence, Union
-
-from alembic import op
-import sqlalchemy as sa
-
-
-# revision identifiers, used by Alembic.
-revision: str = 'e2398672eb07'
-down_revision: Union[str, Sequence[str], None] = '900c4d6546a2'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
-
-
-def upgrade() -> None:
-    op.create_index(
-        "idx_domain_events_restaurant",
-        "domain_events",
-        ["restaurant_id"]
-    )
-
-
-
-def downgrade() -> None:
-    op.drop_index(
-        "idx_domain_events_restaurant",
-        table_name="domain_events"
-    )
-
-```
-
----
-
-### .\backend\alembic\versions\f2b920bbec2b_align_remaining_backend_model.py
-
-**Funciones (2):**
-- upgrade
-- downgrade
-
-**Clases (0):**
-
-**Imports (5):**
-- typing.Sequence
-- typing.Union
-- alembic.op
-- sqlalchemy
-- sqlalchemy.dialects.postgresql
-
-```python
-"""align remaining backend model
-
-Revision ID: f2b920bbec2b
-Revises: 789ad8c3f1b5
-Create Date: 2026-08-12 04:07:15.221597
-
-"""
-from typing import Sequence, Union
-
-from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
-
-# revision identifiers, used by Alembic.
-revision: str = 'f2b920bbec2b'
-down_revision: Union[str, Sequence[str], None] = '789ad8c3f1b5'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
-
-
-def upgrade() -> None:
-    """Upgrade schema."""
-    # ### commands auto generated by Alembic - please adjust! ###
-    op.alter_column('cash_registers', 'opened_by_id',
-               existing_type=sa.INTEGER(),
-               nullable=False)
-    op.alter_column('cash_registers', 'opened_at',
-               existing_type=postgresql.TIMESTAMP(timezone=True),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
-    op.drop_index(op.f('ix_restaurants_id'), table_name='restaurants')
-    op.alter_column('tables', 'shape',
-               existing_type=sa.VARCHAR(),
-               nullable=False)
-    op.drop_index(op.f('ix_tables_id'), table_name='tables')
-    op.alter_column('users', 'active',
-               existing_type=sa.BOOLEAN(),
-               nullable=False)
-    op.create_index(op.f('ix_users_restaurant_id'), 'users', ['restaurant_id'], unique=False)
-    op.create_unique_constraint('uq_user_username_per_restaurant', 'users', ['restaurant_id', 'username'])
-    # ### end Alembic commands ###
-
-
-def downgrade() -> None:
-    """Downgrade schema."""
-    # ### commands auto generated by Alembic - please adjust! ###
-    op.drop_constraint('uq_user_username_per_restaurant', 'users', type_='unique')
-    op.drop_index(op.f('ix_users_restaurant_id'), table_name='users')
-    op.alter_column('users', 'active',
-               existing_type=sa.BOOLEAN(),
-               nullable=True)
-    op.create_index(op.f('ix_tables_id'), 'tables', ['id'], unique=False)
-    op.alter_column('tables', 'shape',
-               existing_type=sa.VARCHAR(),
-               nullable=True)
-    op.create_index(op.f('ix_restaurants_id'), 'restaurants', ['id'], unique=False)
-    op.alter_column('cash_registers', 'opened_at',
-               existing_type=postgresql.TIMESTAMP(timezone=True),
-               nullable=True,
-               existing_server_default=sa.text('now()'))
-    op.alter_column('cash_registers', 'opened_by_id',
-               existing_type=sa.INTEGER(),
-               nullable=True)
-    # ### end Alembic commands ###
-
-```
-
----
-
-### .\backend\alembic\versions\fa7705341950_add_table_coordinates.py
-
-**Funciones (2):**
-- upgrade
-- downgrade
-
-**Clases (0):**
-
-**Imports (4):**
-- typing.Sequence
-- typing.Union
-- alembic.op
-- sqlalchemy
-
-```python
-"""add table coordinates
-
-Revision ID: fa7705341950
-Revises: b30663f913d9
-Create Date: 2026-03-15 02:39:50.294892
-
-"""
-from typing import Sequence, Union
-
-from alembic import op
-import sqlalchemy as sa
-
-
-# revision identifiers, used by Alembic.
-revision: str = 'fa7705341950'
-down_revision: Union[str, Sequence[str], None] = 'b30663f913d9'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
-
-
-def upgrade():
-    op.add_column(
-        "tables",
-        sa.Column("x", sa.Integer(), nullable=False, server_default="0")
-    )
-
-    op.add_column(
-        "tables",
-        sa.Column("y", sa.Integer(), nullable=False, server_default="0")
-    )
-
-    op.add_column(
-        "tables",
-        sa.Column("capacity", sa.Integer(), nullable=False, server_default="4")
-    )
-
-
-def downgrade() -> None:
-    """Downgrade schema."""
-    # ### commands auto generated by Alembic - please adjust! ###
-    op.drop_column('tables', 'capacity')
-    op.drop_column('tables', 'y')
-    op.drop_column('tables', 'x')
-    # ### end Alembic commands ###
-
-```
-
----
-
-### .\backend\alembic\versions\fdb697085b8d_add_more_and_more_and_more_backup_.py
-
-**Funciones (2):**
-- upgrade
-- downgrade
-
-**Clases (0):**
-
-**Imports (4):**
-- typing.Sequence
-- typing.Union
-- alembic.op
-- sqlalchemy
-
-```python
-"""add more and more and more backup settings
-
-Revision ID: fdb697085b8d
-Revises: 27cc3e563d72
-Create Date: 2026-07-11 23:06:30.821779
-
-"""
-from typing import Sequence, Union
-
-from alembic import op
-import sqlalchemy as sa
-
-
-# revision identifiers, used by Alembic.
-revision: str = 'fdb697085b8d'
-down_revision: Union[str, Sequence[str], None] = '27cc3e563d72'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
-
-
-def upgrade():
-
-    op.add_column(
-        "system_settings",
-        sa.Column(
-            "backup_time",
-            sa.Time(),
-            nullable=False,
-            server_default="03:00:00",
-        ),
-    )
-
-    op.add_column(
-        "system_settings",
-        sa.Column(
-            "backup_weekday",
-            sa.Integer(),
-            nullable=True,
-        ),
-    )
-
-    op.add_column(
-        "system_settings",
-        sa.Column(
-            "backup_monthday",
-            sa.Integer(),
-            nullable=True,
-        ),
-    )
-
-    op.add_column(
-        "system_settings",
-        sa.Column(
-            "backup_keep_local",
-            sa.Boolean(),
-            nullable=False,
-            server_default=sa.true(),
-        ),
-    )
-
-    op.add_column(
-        "system_settings",
-        sa.Column(
-            "backup_send_email",
-            sa.Boolean(),
-            nullable=False,
-            server_default=sa.false(),
-        ),
-    )
-
-    op.add_column(
-        "system_settings",
-        sa.Column(
-            "backup_timezone",
-            sa.String(),
-            nullable=False,
-            server_default="America/Montevideo",
-        ),
-    )
-
-
-def downgrade():
-
-    op.drop_column(
-        "system_settings",
-        "backup_keep_local",
-    )
-
-    op.drop_column(
-        "system_settings",
-        "backup_monthday",
-    )
-
-    op.drop_column(
-        "system_settings",
-        "backup_weekday",
-    )
-
-    op.drop_column(
-        "system_settings",
-        "backup_time",
-    )
-
-    op.drop_column(
-        "system_settings",
-        "backup_send_email",
-    )
-
-    op.drop_column(
-        "system_settings",
-        "backup_timezone",
-    )   
 ```
 
 ---
@@ -3734,13 +1932,6 @@ class BackupService:
             directory /
             f"backup-{created_at:%Y%m%d-%H%M%S}{suffix}"
         )
-    '''
-#-------------------------------------------------------------------
-# DEVOLVER EL DIRECTORIO DE BACKUPS DEL RESTAURANTE
-#-------------------------------------------------------------------
-    def _restaurant_backup_directory(self, restaurant_id: int) -> Path:
-        return self._restaurant_backup_directory(restaurant_id)
-    '''
 
 #-------------------------------------------------------------------
 # BACKUP BASE DE DATOS DE ACUERDO AL MOTOR DE BASE DE DATOS
@@ -5373,6 +3564,7 @@ class ErrorCode(str, Enum):
     # ORDERS
     ORDER_NOT_FOUND = "order_not_found"
     ORDER_ALREADY_CLOSED = "order_already_closed"
+    ORDER_ALREADY_CANCELLED = "order_already_cancelled"
     ORDER_ITEMS_NOT_DELIVERED = "order_items_not_delivered"
     ORDER_EMPTY = "order_empty"
     ORDER_HAS_REMAINING_BALANCE = "order_has_remaining_balance"
@@ -5619,7 +3811,8 @@ class KitchenService:
                 quantity=item.quantity,
                 status=item.status,
                 table_number=item.order.table.number,
-                order_id=item.order.id
+                order_id=item.order.id,
+                notes=item.notes
             )
             for item in items
         ]
@@ -5907,7 +4100,7 @@ def get_order_service(
 
 ### .\backend\app\domain\order\order_service.py
 
-**Funciones (19):**
+**Funciones (20):**
 - __init__
 - _get_active_orders
 - _get_active_order
@@ -5925,16 +4118,19 @@ def get_order_service(
 - add_payment
 - delete_payment
 - close_order
+- cancel_order
 - delete_order_item
 - update_item_quantity
 
 **Clases (1):**
 - OrderService
 
-**Imports (27):**
+**Imports (29):**
 - logging
 - decimal.Decimal
 - decimal.ROUND_HALF_UP
+- datetime.datetime
+- datetime.timezone
 - sqlalchemy.orm.Session
 - sqlalchemy.orm.joinedload
 - sqlalchemy.func
@@ -5964,6 +4160,7 @@ def get_order_service(
 import logging
 
 from decimal import Decimal, ROUND_HALF_UP
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
@@ -6046,11 +4243,16 @@ class OrderService:
     # -------------------------
     # Calcular totales de la orden
     # -------------------------
-    def _calculate_totals(self, order: Order) -> tuple[Decimal, Decimal, Decimal, Decimal]:
-        subtotal = sum((item.quantity * item.unit_price for item in order.items), Decimal("0"))
+    def _calculate_totals(self, order: Order) -> tuple[Decimal, Decimal, Decimal, Decimal]: 
+        active_items = [
+            item
+            for item in order.items
+            if item.status != OrderItemStatus.CANCELLED
+        ]
+        subtotal = sum((item.quantity * item.unit_price for item in active_items), Decimal("0"))
         discount = order.discount or Decimal("0")
         total = max(subtotal - discount, Decimal("0"))
-        total_paid = sum(payment.amount for payment in order.payments)
+        total_paid = sum((payment.amount for payment in order.payments), Decimal("0"))
         remaining = total - total_paid
         return subtotal, total, total_paid, remaining
 
@@ -6063,7 +4265,10 @@ class OrderService:
             if i.status != OrderItemStatus.CANCELLED
         ]
         if not active_items:
-            if order.status in (OrderStatus.DRAFT, OrderStatus.OPEN):
+            if order.status not in (
+                OrderStatus.CLOSED,
+                OrderStatus.CANCELLED
+            ):
                 return OrderStatus.CANCELLED
             return order.status
         statuses = [i.status for i in active_items]
@@ -6141,7 +4346,8 @@ class OrderService:
                     quantity=item.quantity,
                     unit_price=money(item.unit_price),
                     subtotal=money(item.quantity * item.unit_price),
-                    status=item.status
+                    status=item.status,
+                    notes=item.notes
                 )
                 for item in order.items
             ],
@@ -6232,6 +4438,11 @@ class OrderService:
                 "Cannot add items to closed order",
                 ErrorCode.ORDER_ALREADY_CLOSED
             )
+        if order.status == OrderStatus.CANCELLED:
+            raise DomainError(
+                "Cannot add items to cancelled order",
+                ErrorCode.ORDER_ALREADY_CANCELLED
+            )
         if data.quantity <= 0:
             raise DomainError(
                 "Quantity must be greater than zero",
@@ -6254,13 +4465,15 @@ class OrderService:
             )
         
         previous_status = order.status
+        notes = (data.notes.strip() if data.notes else None)
 
         existing_item = (
             self.db.query(OrderItem)
             .filter(
                 OrderItem.order_id == order.id,
                 OrderItem.product_id == product.id,
-                OrderItem.status == OrderItemStatus.PENDING
+                OrderItem.status == OrderItemStatus.PENDING,
+                OrderItem.notes == notes
             )
             .first()
         )
@@ -6274,7 +4487,8 @@ class OrderService:
                 product_id=product.id,
                 quantity=data.quantity,
                 unit_price=product.price,
-                status=OrderItemStatus.PENDING
+                status=OrderItemStatus.PENDING,
+                notes=data.notes
             )
             self.db.add(item)        
         self.db.flush()
@@ -6328,7 +4542,7 @@ class OrderService:
             self.db.add(order)
             self.db.flush()
         item = self.add_item(order, data)
-        return {"order_id": order.id, "item_id": item.id}
+        return {"order_id": order.id}
 
     # -------------------------
     # Actualizar estado de la orden
@@ -6357,29 +4571,22 @@ class OrderService:
     # -------------------------
     # Enviar a cocina
     # -------------------------
-    def send_to_kitchen(
-        self,
-        order: Order
-    ) -> OrderResponse:
-
+    def send_to_kitchen(self, order: Order) -> OrderResponse:
         if order.status == OrderStatus.CLOSED:
-            raise DomainError(
-                "Order is closed",
-                ErrorCode.ORDER_ALREADY_CLOSED
-            )
-
+            raise DomainError("Order is closed", ErrorCode.ORDER_ALREADY_CLOSED)
+        
+        if order.status == OrderStatus.CANCELLED:
+            raise DomainError("Order is cancelled", ErrorCode.ORDER_ALREADY_CANCELLED)
         pending_items = [
             item
             for item in order.items
             if item.status == OrderItemStatus.PENDING
         ]
-
         if not pending_items:
             raise DomainError(
                 "No pending items to send",
                 ErrorCode.NO_PENDING_ITEMS_TO_SEND
             )
-
         previous_status = order.status
 
         # --------------------------------------------------
@@ -6434,7 +4641,6 @@ class OrderService:
                     target="role",
                     target_id=role.value
                 )
-
         # --------------------------------------------------
         # Un único commit:
         #
@@ -6458,6 +4664,11 @@ class OrderService:
             raise DomainError(
                 "Order already closed",
                 ErrorCode.ORDER_ALREADY_CLOSED
+            )
+        if order.status == OrderStatus.CANCELLED:
+            raise DomainError(
+                "Order already cancelled",
+                ErrorCode.ORDER_ALREADY_CANCELLED
             )
         cash_service = CashRegisterService(self.db)
         cash_register = cash_service.get_open_cash_register(order.restaurant_id)
@@ -6513,16 +4724,18 @@ class OrderService:
         )
 
         if not payment:
-            raise DomainError(
-                "Pago no encontrado",
-                ErrorCode.PAYMENT_NOT_FOUND
-                )
+            raise DomainError("Pago no encontrado", ErrorCode.PAYMENT_NOT_FOUND)
 
         if payment.order.status == OrderStatus.CLOSED:
             raise DomainError(
                 "Cannot delete payment from closed order",
                 ErrorCode.INVALID_OPERATION
             )
+        if payment.order.status == OrderStatus.CANCELLED:
+            raise DomainError(
+                "Cannot delete payment from cancelled order",
+                ErrorCode.INVALID_OPERATION
+            )        
         logger.info("Pago eliminado order_id=%s amount=%s method=%s", payment.order_id, payment.amount, payment.method)
         order_id = payment.order_id
         amount = payment.amount
@@ -6555,10 +4768,9 @@ class OrderService:
     # -------------------------
     def close_order(self, order: Order) -> OrderResponse:
         if order.status == OrderStatus.CLOSED:
-            raise DomainError(
-                "La orden ya está cerrada",
-                ErrorCode.ORDER_ALREADY_CLOSED
-            )
+            raise DomainError("La orden ya está cerrada", ErrorCode.ORDER_ALREADY_CLOSED)
+        if order.status == OrderStatus.CANCELLED:
+            raise DomainError("La orden está cancelada", ErrorCode.ORDER_ALREADY_CANCELLED)
         subtotal, total, total_paid, remaining = self._calculate_totals(order)
         if remaining > 0:
             raise DomainError(
@@ -6566,9 +4778,15 @@ class OrderService:
                 ErrorCode.ORDER_HAS_REMAINING_BALANCE,
                 context={"remaining": money(remaining)}
             )
-        if not order.items:
+        active_items = [
+            item
+            for item in order.items
+            if item.status != OrderItemStatus.CANCELLED
+        ]
+
+        if not active_items:
             raise DomainError(
-                "La orden no tiene items",
+                "La orden no tiene items activos",
                 ErrorCode.ORDER_EMPTY
             )
         not_delivered = [
@@ -6605,6 +4823,210 @@ class OrderService:
         return self.to_order_response(order)
 
     # -------------------------
+    # Cancelar orden
+    # -------------------------
+    def cancel_order(self, order: Order, user_id: int, reason: str) -> OrderResponse:
+        reason = reason.strip()
+        if not reason:
+            raise DomainError(
+                "Debe indicar un motivo para cancelar la orden",
+                ErrorCode.INVALID_OPERATION,
+                context={
+                    "order_id": order.id
+                }
+            )
+
+        # --------------------------------------------------
+        # Estados finales
+        # --------------------------------------------------
+        if order.status == OrderStatus.CLOSED:
+            raise DomainError(
+                "No se puede cancelar una orden cerrada",
+                ErrorCode.ORDER_ALREADY_CLOSED,
+                context={
+                    "order_id": order.id
+                }
+            )
+
+        if order.status == OrderStatus.CANCELLED:
+            raise DomainError(
+                "La orden ya está cancelada",
+                ErrorCode.ORDER_ALREADY_CANCELLED,
+                context={
+                    "order_id": order.id
+                }
+            )
+
+        # --------------------------------------------------
+        # No permitimos cancelar una orden que ya tenga
+        # items entregados.
+        #
+        # Una devolución posterior a la entrega deberá
+        # modelarse como otra operación.
+        # --------------------------------------------------
+        delivered_items = [
+            item
+            for item in order.items
+            if item.status == OrderItemStatus.DELIVERED
+        ]
+
+        if delivered_items:
+            raise DomainError(
+                (
+                    "No se puede cancelar la orden porque "
+                    "contiene items entregados"
+                ),
+                ErrorCode.INVALID_OPERATION,
+                context={
+                    "order_id": order.id,
+                    "items": [
+                        item.id
+                        for item in delivered_items
+                    ]
+                }
+            )
+
+        # --------------------------------------------------
+        # Validación financiera
+        #
+        # La cancelación completa deja el total en cero.
+        # Por lo tanto no puede haber pagos registrados.
+        # --------------------------------------------------
+        _, _, total_paid, _ = (
+            self._calculate_totals(order)
+        )
+
+        if total_paid > Decimal("0"):
+            raise DomainError(
+                (
+                    "No se puede cancelar la orden mientras "
+                    "tenga pagos registrados"
+                ),
+                ErrorCode.INVALID_OPERATION,
+                context={
+                    "order_id": order.id,
+                    "total_paid": money(total_paid)
+                }
+            )
+
+        cancelled_at = datetime.now(timezone.utc)
+
+        # --------------------------------------------------
+        # Cancelar todos los items activos.
+        #
+        # En una cancelación completa preservamos también
+        # los PENDING porque forman parte del historial
+        # de la orden cancelada.
+        # --------------------------------------------------
+        items_to_cancel = [
+            item
+            for item in order.items
+            if item.status != OrderItemStatus.CANCELLED
+        ]
+
+        affected_station_ids = set()
+
+        for item in items_to_cancel:
+
+            item.status = OrderItemStatus.CANCELLED
+
+            item.cancelled_at = cancelled_at
+            item.cancelled_by_id = user_id
+            item.cancellation_reason = reason
+
+            if item.product.station_id is not None:
+                affected_station_ids.add(
+                    item.product.station_id
+                )
+
+        # --------------------------------------------------
+        # Cancelar orden
+        # --------------------------------------------------
+        previous_status = order.status
+
+        self._set_status(
+            order,
+            OrderStatus.CANCELLED
+        )
+
+        order.cancelled_at = cancelled_at
+        order.cancelled_by_id = user_id
+        order.cancellation_reason = reason
+
+        logger.info(
+            (
+                "Orden cancelada "
+                "order_id=%s user_id=%s reason=%s"
+            ),
+            order.id,
+            user_id,
+            reason
+        )
+
+        # ==================================================
+        # EVENTOS
+        # ==================================================
+
+        # --------------------------------------------------
+        # Cocina
+        #
+        # Un único ORDER_UPDATED por estación es suficiente
+        # para que cada estación vuelva a obtener su estado.
+        # --------------------------------------------------
+        for station_id in affected_station_ids:
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type=WSEvent.ORDER_UPDATED,
+                payload={
+                    "order_id": order.id
+                },
+                target="station",
+                target_id=str(station_id)
+            )
+
+        # --------------------------------------------------
+        # Salón / administración / caja
+        # --------------------------------------------------
+        for role in [
+            UserRole.ADMIN,
+            UserRole.WAITER,
+            UserRole.CASHIER
+        ]:
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type=WSEvent.ORDER_STATUS_CHANGED,
+                payload={
+                    "order_id": order.id,
+                    "status": order.status.value
+                },
+                target="role",
+                target_id=role.value
+            )
+
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type=WSEvent.ORDER_UPDATED,
+                payload={
+                    "order_id": order.id
+                },
+                target="role",
+                target_id=role.value
+            )
+
+        # --------------------------------------------------
+        # Un único commit:
+        #
+        # - cancelación de items
+        # - cancelación de orden
+        # - datos de auditoría
+        # - eventos Outbox
+        # todo dentro de la misma transacción.
+        # --------------------------------------------------
+        self.db.commit()
+        self.db.refresh(order)
+        return self.to_order_response(order)
+
+    # -------------------------
     # Eliminar item de la orden
     # -------------------------
     def delete_order_item(
@@ -6612,7 +5034,7 @@ class OrderService:
         restaurant_id: int,
         order_id: int,
         item_id: int,
-    ) -> None:
+    ) -> OrderResponse:
         item = (
             self.db.query(OrderItem)
             .filter(
@@ -6644,12 +5066,33 @@ class OrderService:
             )
 
         order = item.order
+        previous_status = order.status
 
         self.db.delete(item)
+        self.db.flush()
         new_status = self._calculate_order_status(order)
         self._set_status(order, new_status)
         logger.info("Item eliminado order_id=%s item_id=%s", order_id, item_id)
+
         # 🔔 EVENTO
+        if order.status != previous_status:
+            for role in [
+                UserRole.ADMIN,
+                UserRole.WAITER,
+                UserRole.CASHIER
+            ]:
+                self.events.emit(
+                    restaurant_id=restaurant_id,
+                    event_type=WSEvent.ORDER_STATUS_CHANGED,
+                    payload={
+                        "order_id": order.id,
+                        "status": order.status.value
+                    },
+                    target="role",
+                    target_id=role.value
+                )
+
+
         for role in [UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER]:
             self.events.emit(
                 restaurant_id=restaurant_id,
@@ -6658,8 +5101,10 @@ class OrderService:
                 target="role",
                 target_id=role.value
             )
+            
         self.db.commit()
         self.db.refresh(order)
+        return self.to_order_response(order)
         
     # -------------------------
     # Actualizar cantidad por item de la orden
@@ -6680,10 +5125,7 @@ class OrderService:
             .first()
         )
         if not item:
-            raise DomainError(
-                "order item not found",
-                ErrorCode.ITEM_NOT_FOUND
-            )
+            raise DomainError("order item not found", ErrorCode.ITEM_NOT_FOUND)
         order = item.order
         if item.status != OrderItemStatus.PENDING:
             raise DomainError(
@@ -6722,30 +5164,38 @@ class OrderService:
 from app.models.order import OrderStatus
 
 ORDER_ALLOWED_TRANSITIONS = {
+
     OrderStatus.DRAFT: [
         OrderStatus.OPEN,
         OrderStatus.CANCELLED
     ],
+
     OrderStatus.OPEN: [
         OrderStatus.SENT,
         OrderStatus.CANCELLED
     ],
+
     OrderStatus.SENT: [
         OrderStatus.IN_PROGRESS,
         OrderStatus.READY,
         OrderStatus.CANCELLED
     ],
+
     OrderStatus.IN_PROGRESS: [
         OrderStatus.SENT,
         OrderStatus.READY,
         OrderStatus.CANCELLED
     ],
+
     OrderStatus.READY: [
         OrderStatus.OPEN,
         OrderStatus.SENT,
-        OrderStatus.CLOSED
+        OrderStatus.CLOSED,
+        OrderStatus.CANCELLED
     ],
+
     OrderStatus.CLOSED: [],
+
     OrderStatus.CANCELLED: []
 }
 
@@ -6792,16 +5242,21 @@ def get_order_item_service(
 
 ### .\backend\app\domain\order_item\order_item_service.py
 
-**Funciones (4):**
+**Funciones (5):**
 - __init__
 - _get_item
 - _process_status_transition
 - update_status
+- cancel_item
 
 **Clases (1):**
 - OrderItemService
 
-**Imports (12):**
+**Imports (18):**
+- logging
+- datetime.datetime
+- datetime.timezone
+- decimal.Decimal
 - sqlalchemy.orm.Session
 - app.domain.order.order_service.OrderService
 - app.domain.order_item.order_item_transitions.can_transition
@@ -6809,13 +5264,20 @@ def get_order_item_service(
 - app.domain.errors.error_codes.ErrorCode
 - app.domain.events.websocket.WSEvent
 - app.services.event_service.EventService
+- app.utils.money.money
 - app.models.order_item.OrderItem
 - app.models.order_item.OrderItemStatus
 - app.models.user.User
 - app.models.user.UserRole
 - app.models.order.OrderStatus
+- app.schemas.order.order.OrderResponse
 
 ```python
+import logging
+
+from datetime import datetime, timezone
+from decimal import Decimal
+
 from sqlalchemy.orm import Session
 
 from app.domain.order.order_service import OrderService
@@ -6826,9 +5288,15 @@ from app.domain.events.websocket import WSEvent
 
 from app.services.event_service import EventService
 
+from app.utils.money import money
+
 from app.models.order_item import OrderItem, OrderItemStatus
 from app.models.user import User, UserRole
 from app.models.order import OrderStatus
+
+from app.schemas.order.order import OrderResponse
+
+logger = logging.getLogger("app.domain.order_item")
 
 class OrderItemService:
 
@@ -6875,34 +5343,80 @@ class OrderItemService:
         user: User,
         order_service: OrderService
     ) -> OrderStatus:
+
         order = item.order
+
         if order.status == OrderStatus.CLOSED:
             raise DomainError(
                 "No se pueden modificar items en una orden cerrada",
                 ErrorCode.ORDER_ALREADY_CLOSED,
                 context={"order_id": order.id}
             )
-        if new_status == OrderItemStatus.IN_PROGRESS and user.role != UserRole.KITCHEN:
+
+        if order.status == OrderStatus.CANCELLED:
+            raise DomainError(
+                "No se pueden modificar items en una orden cancelada",
+                ErrorCode.ORDER_ALREADY_CANCELLED,
+                context={"order_id": order.id}
+            )
+
+        if (
+            new_status == OrderItemStatus.IN_PROGRESS
+            and user.role != UserRole.KITCHEN
+        ):
             raise DomainError(
                 "Sólo COCINA puede comenzar items",
                 ErrorCode.ITEM_STATUS_ROLE_FORBIDDEN,
                 context={"required_role": "KITCHEN"}
             )
-        if new_status == OrderItemStatus.READY and user.role != UserRole.KITCHEN:
+
+        if (
+            new_status == OrderItemStatus.READY
+            and user.role != UserRole.KITCHEN
+        ):
             raise DomainError(
                 "Sólo COCINA puede marcar items como listos",
                 ErrorCode.ITEM_STATUS_ROLE_FORBIDDEN,
                 context={"required_role": "KITCHEN"}
             )
-        if new_status == OrderItemStatus.DELIVERED and user.role != UserRole.WAITER:
+
+        if (
+            new_status == OrderItemStatus.DELIVERED
+            and user.role != UserRole.WAITER
+        ):
             raise DomainError(
                 "Sólo MOZO puede entregar items",
                 ErrorCode.ITEM_STATUS_ROLE_FORBIDDEN,
                 context={"required_role": "WAITER"}
             )
-        if not can_transition(item.status, new_status):
+
+        if (
+            new_status == OrderItemStatus.CANCELLED
+            and user.role not in (
+                UserRole.WAITER,
+                UserRole.ADMIN
+            )
+        ):
             raise DomainError(
-                f"Transición inválida desde {item.status.value} a {new_status.value}",
+                "Sólo MOZO o ADMIN puede cancelar items",
+                ErrorCode.ITEM_STATUS_ROLE_FORBIDDEN,
+                context={
+                    "required_roles": [
+                        UserRole.WAITER.value,
+                        UserRole.ADMIN.value
+                    ]
+                }
+            )
+
+        if not can_transition(
+            item.status,
+            new_status
+        ):
+            raise DomainError(
+                (
+                    f"Transición inválida desde "
+                    f"{item.status.value} a {new_status.value}"
+                ),
                 ErrorCode.ITEM_INVALID_TRANSITION,
                 context={
                     "from": item.status.value,
@@ -6911,7 +5425,7 @@ class OrderItemService:
             )
         item.status = new_status
         previous_status = order.status
-        new_order_status = order_service._calculate_order_status(order)
+        new_order_status = (order_service._calculate_order_status(order))
         order_service._set_status(order, new_order_status)
         return previous_status
 
@@ -6924,6 +5438,12 @@ class OrderItemService:
         new_status: OrderItemStatus,
         user: User
     ) -> OrderItem:
+
+        if new_status == OrderItemStatus.CANCELLED:
+            raise DomainError(
+                "La cancelación de items debe realizarse mediante la operación específica de cancelación",
+                ErrorCode.INVALID_OPERATION
+            )
 
         item = self._get_item(
             item_id,
@@ -7029,8 +5549,268 @@ class OrderItemService:
         # --------------------------------------------------
         self.db.commit()
         self.db.refresh(item)
-
         return item
+
+    # -------------------------
+    # Cancelar item
+    # -------------------------
+    def cancel_item(
+        self,
+        item_id: int,
+        reason: str,
+        user: User
+    ) -> OrderResponse:
+
+        item = self._get_item(
+            item_id,
+            user.restaurant_id
+        )
+
+        order = item.order
+
+        reason = reason.strip()
+
+        if not reason:
+            raise DomainError(
+                "Debe indicar un motivo para cancelar el item",
+                ErrorCode.INVALID_OPERATION,
+                context={"item_id": item.id}
+            )
+
+        # --------------------------------------------------
+        # La tabla de transiciones sigue siendo la fuente
+        # de verdad respecto a qué estados pueden cancelarse.
+        #
+        # PENDING no admite CANCELLED: debe eliminarse.
+        # DELIVERED y CANCELLED son estados finales.
+        # --------------------------------------------------
+        if not can_transition(
+            item.status,
+            OrderItemStatus.CANCELLED
+        ):
+            raise DomainError(
+                (
+                    f"No se puede cancelar un item "
+                    f"en estado {item.status.value}"
+                ),
+                ErrorCode.ITEM_INVALID_TRANSITION,
+                context={
+                    "item_id": item.id,
+                    "from": item.status.value,
+                    "to": OrderItemStatus.CANCELLED.value
+                }
+            )
+
+        order_service = OrderService(self.db)
+
+        # --------------------------------------------------
+        # Validación financiera
+        #
+        # Cancelar el item reduce el subtotal y, por tanto,
+        # puede dejar inválido un descuento existente o hacer
+        # que lo ya pagado supere el nuevo total.
+        # --------------------------------------------------
+        subtotal, _, total_paid, _ = (
+            order_service._calculate_totals(order)
+        )
+
+        item_amount = (
+            item.quantity * item.unit_price
+        )
+
+        new_subtotal = (
+            subtotal - item_amount
+        )
+
+        discount = (
+            order.discount or Decimal("0")
+        )
+
+        if discount > new_subtotal:
+            raise DomainError(
+                (
+                    "No se puede cancelar el item porque "
+                    "el descuento de la orden superaría "
+                    "el nuevo subtotal"
+                ),
+                ErrorCode.INVALID_OPERATION,
+                context={
+                    "item_id": item.id,
+                    "new_subtotal": money(new_subtotal),
+                    "discount": money(discount)
+                }
+            )
+
+        new_total = max(
+            new_subtotal - discount,
+            Decimal("0")
+        )
+
+        if total_paid > new_total:
+            raise DomainError(
+                (
+                    "No se puede cancelar el item porque "
+                    "el monto pagado superaría el nuevo total"
+                ),
+                ErrorCode.INVALID_OPERATION,
+                context={
+                    "item_id": item.id,
+                    "new_total": money(new_total),
+                    "total_paid": money(total_paid)
+                }
+            )
+
+        # --------------------------------------------------
+        # Transición de estado.
+        #
+        # Acá se validan también:
+        # - estado de la orden
+        # - rol del usuario
+        # - transición del item
+        # - nuevo estado general de la orden
+        # --------------------------------------------------
+        previous_order_status = (
+            self._process_status_transition(
+                item=item,
+                new_status=OrderItemStatus.CANCELLED,
+                user=user,
+                order_service=order_service
+            )
+        )
+
+        # --------------------------------------------------
+        # Auditoría del item
+        # --------------------------------------------------
+        cancelled_at = datetime.now(
+            timezone.utc
+        )
+
+        item.cancelled_at = cancelled_at
+        item.cancelled_by_id = user.id
+        item.cancellation_reason = reason
+
+        # --------------------------------------------------
+        # Si era el último item activo,
+        # _calculate_order_status() habrá cancelado también
+        # la orden. Registramos su auditoría.
+        # --------------------------------------------------
+        if (
+            previous_order_status != OrderStatus.CANCELLED
+            and order.status == OrderStatus.CANCELLED
+        ):
+            order.cancelled_at = cancelled_at
+            order.cancelled_by_id = user.id
+            order.cancellation_reason = reason
+
+        logger.info(
+            (
+                "Item cancelado "
+                "order_id=%s item_id=%s "
+                "user_id=%s reason=%s"
+            ),
+            order.id,
+            item.id,
+            user.id,
+            reason
+        )
+
+        # ==================================================
+        # EVENTOS
+        # ==================================================
+
+        payload = {
+            "order_id": order.id,
+            "item_id": item.id,
+            "status": item.status.value,
+            "product": item.product.name,
+            "quantity": item.quantity,
+            "table": order.table.number
+        }
+
+        # --------------------------------------------------
+        # Cocina
+        # --------------------------------------------------
+        self.events.emit(
+            restaurant_id=order.restaurant_id,
+            event_type=WSEvent.ITEM_STATUS_CHANGED,
+            payload=payload,
+            target="station",
+            target_id=str(
+                item.product.station_id
+            )
+        )
+
+        # --------------------------------------------------
+        # Salón / administración / caja
+        #
+        # Caja también debe enterarse porque la cancelación
+        # modifica subtotal, total y saldo de la orden.
+        # --------------------------------------------------
+        for role in [
+            UserRole.ADMIN,
+            UserRole.WAITER,
+            UserRole.CASHIER
+        ]:
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type=WSEvent.ITEM_STATUS_CHANGED,
+                payload=payload,
+                target="role",
+                target_id=role.value
+            )
+
+            self.events.emit(
+                restaurant_id=order.restaurant_id,
+                event_type=WSEvent.ORDER_UPDATED,
+                payload={
+                    "order_id": order.id
+                },
+                target="role",
+                target_id=role.value
+            )
+
+        # --------------------------------------------------
+        # Si cambió también el estado general de la orden.
+        #
+        # Por ejemplo:
+        # READY → CANCELLED
+        # al cancelar el último item activo.
+        # --------------------------------------------------
+        if order.status != previous_order_status:
+            for role in [
+                UserRole.ADMIN,
+                UserRole.WAITER,
+                UserRole.CASHIER
+            ]:
+                self.events.emit(
+                    restaurant_id=order.restaurant_id,
+                    event_type=WSEvent.ORDER_STATUS_CHANGED,
+                    payload={
+                        "order_id": order.id,
+                        "status": order.status.value
+                    },
+                    target="role",
+                    target_id=role.value
+                )
+
+        # --------------------------------------------------
+        # Un único commit:
+        #
+        # - cancelación del item
+        # - posible cancelación de la orden
+        # - auditoría
+        # - eventos Outbox
+        #
+        # todo queda dentro de la misma transacción.
+        # --------------------------------------------------
+        self.db.commit()
+
+        self.db.refresh(item)
+        self.db.refresh(order)
+
+        return order_service.to_order_response(
+            order
+        )
 ```
 
 ---
@@ -7051,22 +5831,28 @@ from app.models.order_item import OrderItemStatus
 
 
 _ALLOWED_TRANSITIONS = {
+
     OrderItemStatus.PENDING: [
-        OrderItemStatus.SENT,
-        OrderItemStatus.CANCELLED
+        OrderItemStatus.SENT
     ],
+
     OrderItemStatus.SENT: [
         OrderItemStatus.IN_PROGRESS,
         OrderItemStatus.CANCELLED
     ],
+
     OrderItemStatus.IN_PROGRESS: [
         OrderItemStatus.READY,
         OrderItemStatus.CANCELLED
     ],
+
     OrderItemStatus.READY: [
-        OrderItemStatus.DELIVERED
+        OrderItemStatus.DELIVERED,
+        OrderItemStatus.CANCELLED
     ],
+
     OrderItemStatus.DELIVERED: [],
+
     OrderItemStatus.CANCELLED: []
 }
 
@@ -9293,9 +8079,9 @@ class CashMovement(Base):
     )
 
     created_at = Column(
-        DateTime,
-        nullable=False,
-        server_default=func.now()
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False
     )
 
     __table_args__ = (
@@ -9697,7 +8483,7 @@ class EventOutbox(Base):
 - OrderStatus
 - Order
 
-**Imports (14):**
+**Imports (15):**
 - enum
 - uuid
 - sqlalchemy.Column
@@ -9709,6 +8495,7 @@ class EventOutbox(Base):
 - sqlalchemy.Enum
 - sqlalchemy.Index
 - sqlalchemy.Identity
+- sqlalchemy.Text
 - sqlalchemy.sql.func
 - app.db.base_class.Base
 - sqlalchemy.orm.relationship
@@ -9725,7 +8512,8 @@ from sqlalchemy import (
     DateTime, 
     Enum, 
     Index, 
-    Identity
+    Identity,
+    Text
 )
 from sqlalchemy.sql import func
 from app.db.base_class import Base
@@ -9744,7 +8532,7 @@ class OrderStatus(str, enum.Enum):
 class Order(Base):
     __tablename__ = "orders"
 
-    id = Column(Integer, Identity(), primary_key=True, index=True)
+    id = Column(Integer, Identity(), primary_key=True)
     restaurant_id = Column(
         Integer,
         ForeignKey("restaurants.id"),
@@ -9770,6 +8558,23 @@ class Order(Base):
         nullable=True
     )
     discount = Column(Numeric(10, 2), nullable=False, default=0)
+
+    cancelled_at = Column(
+        DateTime(timezone=True),
+        nullable=True
+    )
+
+    cancelled_by_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=True
+    )
+
+    cancellation_reason = Column(
+        Text,
+        nullable=True
+    )
+    
     external_id = Column(
         String,
         unique=True,
@@ -9796,7 +8601,7 @@ class Order(Base):
 - OrderItemStatus
 - OrderItem
 
-**Imports (11):**
+**Imports (13):**
 - sqlalchemy.Column
 - sqlalchemy.Integer
 - sqlalchemy.ForeignKey
@@ -9805,6 +8610,8 @@ class Order(Base):
 - sqlalchemy.Enum
 - sqlalchemy.Identity
 - sqlalchemy.Index
+- sqlalchemy.DateTime
+- sqlalchemy.Text
 - sqlalchemy.orm.relationship
 - enum
 - app.db.base_class.Base
@@ -9818,7 +8625,9 @@ from sqlalchemy import (
     String,
     Enum,
     Identity,
-    Index
+    Index,
+    DateTime,
+    Text
 )
 from sqlalchemy.orm import relationship
 import enum
@@ -9880,6 +8689,22 @@ class OrderItem(Base):
 
     notes = Column(
         String,
+        nullable=True
+    )
+
+    cancelled_at = Column(
+        DateTime(timezone=True),
+        nullable=True
+    )
+
+    cancelled_by_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=True
+    )
+
+    cancellation_reason = Column(
+        Text,
         nullable=True
     )
 
@@ -10812,14 +9637,22 @@ Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
 """
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import (
+    APIRouter, 
+    Depends, 
+    HTTPException, 
+    status
+)
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 
 from app.dependencies.auth import get_current_user
-from app.core.security import create_access_token, verify_password
+from app.core.security import (
+    create_access_token, 
+    verify_password
+)
 
 from app.models.user import User
 
@@ -10913,7 +9746,11 @@ Endpoints para la gestión de backups.
 Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
 """
 
-from fastapi import APIRouter, Depends, status
+from fastapi import (
+    APIRouter, 
+    Depends, 
+    status
+)
 
 from app.dependencies.roles import admin_only
 
@@ -11092,7 +9929,11 @@ Endpoints para la gestión de la caja registradora.
 Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
 """
 
-from fastapi import APIRouter, Depends, status
+from fastapi import (
+    APIRouter, 
+    Depends, 
+    status
+)
 
 from app.dependencies.roles import cashier_or_admin
 
@@ -11272,9 +10113,17 @@ Endpoints para la gestión de categorías.
 Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
 """
 
-from fastapi import APIRouter, Depends, status, Query
+from fastapi import (
+    APIRouter, 
+    Depends, 
+    status,
+    Query
+)
 
-from app.dependencies.roles import admin_only, waiter_or_admin
+from app.dependencies.roles import (
+    admin_only, 
+    waiter_or_admin
+)
 
 from app.domain.category.category_service import CategoryService
 from app.domain.category.dependencies import get_category_service
@@ -11401,7 +10250,11 @@ Endpoints para la gestión de la cocina.
 Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
 """
 
-from fastapi import APIRouter, Depends, status
+from fastapi import (
+    APIRouter, 
+    Depends, 
+    status
+)
 
 from app.dependencies.roles import kitchen_or_admin
 
@@ -11449,9 +10302,9 @@ def get_station_items(
 **Imports (12):**
 - fastapi.APIRouter
 - fastapi.Depends
+- fastapi.status
 - fastapi.File
 - fastapi.UploadFile
-- fastapi.status
 - app.dependencies.roles.waiter_or_admin
 - app.dependencies.roles.admin_only
 - app.domain.layout.dependencies.get_layout_service
@@ -11466,9 +10319,18 @@ Endpoints para la gestión de la layout del restaurant.
 Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
 """
 
-from fastapi import APIRouter, Depends, File, UploadFile, status
+from fastapi import (
+    APIRouter, 
+    Depends, 
+    status,
+    File,
+    UploadFile
+)
 
-from app.dependencies.roles import waiter_or_admin, admin_only
+from app.dependencies.roles import (
+    waiter_or_admin, 
+    admin_only
+)
 
 from app.domain.layout.dependencies import get_layout_service
 from app.domain.layout.layout_service import LayoutService
@@ -11537,7 +10399,7 @@ def update_layout(
 
 ### .\backend\app\routers\orders.py
 
-**Funciones (10):**
+**Funciones (11):**
 - add_item_to_order
 - send_to_kitchen
 - add_payment
@@ -11546,17 +10408,18 @@ def update_layout(
 - get_active_orders
 - get_order
 - update_order_item_quantity
+- cancel_order
 - delete_order_item
 - delete_payment
 
 **Clases (0):**
 
-**Imports (17):**
+**Imports (16):**
 - decimal.Decimal
 - fastapi.APIRouter
 - fastapi.Depends
-- fastapi.Query
 - fastapi.status
+- fastapi.Query
 - app.dependencies.roles.waiter_or_admin
 - app.dependencies.roles.waiter_cashier_or_admin
 - app.dependencies.roles.all_staff
@@ -11566,9 +10429,8 @@ def update_layout(
 - app.schemas.order.order_item.OrderItemCreate
 - app.schemas.order.payment.PaymentCreate
 - app.schemas.order.payment.PaymentOut
-- app.schemas.order.order.OrderStatusUpdate
-- app.schemas.order.order.OrderDetail
 - app.schemas.order.order.OrderResponse
+- app.schemas.order.order.OrderCancel
 
 ```python
 """
@@ -11577,9 +10439,18 @@ Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
 """
 
 from decimal import Decimal
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import (
+    APIRouter, 
+    Depends, 
+    status,
+    Query
+)
 
-from app.dependencies.roles import waiter_or_admin, waiter_cashier_or_admin, all_staff
+from app.dependencies.roles import (
+    waiter_or_admin, 
+    waiter_cashier_or_admin, 
+    all_staff
+)
 
 from app.domain.order.order_service import OrderService
 from app.domain.order.dependencies import get_order_service
@@ -11592,9 +10463,8 @@ from app.schemas.order.payment import (
     PaymentOut
 )
 from app.schemas.order.order import (
-    OrderStatusUpdate,
-    OrderDetail,
-    OrderResponse
+    OrderResponse,
+    OrderCancel
 )
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -11604,7 +10474,7 @@ router = APIRouter(prefix="/orders", tags=["orders"])
 # -------------------------
 @router.post(
     "/{order_id}/items",
-    response_model=OrderDetail,
+    response_model=OrderResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Agregar item a orden",
     description="Agrega un item a la orden especificada."
@@ -11623,7 +10493,7 @@ def add_item_to_order(
 # -------------------------
 @router.post(
     "/{order_id}/send-to-kitchen",
-    response_model=OrderDetail,
+    response_model=OrderResponse,
     status_code=status.HTTP_200_OK,
     summary="Enviar orden a cocina",
     description="Envía la orden especificada a la cocina."
@@ -11660,7 +10530,7 @@ def add_payment(
 # -------------------------
 @router.post(
     "/{order_id}/close",
-    response_model=OrderDetail,
+    response_model=OrderResponse,
     status_code=status.HTTP_200_OK,
     summary="Cerrar orden",
     description="Cierra la orden especificada."
@@ -11678,7 +10548,7 @@ def close_order(
 # -------------------------
 @router.put(
     "/{order_id}/discount",
-    response_model=OrderDetail,
+    response_model=OrderResponse,
     status_code=status.HTTP_200_OK,
     summary="Aplicar descuento a orden",
     description="Aplica un descuento a la orden especificada."
@@ -11731,7 +10601,7 @@ def get_order(
 # -------------------------
 @router.patch(
     "/order-items/{item_id}",
-    response_model=OrderDetail,
+    response_model=OrderResponse,
     status_code=status.HTTP_200_OK,
     summary="Actualizar cantidad de item",
     description="Actualiza la cantidad del item especificado en la orden."
@@ -11745,10 +10615,40 @@ def update_order_item_quantity(
     return service.update_item_quantity(user.restaurant_id, item_id, quantity)
 
 # -------------------------
+# Cancelar orden
+# -------------------------
+@router.patch(
+    "/{order_id}/cancel",
+    response_model=OrderResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Cancelar orden",
+    description=(
+        "Cancela una orden y conserva "
+        "su información para auditoría."
+    )
+)
+def cancel_order(
+    order_id: int,
+    data: OrderCancel,
+    user: User = Depends(waiter_or_admin),
+    service: OrderService = Depends(
+        get_order_service
+    )
+):
+    order = service.get_order(order_id, user.restaurant_id)
+
+    return service.cancel_order(
+        order=order,
+        user_id=user.id,
+        reason=data.reason
+    )
+
+# -------------------------
 # Borrar item de orden
 # -------------------------
 @router.delete(
     "/{order_id}/items/{item_id}",
+    response_model=OrderResponse,
     status_code=status.HTTP_200_OK,
     summary="Borrar item de orden",
     description="Borra el item especificado de la orden."
@@ -11759,7 +10659,7 @@ def delete_order_item(
     user: User = Depends(waiter_or_admin),
     service: OrderService = Depends(get_order_service)
 ):
-    service.delete_order_item(user.restaurant_id, order_id, item_id)
+    return service.delete_order_item(user.restaurant_id, order_id, item_id)
 
 # -------------------------
 # Borrar Pago
@@ -11782,21 +10682,24 @@ def delete_payment(
 
 ### .\backend\app\routers\order_items.py
 
-**Funciones (1):**
+**Funciones (2):**
 - update_item_status
+- cancel_order_item
 
 **Clases (0):**
 
-**Imports (9):**
+**Imports (11):**
 - fastapi.APIRouter
 - fastapi.Depends
 - fastapi.status
 - app.dependencies.roles.waiter_kitchen_or_admin
+- app.dependencies.roles.waiter_or_admin
 - app.domain.order_item.order_item_service.OrderItemService
 - app.domain.order_item.dependencies.get_order_item_service
 - app.models.user.User
 - app.schemas.order.order_item.OrderItemStatusUpdate
-- app.schemas.order.order_item.OrderItemOut
+- app.schemas.order.order_item.OrderItemCancel
+- app.schemas.order.order.OrderResponse
 
 ```python
 """
@@ -11804,9 +10707,16 @@ Endpoints para la gestión de los items de una orden.
 Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
 """
 
-from fastapi import APIRouter, Depends, status
+from fastapi import (
+    APIRouter, 
+    Depends, 
+    status
+)
 
-from app.dependencies.roles import waiter_kitchen_or_admin
+from app.dependencies.roles import (
+    waiter_kitchen_or_admin, 
+    waiter_or_admin
+)
 
 from app.domain.order_item.order_item_service import OrderItemService
 from app.domain.order_item.dependencies import get_order_item_service
@@ -11815,13 +10725,13 @@ from app.models.user import User
 
 from app.schemas.order.order_item import (
     OrderItemStatusUpdate,
-    OrderItemOut
+    OrderItemCancel
 )
 
-router = APIRouter(
-    prefix="/order-items",
-    tags=["order-items"]
-)
+from app.schemas.order.order import OrderResponse
+
+
+router = APIRouter(prefix="/order-items", tags=["order-items"])
 
 # ----------------------------------------------------------------------------------------------------
 # Cambiar estado de item
@@ -11842,6 +10752,33 @@ def update_item_status(
         item_id=item_id,
         new_status=data.status,
         user=user,
+    )
+
+# -------------------------
+# Cancelar item
+# -------------------------
+@router.patch(
+    "/{item_id}/cancel",
+    response_model=OrderResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Cancelar item",
+    description=(
+        "Cancela un item que ya fue enviado a cocina "
+        "y conserva su registro histórico."
+    )
+)
+def cancel_order_item(
+    item_id: int,
+    data: OrderItemCancel,
+    user: User = Depends(waiter_or_admin),
+    service: OrderItemService = Depends(
+        get_order_item_service
+    )
+):
+    return service.cancel_item(
+        item_id=item_id,
+        reason=data.reason,
+        user=user
     )
 ```
 
@@ -11884,7 +10821,10 @@ from fastapi import(
     Query
 )
 
-from app.dependencies.roles import admin_only, waiter_or_admin
+from app.dependencies.roles import (
+    admin_only, 
+    waiter_or_admin
+)
 
 from app.domain.product.dependencies import get_product_service
 from app.domain.product.product_service import ProductService
@@ -11988,8 +10928,8 @@ def toggle_product(
 - datetime.date
 - fastapi.APIRouter
 - fastapi.Depends
-- fastapi.Query
 - fastapi.status
+- fastapi.Query
 - app.dependencies.roles.admin_only
 - app.domain.reports.dependencies.get_report_service
 - app.domain.reports.report_service.ReportService
@@ -12006,7 +10946,12 @@ Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
 """
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import (
+    APIRouter, 
+    Depends, 
+    status,
+    Query
+)
 
 from app.dependencies.roles import admin_only
 
@@ -12157,7 +11102,10 @@ from fastapi import (
     Query
 )
 
-from app.dependencies.roles import admin_only, kitchen_or_admin
+from app.dependencies.roles import (
+    admin_only, 
+    kitchen_or_admin
+)
 
 from app.domain.stations.dependencies import get_station_service
 from app.domain.stations.station_service import StationService
@@ -12304,7 +11252,11 @@ Endpoints para la gestión de la configuración del sistema.
 Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
 """
 
-from fastapi import APIRouter, Depends, status
+from fastapi import (
+    APIRouter, 
+    Depends, 
+    status
+)
 
 from app.dependencies.roles import admin_only
 
@@ -12392,8 +11344,8 @@ def update_settings(
 **Imports (20):**
 - fastapi.APIRouter
 - fastapi.Depends
-- fastapi.Query
 - fastapi.status
+- fastapi.Query
 - app.dependencies.roles.waiter_or_admin
 - app.dependencies.roles.admin_only
 - app.domain.table.table_service.TableService
@@ -12417,9 +11369,17 @@ Endpoints para la gestión de mesas.
 Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
 """
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import (
+    APIRouter, 
+    Depends, 
+    status,
+    Query
+)
 
-from app.dependencies.roles import waiter_or_admin, admin_only
+from app.dependencies.roles import (
+    waiter_or_admin, 
+    admin_only
+)
 
 from app.domain.table.table_service import TableService
 from app.domain.table.dependencies import get_table_service
@@ -12630,7 +11590,11 @@ Endpoints para la gestión de los usuarios del sistema.
 Todas las operaciones trabajan únicamente sobre el restaurante autenticado.
 """
 
-from fastapi import APIRouter, Depends, status
+from fastapi import (
+    APIRouter, 
+    Depends, 
+    status
+)
 
 from app.dependencies.roles import admin_only
 
@@ -13553,6 +12517,7 @@ class KitchenItemOut(BaseSchema):
     status: OrderItemStatus
     table_number: int
     order_id: int
+    notes: str | None = None
 ```
 
 ---
@@ -13562,12 +12527,13 @@ class KitchenItemOut(BaseSchema):
 **Funciones (0):**
 
 **Clases (3):**
-- OrderDetail
 - OrderResponse
 - OrderStatusUpdate
+- OrderCancel
 
-**Imports (6):**
+**Imports (7):**
 - decimal.Decimal
+- pydantic.Field
 - app.models.order.OrderStatus
 - datetime.datetime
 - base.BaseSchema
@@ -13576,6 +12542,7 @@ class KitchenItemOut(BaseSchema):
 
 ```python
 from decimal import Decimal
+from pydantic import Field
 from app.models.order import OrderStatus
 from datetime import datetime
 from ..base import BaseSchema
@@ -13583,8 +12550,9 @@ from .order_item import OrderItemOut
 from .payment import PaymentOut
 
 
-class OrderDetail(BaseSchema):
+class OrderResponse(BaseSchema):
     id: int
+    table_id: int
     table_number: int
     status: OrderStatus
     created_at: datetime
@@ -13596,11 +12564,14 @@ class OrderDetail(BaseSchema):
     total_paid: Decimal
     remaining: Decimal
 
-class OrderResponse(OrderDetail):
-    table_id: int
-
 class OrderStatusUpdate(BaseSchema):
     status: OrderStatus
+
+class OrderCancel(BaseSchema):
+    reason: str = Field(
+        min_length=1,
+        max_length=500
+    )
 ```
 
 ---
@@ -13609,24 +12580,28 @@ class OrderStatusUpdate(BaseSchema):
 
 **Funciones (0):**
 
-**Clases (3):**
+**Clases (4):**
 - OrderItemCreate
 - OrderItemStatusUpdate
 - OrderItemOut
+- OrderItemCancel
 
-**Imports (3):**
+**Imports (4):**
 - decimal.Decimal
 - app.models.order_item.OrderItemStatus
 - base.BaseSchema
+- pydantic.Field
 
 ```python
 from decimal import Decimal
 from app.models.order_item import OrderItemStatus
 from ..base import BaseSchema
+from pydantic import Field
 
 class OrderItemCreate(BaseSchema):
     product_id: int
     quantity: int
+    notes: str | None = None
 
 
 class OrderItemStatusUpdate(BaseSchema):
@@ -13640,6 +12615,13 @@ class OrderItemOut(BaseSchema):
     unit_price: Decimal
     subtotal: Decimal
     status: OrderItemStatus
+    notes: str | None = None
+
+class OrderItemCancel(BaseSchema):
+    reason: str = Field(
+        min_length=1,
+        max_length=500
+    )
 ```
 
 ---
@@ -14351,6 +13333,1482 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 
     finally:
         db.close()
+```
+
+---
+
+### .\backend\tests\conftest.py
+
+**Funciones (6):**
+- db
+- restaurant
+- user
+- table
+- product
+- order
+
+**Clases (0):**
+
+**Imports (16):**
+- pytest
+- decimal.Decimal
+- sqlalchemy.create_engine
+- sqlalchemy.orm.sessionmaker
+- app.db.base_class.Base
+- app.models.restaurant.Restaurant
+- app.models.user.User
+- app.models.user.UserRole
+- app.models.table.Table
+- app.models.category.Category
+- app.models.production_station.ProductionStation
+- app.models.product.Product
+- app.models.order.Order
+- app.models.order.OrderStatus
+- app.models.order_item.OrderItem
+- app.models.order_item.OrderItemStatus
+
+```python
+"""
+conftest.py
+
+Fixtures compartidas para toda la suite de tests.
+pytest descubre este archivo automáticamente (no hace falta importarlo).
+
+Ubicación esperada: backend/tests/conftest.py
+"""
+
+import pytest
+from decimal import Decimal
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from app.db.base_class import Base
+
+from app.models.restaurant import Restaurant
+from app.models.user import User, UserRole
+from app.models.table import Table
+from app.models.category import Category
+from app.models.production_station import ProductionStation
+from app.models.product import Product
+from app.models.order import Order, OrderStatus
+from app.models.order_item import OrderItem, OrderItemStatus
+
+
+@pytest.fixture
+def db():
+    """
+    Sesión de base de datos aislada por test.
+
+    SQLite in-memory: no toca Postgres, no requiere el contenedor `db`
+    levantado, y se descarta automáticamente al terminar el test.
+    """
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(engine)
+
+    SessionLocal = sessionmaker(bind=engine)
+    session = SessionLocal()
+
+    try:
+        yield session
+    finally:
+        session.close()
+        engine.dispose()
+
+
+@pytest.fixture
+def restaurant(db):
+    """
+    Restaurante base para asociar a las entidades de cada test.
+    Ajustar los campos si Restaurant exige más columnas obligatorias.
+    """
+    r = Restaurant(name="Restaurante de Prueba")
+    db.add(r)
+    db.commit()
+    db.refresh(r)
+    return r
+
+
+@pytest.fixture
+def user(db, restaurant):
+    """
+    Usuario base (cajero) para operaciones que requieren user_id.
+    """
+    u = User(
+        restaurant_id=restaurant.id,
+        username="cajero_test",
+        role=UserRole.CASHIER,
+        password_hash="x",  # placeholder, no se testea login en estos tests
+    )
+    db.add(u)
+    db.commit()
+    db.refresh(u)
+    return u
+
+
+@pytest.fixture
+def table(db, restaurant):
+    """
+    Mesa base -- Order.table_id es obligatorio, así que toda orden
+    de prueba necesita una mesa asociada.
+    """
+    t = Table(
+        restaurant_id=restaurant.id,
+        number=1,
+    )
+    db.add(t)
+    db.commit()
+    db.refresh(t)
+    return t
+
+
+@pytest.fixture
+def product(db, restaurant):
+    """
+    Producto base para armar OrderItems. Encadena Category y
+    ProductionStation porque Product los exige como FK obligatoria,
+    aunque la lógica de order_service no los use directamente.
+    """
+    category = Category(restaurant_id=restaurant.id, name="Categoría Test")
+    station = ProductionStation(restaurant_id=restaurant.id, name="Estación Test")
+    db.add_all([category, station])
+    db.commit()
+    db.refresh(category)
+    db.refresh(station)
+
+    p = Product(
+        restaurant_id=restaurant.id,
+        name="Producto Test",
+        price=Decimal("100.00"),
+        station_id=station.id,
+        category_id=category.id,
+    )
+    db.add(p)
+    db.commit()
+    db.refresh(p)
+    return p
+
+
+@pytest.fixture
+def order(db, restaurant, table):
+    """
+    Orden vacía (sin items) en estado OPEN, lista para que cada test
+    le agregue los items/pagos que necesite.
+    """
+    o = Order(
+        restaurant_id=restaurant.id,
+        table_id=table.id,
+        status=OrderStatus.OPEN,
+    )
+    db.add(o)
+    db.commit()
+    db.refresh(o)
+    return o
+```
+
+---
+
+### .\backend\tests\__init__.py
+
+**Funciones (0):**
+
+**Clases (0):**
+
+**Imports (0):**
+
+```python
+
+```
+
+---
+
+### .\backend\tests\unit\factories.py
+
+**Funciones (4):**
+- crear_pago
+- crear_movimiento_caja
+- crear_orden
+- crear_item
+
+**Clases (0):**
+
+**Imports (9):**
+- decimal.Decimal
+- app.models.payment.Payment
+- app.models.payment.PaymentMethod
+- app.models.cash_movement.CashMovement
+- app.models.cash_movement.CashMovementType
+- app.models.order.Order
+- app.models.order.OrderStatus
+- app.models.order_item.OrderItem
+- app.models.order_item.OrderItemStatus
+
+```python
+"""
+tests/unit/factories.py
+
+Funciones helper para crear datos de prueba rápido, sin repetir
+boilerplate de SQLAlchemy en cada test.
+
+Estas NO son fixtures de pytest -- son funciones normales que se
+llaman a mano dentro de cada test, pasándoles la sesión `db`.
+"""
+
+from decimal import Decimal
+
+from app.models.payment import Payment, PaymentMethod
+from app.models.cash_movement import CashMovement, CashMovementType
+from app.models.order import Order, OrderStatus
+from app.models.order_item import OrderItem, OrderItemStatus
+
+
+def crear_pago(
+    db,
+    restaurant_id: int,
+    cash_register_id: int,
+    order_id: int,
+    amount: Decimal,
+    method: PaymentMethod = PaymentMethod.CASH,
+) -> Payment:
+    pago = Payment(
+        restaurant_id=restaurant_id,
+        cash_register_id=cash_register_id,
+        order_id=order_id,
+        amount=amount,
+        method=method,
+    )
+    db.add(pago)
+    db.commit()
+    db.refresh(pago)
+    return pago
+
+
+def crear_movimiento_caja(
+    db,
+    cash_register_id: int,
+    user_id: int,
+    amount: Decimal,
+    tipo: CashMovementType,
+    reason: str = "ajuste de prueba",
+) -> CashMovement:
+    mov = CashMovement(
+        cash_register_id=cash_register_id,
+        user_id=user_id,
+        amount=amount,
+        type=tipo,
+        reason=reason,
+    )
+    db.add(mov)
+    db.commit()
+    db.refresh(mov)
+    return mov
+
+
+def crear_orden(
+    db,
+    restaurant_id: int,
+    table_id: int,
+    status: OrderStatus = OrderStatus.CLOSED,
+) -> Order:
+    """
+    Por defecto crea la orden ya CLOSED, porque la mayoría de los
+    tests de caja no necesitan una orden abierta -- solo necesitan
+    que exista una orden a la que asociar pagos.
+    """
+    orden = Order(
+        restaurant_id=restaurant_id,
+        table_id=table_id,
+        status=status,
+    )
+    db.add(orden)
+    db.commit()
+    db.refresh(orden)
+    return orden
+
+
+def crear_item(
+    db,
+    restaurant_id: int,
+    order_id: int,
+    product_id: int,
+    quantity: int = 1,
+    unit_price: Decimal = Decimal("100.00"),
+    status: OrderItemStatus = OrderItemStatus.PENDING,
+) -> OrderItem:
+    item = OrderItem(
+        restaurant_id=restaurant_id,
+        order_id=order_id,
+        product_id=product_id,
+        quantity=quantity,
+        unit_price=unit_price,
+        status=status,
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+```
+
+---
+
+### .\backend\tests\unit\test_auth_and_permissions.py
+
+**Funciones (9):**
+- test_authenticate_token_rechaza_token_invalido
+- test_authenticate_token_rechaza_payload_incompleto
+- test_authenticate_token_rechaza_usuario_inexistente
+- test_authenticate_token_rechaza_usuario_inactivo
+- test_authenticate_token_rechaza_rol_desactualizado
+- test_authenticate_token_rechaza_restaurant_id_cruzado
+- test_authenticate_token_devuelve_el_usuario_con_token_valido
+- test_require_roles_permite_rol_incluido
+- test_require_roles_rechaza_rol_no_incluido
+
+**Clases (0):**
+
+**Imports (6):**
+- pytest
+- app.core.security.create_access_token
+- app.dependencies.auth.authenticate_token
+- app.dependencies.permissions.require_roles
+- app.domain.errors.base.DomainError
+- app.models.user.UserRole
+
+```python
+"""
+tests/unit/test_auth_and_permissions.py
+
+Fase 3 (P1) del plan de testing: authenticate_token (dependencies/auth.py)
+y require_roles (dependencies/permissions.py).
+
+Estos tests protegen el activo más crítico de un sistema multi-tenant:
+que un usuario nunca pueda autenticarse "cruzado" contra otro restaurante.
+
+Correr con: docker compose exec backend pytest tests/unit/test_auth_and_permissions.py -v
+"""
+
+import pytest
+from app.core.security import create_access_token
+from app.dependencies.auth import authenticate_token
+from app.dependencies.permissions import require_roles
+from app.domain.errors.base import DomainError
+from app.models.user import UserRole
+
+
+# --------------------------------------------------------------------------------
+# authenticate_token
+# --------------------------------------------------------------------------------
+
+def test_authenticate_token_rechaza_token_invalido(db):
+    with pytest.raises(DomainError):
+        authenticate_token(db=db, token="esto-no-es-un-token")
+
+
+def test_authenticate_token_rechaza_payload_incompleto(db):
+    """
+    Token válido y bien firmado, pero le falta 'restaurant_id' --
+    debe rechazarse en vez de reventar con un KeyError sin controlar.
+    """
+    token = create_access_token({"sub": "1", "role": "ADMIN"})
+
+    with pytest.raises(DomainError):
+        authenticate_token(db=db, token=token)
+
+
+def test_authenticate_token_rechaza_usuario_inexistente(db, restaurant):
+    token = create_access_token({
+        "sub": "99999",  # no existe en la DB
+        "restaurant_id": str(restaurant.id),
+        "role": "ADMIN",
+    })
+
+    with pytest.raises(DomainError):
+        authenticate_token(db=db, token=token)
+
+
+def test_authenticate_token_rechaza_usuario_inactivo(db, restaurant, user):
+    user.active = False
+    db.commit()
+
+    token = create_access_token({
+        "sub": str(user.id),
+        "restaurant_id": str(restaurant.id),
+        "role": user.role.value,
+    })
+
+    with pytest.raises(DomainError):
+        authenticate_token(db=db, token=token)
+
+
+def test_authenticate_token_rechaza_rol_desactualizado(db, restaurant, user):
+    """
+    El token dice CASHIER (el rol que tenía al loguearse), pero en DB
+    ahora el usuario es ADMIN (alguien le cambió el rol después). Debe
+    rechazarse -- fuerza a repetir login en vez de operar con un rol
+    que ya no es el real.
+    """
+    token = create_access_token({
+        "sub": str(user.id),
+        "restaurant_id": str(restaurant.id),
+        "role": "CASHIER",  # rol viejo, embebido en el token
+    })
+    user.role = UserRole.ADMIN  # el rol real cambió en DB
+    db.commit()
+
+    with pytest.raises(DomainError):
+        authenticate_token(db=db, token=token)
+
+
+def test_authenticate_token_rechaza_restaurant_id_cruzado(db, restaurant, user):
+    """
+    CRÍTICO -- aislamiento multi-tenant.
+
+    El token tiene el user_id correcto pero un restaurant_id de OTRO
+    restaurante. La query de authenticate_token filtra por
+    (User.id == user_id AND User.restaurant_id == restaurant_id), así
+    que este intento de "cruzar" tenants debe fallar como si el
+    usuario no existiera -- nunca debe devolver el User real.
+    """
+    token = create_access_token({
+        "sub": str(user.id),
+        "restaurant_id": "999999",  # restaurante que no es el suyo
+        "role": user.role.value,
+    })
+
+    with pytest.raises(DomainError):
+        authenticate_token(db=db, token=token)
+
+
+def test_authenticate_token_devuelve_el_usuario_con_token_valido(db, restaurant, user):
+    token = create_access_token({
+        "sub": str(user.id),
+        "restaurant_id": str(restaurant.id),
+        "role": user.role.value,
+    })
+
+    resultado = authenticate_token(db=db, token=token)
+
+    assert resultado.id == user.id
+    assert resultado.restaurant_id == restaurant.id
+
+
+# --------------------------------------------------------------------------------
+# require_roles / role_checker
+# --------------------------------------------------------------------------------
+
+def test_require_roles_permite_rol_incluido(user):
+    """
+    role_checker es la función interna que devuelve require_roles().
+    Se puede llamar directo pasándole el User -- FastAPI normalmente
+    lo resuelve vía Depends(get_current_user), pero para testear la
+    lógica de permisos no hace falta levantar ese mecanismo.
+    """
+    checker = require_roles(UserRole.CASHIER, UserRole.ADMIN)
+
+    resultado = checker(user=user)
+
+    assert resultado is user
+
+
+def test_require_roles_rechaza_rol_no_incluido(user):
+    checker = require_roles(UserRole.ADMIN)  # user (fixture) es CASHIER
+
+    with pytest.raises(DomainError):
+        checker(user=user)
+
+```
+
+---
+
+### .\backend\tests\unit\test_backup_service.py
+
+**Funciones (14):**
+- _settings
+- test_calculate_next_run_daily_hora_futura_es_hoy
+- test_calculate_next_run_daily_hora_pasada_es_manana
+- test_calculate_next_run_monthly_clampea_dia_31_en_febrero
+- test_calculate_next_run_weekly_cae_en_el_weekday_configurado
+- test_apply_retention_policy_borra_backups_viejos_conserva_nuevos
+- test_apply_retention_policy_sin_directorio_no_falla
+- test_apply_retention_policy_dias_en_cero_no_borra_nada
+- test_resolve_backup_dir_respeta_env_var
+- test_restaurant_backup_directory_crea_carpeta_si_no_existe
+- test_backup_postgres_lanza_domain_error_si_pg_dump_falla
+- test_backup_postgres_no_lanza_error_si_pg_dump_ok
+- fake_run
+- fake_run
+
+**Clases (0):**
+
+**Imports (10):**
+- os
+- subprocess
+- datetime.datetime
+- datetime.time
+- datetime.timezone
+- pytest
+- app.domain.backup.backup_service.BackupService
+- app.domain.errors.base.DomainError
+- app.models.system_settings.SystemSettings
+- app.models.enums.BackupFrequency
+
+```python
+"""
+tests/unit/test_backup_service.py
+
+Fase 4 (P1) del plan de testing: backup/restore.
+
+No testeamos pg_dump/pg_restore en sí (eso lo garantiza Postgres) --
+testeamos la lógica alrededor: cálculo de próxima corrida, política
+de retención, resolución de directorios, y el manejo de errores de
+subprocess (mockeado, sin ejecutar pg_dump de verdad).
+
+IMPORTANTE: BackupService(db) llama a _resolve_backup_dir() en su
+__init__, que en este contenedor puede resolver a /backups (el
+volumen real montado, ver BACKUP_DIR en docker-compose.yml). Por eso
+en casi todos los tests pisamos service.backup_dir = tmp_path
+INMEDIATAMENTE después de instanciar, para no escribir jamás sobre
+el directorio real de backups del restaurante.
+
+Correr con: docker compose exec backend pytest tests/unit/test_backup_service.py -v
+"""
+
+import os
+import subprocess
+from datetime import datetime, time, timezone
+
+import pytest
+from app.domain.backup.backup_service import BackupService
+from app.domain.errors.base import DomainError
+from app.models.system_settings import SystemSettings
+from app.models.enums import BackupFrequency
+
+
+def _settings(**overrides) -> SystemSettings:
+    """
+    SystemSettings como objeto Python plano, SIN guardar en DB --
+    _calculate_next_run y _apply_retention_policy solo leen atributos,
+    no hacen falta persistidos.
+    """
+    defaults = dict(
+        restaurant_id=1,
+        backup_frequency=BackupFrequency.DAILY,
+        backup_time=time(3, 0),
+        backup_weekday=0,
+        backup_monthday=1,
+        backup_timezone="America/Montevideo",
+        backup_retention_daily=30,
+        backup_retention_weekly=84,
+        backup_retention_monthly=365,
+    )
+    defaults.update(overrides)
+    return SystemSettings(**defaults)
+
+
+# --------------------------------------------------------------------------------
+# _calculate_next_run -- función pura, sin filesystem ni DB
+# --------------------------------------------------------------------------------
+
+def test_calculate_next_run_daily_hora_futura_es_hoy(db):
+    service = BackupService(db)
+    settings = _settings(
+        backup_frequency=BackupFrequency.DAILY,
+        backup_time=time(23, 59),
+    )
+
+    resultado = service._calculate_next_run(settings)
+
+    ahora = datetime.now(resultado.tzinfo)
+    assert resultado.date() == ahora.date()
+    assert resultado.hour == 23 and resultado.minute == 59
+
+
+def test_calculate_next_run_daily_hora_pasada_es_manana(db):
+    service = BackupService(db)
+    settings = _settings(
+        backup_frequency=BackupFrequency.DAILY,
+        backup_time=time(0, 1),
+    )
+
+    resultado = service._calculate_next_run(settings)
+
+    ahora = datetime.now(resultado.tzinfo)
+    # Salvo que corras el test a las 00:00-00:01 exactas, debe caer mañana
+    assert resultado.date() > ahora.date() or resultado > ahora
+
+
+def test_calculate_next_run_monthly_clampea_dia_31_en_febrero(db):
+    """
+    Caso límite real: backup_monthday=31 pero el próximo mes es
+    febrero (28 o 29 días) -- no debe reventar, debe usar el último
+    día disponible del mes.
+    """
+    service = BackupService(db)
+    settings = _settings(
+        backup_frequency=BackupFrequency.MONTHLY,
+        backup_monthday=31,
+        backup_time=time(0, 0),
+    )
+
+    resultado = service._calculate_next_run(settings)
+
+    # Nunca debe caer en un día que no existe (ej: 31 de febrero)
+    assert 1 <= resultado.day <= 31
+
+
+def test_calculate_next_run_weekly_cae_en_el_weekday_configurado(db):
+    service = BackupService(db)
+    settings = _settings(
+        backup_frequency=BackupFrequency.WEEKLY,
+        backup_weekday=2,  # miércoles (Monday=0)
+        backup_time=time(23, 59),
+    )
+
+    resultado = service._calculate_next_run(settings)
+
+    assert resultado.weekday() == 2
+
+
+# --------------------------------------------------------------------------------
+# _apply_retention_policy -- filesystem real, pero en tmp_path (pytest lo limpia solo)
+# --------------------------------------------------------------------------------
+
+def test_apply_retention_policy_borra_backups_viejos_conserva_nuevos(db, tmp_path):
+    service = BackupService(db)
+    service.backup_dir = tmp_path  # nunca tocar /backups real
+
+    settings = _settings(restaurant_id=1, backup_retention_daily=7)
+    daily_dir = tmp_path / "restaurant_1" / "daily"
+    daily_dir.mkdir(parents=True)
+
+    viejo = daily_dir / "backup-viejo.dump"
+    nuevo = daily_dir / "backup-nuevo.dump"
+    viejo.write_bytes(b"x")
+    nuevo.write_bytes(b"x")
+
+    ahora = datetime.now(timezone.utc).timestamp()
+    diez_dias = 10 * 24 * 60 * 60
+    un_dia = 24 * 60 * 60
+    os.utime(viejo, (ahora - diez_dias, ahora - diez_dias))  # más viejo que retention=7 días
+    os.utime(nuevo, (ahora - un_dia, ahora - un_dia))         # dentro de retention
+
+    service._apply_retention_policy(settings)
+
+    assert not viejo.exists()
+    assert nuevo.exists()
+
+
+def test_apply_retention_policy_sin_directorio_no_falla(db, tmp_path):
+    """
+    Si todavía no existe restaurant_X/ (nunca se hizo un backup),
+    no debe romper -- debe salir en silencio.
+    """
+    service = BackupService(db)
+    service.backup_dir = tmp_path
+    settings = _settings(restaurant_id=999)
+
+    service._apply_retention_policy(settings)  # no debe lanzar excepción
+
+
+def test_apply_retention_policy_dias_en_cero_no_borra_nada(db, tmp_path):
+    """
+    retention=0/None para un tipo de backup significa "conservar para
+    siempre" (el código hace `if not days: continue`) -- confirmamos
+    que esa interpretación es la que efectivamente corre.
+    """
+    service = BackupService(db)
+    service.backup_dir = tmp_path
+    settings = _settings(restaurant_id=1, backup_retention_daily=0)
+
+    daily_dir = tmp_path / "restaurant_1" / "daily"
+    daily_dir.mkdir(parents=True)
+    viejo = daily_dir / "backup-viejo.dump"
+    viejo.write_bytes(b"x")
+    ahora = datetime.now(timezone.utc).timestamp()
+    cien_dias = 100 * 24 * 60 * 60
+    os.utime(viejo, (ahora - cien_dias, ahora - cien_dias))
+
+    service._apply_retention_policy(settings)
+
+    assert viejo.exists()
+
+
+# --------------------------------------------------------------------------------
+# _resolve_backup_dir
+# --------------------------------------------------------------------------------
+
+def test_resolve_backup_dir_respeta_env_var(db, tmp_path, monkeypatch):
+    monkeypatch.setenv("BACKUP_DIR", str(tmp_path))
+
+    service = BackupService(db)
+
+    assert service.backup_dir == tmp_path
+
+
+# --------------------------------------------------------------------------------
+# _restaurant_backup_directory -- crea el directorio si no existe
+# --------------------------------------------------------------------------------
+
+def test_restaurant_backup_directory_crea_carpeta_si_no_existe(db, tmp_path):
+    service = BackupService(db)
+    service.backup_dir = tmp_path
+
+    resultado = service._restaurant_backup_directory(restaurant_id=5)
+
+    assert resultado.exists()
+    assert resultado == tmp_path / "restaurant_5"
+
+
+# --------------------------------------------------------------------------------
+# _backup_postgres -- subprocess mockeado, nunca corre pg_dump de verdad
+# --------------------------------------------------------------------------------
+
+def test_backup_postgres_lanza_domain_error_si_pg_dump_falla(db, tmp_path, monkeypatch):
+    service = BackupService(db)
+
+    def fake_run(command, capture_output, text, env):
+        return subprocess.CompletedProcess(
+            args=command, returncode=1, stdout="", stderr="conexión rechazada"
+        )
+
+    monkeypatch.setattr(
+        "app.domain.backup.backup_service.subprocess.run", fake_run
+    )
+
+    with pytest.raises(DomainError):
+        service._backup_postgres(tmp_path / "backup.dump")
+
+
+def test_backup_postgres_no_lanza_error_si_pg_dump_ok(db, tmp_path, monkeypatch):
+    service = BackupService(db)
+
+    def fake_run(command, capture_output, text, env):
+        return subprocess.CompletedProcess(args=command, returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(
+        "app.domain.backup.backup_service.subprocess.run", fake_run
+    )
+
+    service._backup_postgres(tmp_path / "backup.dump")  # no debe lanzar
+
+```
+
+---
+
+### .\backend\tests\unit\test_cash_register_service.py
+
+**Funciones (8):**
+- test_open_cash_register_rejects_negative_amount
+- test_open_cash_register_rejects_second_open
+- test_close_cash_register_expected_cash_solo_cuenta_efectivo
+- test_close_cash_register_difference_negativa_no_bloquea_cierre
+- test_close_cash_register_bloquea_si_hay_ordenes_abiertas
+- test_close_cash_register_rejects_negative_counted_cash
+- test_close_cash_register_considera_movimientos_de_caja
+- test_average_ticket_es_cero_sin_ordenes
+
+**Clases (0):**
+
+**Imports (12):**
+- decimal.Decimal
+- pytest
+- app.domain.cash_register.cash_register_service.CashRegisterService
+- app.domain.errors.base.DomainError
+- app.models.payment.PaymentMethod
+- app.models.cash_movement.CashMovementType
+- app.models.order.OrderStatus
+- app.schemas.cash_register.CashRegisterClose
+- factories.crear_pago
+- factories.crear_movimiento_caja
+- factories.crear_orden
+- pydantic.ValidationError
+
+```python
+"""
+tests/unit/test_cash_register_service.py
+
+Fase 1 (P0) del plan de testing: dinero y estado de caja.
+Correr con: docker compose exec backend pytest tests/unit/test_cash_register_service.py -v
+"""
+
+from decimal import Decimal
+
+import pytest
+from app.domain.cash_register.cash_register_service import CashRegisterService
+from app.domain.errors.base import DomainError
+from app.models.payment import PaymentMethod
+from app.models.cash_movement import CashMovementType
+from app.models.order import OrderStatus
+from app.schemas.cash_register import CashRegisterClose
+
+from .factories import crear_pago, crear_movimiento_caja, crear_orden
+
+
+# --------------------------------------------------------------------------------
+# open_cash_register
+# --------------------------------------------------------------------------------
+
+def test_open_cash_register_rejects_negative_amount(db, restaurant, user):
+    service = CashRegisterService(db)
+
+    with pytest.raises(DomainError):
+        service.open_cash_register(
+            restaurant_id=restaurant.id,
+            user_id=user.id,
+            opening_amount=Decimal("-1"),
+        )
+
+
+def test_open_cash_register_rejects_second_open(db, restaurant, user):
+    service = CashRegisterService(db)
+    service.open_cash_register(
+        restaurant_id=restaurant.id,
+        user_id=user.id,
+        opening_amount=Decimal("1000"),
+    )
+
+    with pytest.raises(DomainError):
+        service.open_cash_register(
+            restaurant_id=restaurant.id,
+            user_id=user.id,
+            opening_amount=Decimal("500"),
+        )
+
+
+# --------------------------------------------------------------------------------
+# close_cash_register -- el corazón de la Fase 1
+# --------------------------------------------------------------------------------
+
+def test_close_cash_register_expected_cash_solo_cuenta_efectivo(db, restaurant, user, table):
+    """
+    Caso real que probaste a mano: abrís con $1000, un pago en efectivo
+    de $500 y uno con tarjeta de $300. El expected_cash debe ser 1500,
+    no 1800 -- la tarjeta no suma al efectivo esperado en caja.
+    """
+    service = CashRegisterService(db)
+    caja = service.open_cash_register(
+        restaurant_id=restaurant.id,
+        user_id=user.id,
+        opening_amount=Decimal("1000"),
+    )
+    orden = crear_orden(db, restaurant_id=restaurant.id, table_id=table.id)
+
+    crear_pago(db, restaurant_id=restaurant.id, cash_register_id=caja.id,
+               order_id=orden.id, amount=Decimal("500"), method=PaymentMethod.CASH)
+    crear_pago(db, restaurant_id=restaurant.id, cash_register_id=caja.id,
+               order_id=orden.id, amount=Decimal("300"), method=PaymentMethod.CARD)
+
+    resultado = service.close_cash_register(
+        restaurant_id=restaurant.id,
+        user_id=user.id,
+        data=CashRegisterClose(counted_cash=Decimal("1500")),
+    )
+
+    assert resultado.expected_cash == Decimal("1500")
+    assert resultado.difference == Decimal("0")
+    assert resultado.total_sales == Decimal("800")  # 500 + 300, esto sí suma todo
+
+
+def test_close_cash_register_difference_negativa_no_bloquea_cierre(db, restaurant, user, table):
+    """
+    Si el cajero cuenta menos plata de la esperada, el sistema debe
+    reportar la diferencia pero NO impedir el cierre -- eso lo decide
+    un supervisor después, no el sistema.
+    """
+    service = CashRegisterService(db)
+    caja = service.open_cash_register(
+        restaurant_id=restaurant.id,
+        user_id=user.id,
+        opening_amount=Decimal("1000"),
+    )
+    orden = crear_orden(db, restaurant_id=restaurant.id, table_id=table.id)
+    crear_pago(db, restaurant_id=restaurant.id, cash_register_id=caja.id,
+               order_id=orden.id, amount=Decimal("500"), method=PaymentMethod.CASH)
+
+    resultado = service.close_cash_register(
+        restaurant_id=restaurant.id,
+        user_id=user.id,
+        data=CashRegisterClose(counted_cash=Decimal("1400")),  # faltan $100
+    )
+
+    assert resultado.expected_cash == Decimal("1500")
+    assert resultado.difference == Decimal("-100")
+
+
+def test_close_cash_register_bloquea_si_hay_ordenes_abiertas(db, restaurant, user, table):
+    service = CashRegisterService(db)
+    caja = service.open_cash_register(
+        restaurant_id=restaurant.id,
+        user_id=user.id,
+        opening_amount=Decimal("1000"),
+    )
+    crear_orden(db, restaurant_id=restaurant.id, table_id=table.id, status=OrderStatus.IN_PROGRESS)
+
+    with pytest.raises(DomainError):
+        service.close_cash_register(
+            restaurant_id=restaurant.id,
+            user_id=user.id,
+            data=CashRegisterClose(counted_cash=Decimal("1000")),
+        )
+
+
+def test_close_cash_register_rejects_negative_counted_cash(db, restaurant, user):
+    """
+    OJO: counted_cash ya tiene Field(ge=Decimal("0")) en el schema
+    Pydantic (CashRegisterClose), así que el rechazo pasa ACÁ -- al
+    construir el objeto -- y nunca llega a pisar el service.
+
+    El chequeo `if data.counted_cash < 0: raise DomainError` que
+    tiene close_cash_register es código muerto: Pydantic ya garantiza
+    que ese valor nunca puede ser negativo. No es un bug, pero es
+    duplicación -- vale la pena limpiarlo en algún refactor.
+    """
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        CashRegisterClose(counted_cash=Decimal("-50"))
+
+
+def test_close_cash_register_considera_movimientos_de_caja(db, restaurant, user):
+    """
+    Un cash_in (ej: cambio que trae el dueño) y un cash_out (ej: pago
+    a un proveedor) deben afectar expected_cash en la dirección correcta.
+    """
+    service = CashRegisterService(db)
+    caja = service.open_cash_register(
+        restaurant_id=restaurant.id,
+        user_id=user.id,
+        opening_amount=Decimal("1000"),
+    )
+    crear_movimiento_caja(db, cash_register_id=caja.id, user_id=user.id,
+                           amount=Decimal("200"), tipo=CashMovementType.CASH_IN)
+    crear_movimiento_caja(db, cash_register_id=caja.id, user_id=user.id,
+                           amount=Decimal("50"), tipo=CashMovementType.CASH_OUT)
+
+    resultado = service.close_cash_register(
+        restaurant_id=restaurant.id,
+        user_id=user.id,
+        data=CashRegisterClose(counted_cash=Decimal("1150")),
+    )
+
+    # 1000 (apertura) + 0 (ventas cash) + 200 (in) - 50 (out) = 1150
+    assert resultado.expected_cash == Decimal("1150")
+    assert resultado.difference == Decimal("0")
+
+
+# --------------------------------------------------------------------------------
+# average_ticket -- caso límite de división por cero
+# --------------------------------------------------------------------------------
+
+def test_average_ticket_es_cero_sin_ordenes(db, restaurant, user):
+    """
+    Deja escrito en piedra que _calculate_sales no explota si todavía
+    no hubo ninguna venta -- por si alguien "optimiza" el código después.
+    """
+    service = CashRegisterService(db)
+    service.open_cash_register(
+        restaurant_id=restaurant.id,
+        user_id=user.id,
+        opening_amount=Decimal("1000"),
+    )
+
+    resumen = service.get_current_cash_register(restaurant_id=restaurant.id)
+
+    assert resumen.average_ticket == Decimal("0")
+    assert resumen.orders_count == 0
+```
+
+---
+
+### .\backend\tests\unit\test_order_service.py
+
+**Funciones (17):**
+- test_calculate_totals_suma_items_correctamente
+- test_calculate_totals_aplica_descuento_al_total
+- test_apply_discount_rechaza_descuento_mayor_al_subtotal
+- test_apply_discount_rechaza_si_deja_pagos_excedidos
+- test_apply_discount_rechaza_en_orden_cerrada
+- test_status_todos_cancelados_orden_open_pasa_a_cancelled
+- test_status_item_in_progress_domina_sobre_pending
+- test_status_todos_ready_o_delivered_es_ready
+- test_close_order_rechaza_con_saldo_pendiente
+- test_close_order_rechaza_orden_sin_items
+- test_close_order_rechaza_items_no_entregados
+- test_close_order_ok_con_items_cancelados_y_delivered_mixtos
+- test_calculate_totals_excluye_items_cancelados
+- test_add_payment_rechaza_si_excede_saldo_restante
+- test_add_payment_requiere_caja_abierta
+- test_add_payment_rechaza_en_orden_cerrada
+- test_delete_payment_bloqueado_en_orden_cerrada
+
+**Clases (0):**
+
+**Imports (10):**
+- decimal.Decimal
+- pytest
+- app.domain.order.order_service.OrderService
+- app.domain.cash_register.cash_register_service.CashRegisterService
+- app.domain.errors.base.DomainError
+- app.models.order.OrderStatus
+- app.models.order_item.OrderItemStatus
+- app.schemas.order.payment.PaymentCreate
+- app.models.payment.PaymentMethod
+- factories.crear_item
+
+```python
+"""
+tests/unit/test_order_service.py
+
+Fase 2 (P0) del plan de testing: totales, transiciones de estado
+y flujo de pagos de órdenes.
+
+Correr con: docker compose exec backend pytest tests/unit/test_order_service.py -v
+"""
+
+from decimal import Decimal
+
+import pytest
+from app.domain.order.order_service import OrderService
+from app.domain.cash_register.cash_register_service import CashRegisterService
+from app.domain.errors.base import DomainError
+from app.models.order import OrderStatus
+from app.models.order_item import OrderItemStatus
+from app.schemas.order.payment import PaymentCreate
+from app.models.payment import PaymentMethod
+
+from .factories import crear_item
+
+
+# --------------------------------------------------------------------------------
+# _calculate_totals
+# --------------------------------------------------------------------------------
+
+def test_calculate_totals_suma_items_correctamente(db, restaurant, order, product):
+    service = OrderService(db)
+    crear_item(db, restaurant_id=restaurant.id, order_id=order.id,
+               product_id=product.id, quantity=2, unit_price=Decimal("100.00"))
+    crear_item(db, restaurant_id=restaurant.id, order_id=order.id,
+               product_id=product.id, quantity=1, unit_price=Decimal("50.00"))
+    db.refresh(order)
+
+    subtotal, total, total_paid, remaining = service._calculate_totals(order)
+
+    assert subtotal == Decimal("250.00")  # 2*100 + 1*50
+    assert total == Decimal("250.00")     # sin descuento
+    assert total_paid == Decimal("0")
+    assert remaining == Decimal("250.00")
+
+
+def test_calculate_totals_aplica_descuento_al_total(db, restaurant, order, product):
+    service = OrderService(db)
+    crear_item(db, restaurant_id=restaurant.id, order_id=order.id,
+               product_id=product.id, quantity=1, unit_price=Decimal("100.00"))
+    order.discount = Decimal("20.00")
+    db.commit()
+    db.refresh(order)
+
+    subtotal, total, total_paid, remaining = service._calculate_totals(order)
+
+    assert subtotal == Decimal("100.00")
+    assert total == Decimal("80.00")
+    assert remaining == Decimal("80.00")
+
+
+# --------------------------------------------------------------------------------
+# apply_discount
+# --------------------------------------------------------------------------------
+
+def test_apply_discount_rechaza_descuento_mayor_al_subtotal(db, restaurant, order, product):
+    service = OrderService(db)
+    crear_item(db, restaurant_id=restaurant.id, order_id=order.id,
+               product_id=product.id, quantity=1, unit_price=Decimal("100.00"))
+    db.refresh(order)
+
+    with pytest.raises(DomainError):
+        service.apply_discount(order, Decimal("150.00"))
+
+
+def test_apply_discount_rechaza_si_deja_pagos_excedidos(db, restaurant, user, order, product):
+    """
+    Caso real: ya se pagó $80 sobre un total de $100. Si después
+    intentan aplicar un descuento de $30, el nuevo total ($70) quedaría
+    por debajo de lo ya pagado -- eso no puede pasar.
+    """
+    service = OrderService(db)
+    cash_service = CashRegisterService(db)
+    cash_service.open_cash_register(restaurant.id, user.id, Decimal("0"))
+
+    crear_item(db, restaurant_id=restaurant.id, order_id=order.id,
+               product_id=product.id, quantity=1, unit_price=Decimal("100.00"))
+    db.refresh(order)
+    service.add_payment(order, PaymentCreate(amount=Decimal("80.00"), method=PaymentMethod.CASH))
+    db.refresh(order)
+
+    with pytest.raises(DomainError):
+        service.apply_discount(order, Decimal("30.00"))
+
+
+def test_apply_discount_rechaza_en_orden_cerrada(db, restaurant, order, product):
+    service = OrderService(db)
+    crear_item(db, restaurant_id=restaurant.id, order_id=order.id,
+               product_id=product.id, quantity=1, unit_price=Decimal("100.00"),
+               status=OrderItemStatus.DELIVERED)
+    db.refresh(order)
+    order.status = OrderStatus.CLOSED
+    db.commit()
+
+    with pytest.raises(DomainError):
+        service.apply_discount(order, Decimal("10.00"))
+
+
+# --------------------------------------------------------------------------------
+# _calculate_order_status -- la matriz de estados
+# --------------------------------------------------------------------------------
+
+def test_status_todos_cancelados_orden_open_pasa_a_cancelled(db, restaurant, order, product):
+    service = OrderService(db)
+    crear_item(db, restaurant_id=restaurant.id, order_id=order.id,
+               product_id=product.id, status=OrderItemStatus.CANCELLED)
+    db.refresh(order)
+
+    nuevo_estado = service._calculate_order_status(order)
+
+    assert nuevo_estado == OrderStatus.CANCELLED
+
+
+def test_status_item_in_progress_domina_sobre_pending(db, restaurant, order, product):
+    service = OrderService(db)
+    crear_item(db, restaurant_id=restaurant.id, order_id=order.id,
+               product_id=product.id, status=OrderItemStatus.IN_PROGRESS)
+    crear_item(db, restaurant_id=restaurant.id, order_id=order.id,
+               product_id=product.id, status=OrderItemStatus.PENDING)
+    db.refresh(order)
+
+    nuevo_estado = service._calculate_order_status(order)
+
+    assert nuevo_estado == OrderStatus.IN_PROGRESS
+
+
+def test_status_todos_ready_o_delivered_es_ready(db, restaurant, order, product):
+    service = OrderService(db)
+    crear_item(db, restaurant_id=restaurant.id, order_id=order.id,
+               product_id=product.id, status=OrderItemStatus.READY)
+    crear_item(db, restaurant_id=restaurant.id, order_id=order.id,
+               product_id=product.id, status=OrderItemStatus.DELIVERED)
+    db.refresh(order)
+
+    nuevo_estado = service._calculate_order_status(order)
+
+    assert nuevo_estado == OrderStatus.READY
+
+
+# --------------------------------------------------------------------------------
+# close_order -- los tres guardas
+# --------------------------------------------------------------------------------
+
+def test_close_order_rechaza_con_saldo_pendiente(db, restaurant, order, product):
+    service = OrderService(db)
+    crear_item(db, restaurant_id=restaurant.id, order_id=order.id,
+               product_id=product.id, unit_price=Decimal("100.00"),
+               status=OrderItemStatus.DELIVERED)
+    db.refresh(order)
+
+    with pytest.raises(DomainError):
+        service.close_order(order)
+
+
+def test_close_order_rechaza_orden_sin_items(db, restaurant, order):
+    service = OrderService(db)
+
+    with pytest.raises(DomainError):
+        service.close_order(order)
+
+
+def test_close_order_rechaza_items_no_entregados(db, restaurant, user, order, product):
+    service = OrderService(db)
+    cash_service = CashRegisterService(db)
+    cash_service.open_cash_register(restaurant.id, user.id, Decimal("0"))
+
+    crear_item(db, restaurant_id=restaurant.id, order_id=order.id,
+               product_id=product.id, unit_price=Decimal("100.00"),
+               status=OrderItemStatus.READY)  # READY, no DELIVERED
+    db.refresh(order)
+    service.add_payment(order, PaymentCreate(amount=Decimal("100.00"), method=PaymentMethod.CASH))
+    db.refresh(order)
+
+    with pytest.raises(DomainError):
+        service.close_order(order)
+
+
+def test_close_order_ok_con_items_cancelados_y_delivered_mixtos(db, restaurant, user, order, product):
+    """
+    Un item CANCELLED no cuenta ni para el estado (ya lo cubre
+    _calculate_order_status) ni para el total a pagar (fix aplicado
+    en _calculate_totals) -- la orden cierra pagando solo el item
+    DELIVERED ($100), sin el cancelado ($50).
+    """
+    service = OrderService(db)
+    cash_service = CashRegisterService(db)
+    cash_service.open_cash_register(restaurant.id, user.id, Decimal("0"))
+
+    crear_item(db, restaurant_id=restaurant.id, order_id=order.id,
+               product_id=product.id, unit_price=Decimal("100.00"),
+               status=OrderItemStatus.DELIVERED)
+    crear_item(db, restaurant_id=restaurant.id, order_id=order.id,
+               product_id=product.id, unit_price=Decimal("50.00"),
+               status=OrderItemStatus.CANCELLED)
+    db.refresh(order)
+    service.add_payment(order, PaymentCreate(amount=Decimal("100.00"), method=PaymentMethod.CASH))
+    db.refresh(order)
+    # crear_item es un atajo de test que no dispara _set_status como lo
+    # haría el flujo real (add_item -> send_to_kitchen -> deliver_item).
+    # Simulamos acá el estado al que naturalmente habría llegado la orden.
+    order.status = OrderStatus.READY
+    db.commit()
+    db.refresh(order)
+
+    resultado = service.close_order(order)
+
+    assert resultado.status == OrderStatus.CLOSED
+
+
+def test_calculate_totals_excluye_items_cancelados(db, restaurant, order, product):
+    """
+    Regresión del fix: _calculate_totals debe excluir items CANCELLED
+    del subtotal, igual que ya hace report_service._order_total y
+    _calculate_order_status. Antes del fix este test daba 150.00.
+    """
+    service = OrderService(db)
+    crear_item(db, restaurant_id=restaurant.id, order_id=order.id,
+               product_id=product.id, unit_price=Decimal("100.00"),
+               status=OrderItemStatus.DELIVERED)
+    crear_item(db, restaurant_id=restaurant.id, order_id=order.id,
+               product_id=product.id, unit_price=Decimal("50.00"),
+               status=OrderItemStatus.CANCELLED)
+    db.refresh(order)
+
+    subtotal, total, total_paid, remaining = service._calculate_totals(order)
+
+    assert subtotal == Decimal("100.00")
+    assert total == Decimal("100.00")
+
+
+# --------------------------------------------------------------------------------
+# add_payment / delete_payment
+# --------------------------------------------------------------------------------
+
+def test_add_payment_rechaza_si_excede_saldo_restante(db, restaurant, user, order, product):
+    service = OrderService(db)
+    cash_service = CashRegisterService(db)
+    cash_service.open_cash_register(restaurant.id, user.id, Decimal("0"))
+
+    crear_item(db, restaurant_id=restaurant.id, order_id=order.id,
+               product_id=product.id, unit_price=Decimal("100.00"))
+    db.refresh(order)
+
+    with pytest.raises(DomainError):
+        service.add_payment(order, PaymentCreate(amount=Decimal("150.00"), method=PaymentMethod.CASH))
+
+
+def test_add_payment_requiere_caja_abierta(db, restaurant, order, product):
+    """
+    Sin caja abierta, add_payment debe fallar -- es el acoplamiento
+    real entre OrderService y CashRegisterService.
+    """
+    service = OrderService(db)
+    crear_item(db, restaurant_id=restaurant.id, order_id=order.id,
+               product_id=product.id, unit_price=Decimal("100.00"))
+    db.refresh(order)
+
+    with pytest.raises(DomainError):
+        service.add_payment(order, PaymentCreate(amount=Decimal("50.00"), method=PaymentMethod.CASH))
+
+
+def test_add_payment_rechaza_en_orden_cerrada(db, restaurant, order):
+    service = OrderService(db)
+    order.status = OrderStatus.CLOSED
+    db.commit()
+
+    with pytest.raises(DomainError):
+        service.add_payment(order, PaymentCreate(amount=Decimal("10.00"), method=PaymentMethod.CASH))
+
+
+def test_delete_payment_bloqueado_en_orden_cerrada(db, restaurant, user, order, product):
+    service = OrderService(db)
+    cash_service = CashRegisterService(db)
+    cash_service.open_cash_register(restaurant.id, user.id, Decimal("0"))
+
+    crear_item(db, restaurant_id=restaurant.id, order_id=order.id,
+               product_id=product.id, unit_price=Decimal("100.00"),
+               status=OrderItemStatus.DELIVERED)
+    db.refresh(order)
+    pago = service.add_payment(order, PaymentCreate(amount=Decimal("100.00"), method=PaymentMethod.CASH))
+    db.refresh(order)
+    # Mismo motivo que en el test anterior: simulamos el estado READY
+    # al que se llegaría vía el flujo real antes de cerrar.
+    order.status = OrderStatus.READY
+    db.commit()
+    db.refresh(order)
+    service.close_order(order)
+
+    with pytest.raises(DomainError):
+        service.delete_payment(restaurant.id, pago.id)
+
+```
+
+---
+
+### .\backend\tests\unit\test_security.py
+
+**Funciones (7):**
+- test_password_hash_verifica_correctamente
+- test_password_hash_rechaza_password_incorrecto
+- test_password_hash_nunca_es_igual_al_texto_plano
+- test_create_access_token_incluye_los_claims_esperados
+- test_decode_access_token_con_token_invalido_devuelve_none
+- test_decode_access_token_con_firma_incorrecta_devuelve_none
+- test_decode_access_token_expirado_devuelve_none
+
+**Clases (0):**
+
+**Imports (11):**
+- datetime.datetime
+- datetime.timedelta
+- datetime.timezone
+- jose.jwt
+- pytest
+- app.core.security.get_password_hash
+- app.core.security.verify_password
+- app.core.security.create_access_token
+- app.core.security.decode_access_token
+- app.core.config.SECRET_KEY
+- app.core.config.ALGORITHM
+
+```python
+"""
+tests/unit/test_security.py
+
+Fase 3 (P1) del plan de testing: funciones puras de app/core/security.py.
+No necesitan `db` -- son funciones sin estado, ideales para arrancar rápido.
+
+Correr con: docker compose exec backend pytest tests/unit/test_security.py -v
+"""
+
+from datetime import datetime, timedelta, timezone
+
+from jose import jwt as jose_jwt
+import pytest
+
+from app.core.security import (
+    get_password_hash,
+    verify_password,
+    create_access_token,
+    decode_access_token,
+)
+from app.core.config import SECRET_KEY, ALGORITHM
+
+
+# --------------------------------------------------------------------------------
+# Hashing de contraseñas
+# --------------------------------------------------------------------------------
+
+def test_password_hash_verifica_correctamente():
+    hash_ = get_password_hash("mi_password_segura")
+
+    assert verify_password("mi_password_segura", hash_) is True
+
+
+def test_password_hash_rechaza_password_incorrecto():
+    hash_ = get_password_hash("mi_password_segura")
+
+    assert verify_password("password_equivocado", hash_) is False
+
+
+def test_password_hash_nunca_es_igual_al_texto_plano():
+    """
+    Chequeo básico pero importante: confirma que efectivamente se
+    está hasheando y no guardando en texto plano por error.
+    """
+    hash_ = get_password_hash("mi_password_segura")
+
+    assert hash_ != "mi_password_segura"
+
+
+# --------------------------------------------------------------------------------
+# create_access_token / decode_access_token
+# --------------------------------------------------------------------------------
+
+def test_create_access_token_incluye_los_claims_esperados():
+    token = create_access_token({
+        "sub": "1",
+        "restaurant_id": "1",
+        "role": "ADMIN",
+    })
+
+    payload = decode_access_token(token)
+
+    assert payload is not None
+    assert payload["sub"] == "1"
+    assert payload["restaurant_id"] == "1"
+    assert payload["role"] == "ADMIN"
+    assert "exp" in payload
+    assert "iat" in payload
+    assert "jti" in payload
+
+
+def test_decode_access_token_con_token_invalido_devuelve_none():
+    assert decode_access_token("esto-no-es-un-jwt-valido") is None
+
+
+def test_decode_access_token_con_firma_incorrecta_devuelve_none():
+    """
+    Un token firmado con OTRA clave secreta -- simula un token
+    falsificado o de otro entorno -- debe ser rechazado.
+    """
+    token_falso = jose_jwt.encode(
+        {"sub": "1", "restaurant_id": "1", "role": "ADMIN",
+         "exp": datetime.now(timezone.utc) + timedelta(minutes=5)},
+        "clave-secreta-incorrecta",
+        algorithm=ALGORITHM,
+    )
+
+    assert decode_access_token(token_falso) is None
+
+
+def test_decode_access_token_expirado_devuelve_none():
+    """
+    Construye a mano un token ya vencido (exp en el pasado) para
+    confirmar que decode_access_token lo rechaza en vez de aceptarlo.
+    """
+    token_vencido = jose_jwt.encode(
+        {
+            "sub": "1",
+            "restaurant_id": "1",
+            "role": "ADMIN",
+            "exp": datetime.now(timezone.utc) - timedelta(minutes=5),
+        },
+        SECRET_KEY,
+        algorithm=ALGORITHM,
+    )
+
+    assert decode_access_token(token_vencido) is None
+
+```
+
+---
+
+### .\backend\tests\unit\__init__.py
+
+**Funciones (0):**
+
+**Clases (0):**
+
+**Imports (0):**
+
+```python
+
 ```
 
 ---

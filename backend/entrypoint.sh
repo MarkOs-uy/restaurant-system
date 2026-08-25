@@ -1,18 +1,22 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
 echo "Esperando a Postgres..."
 
-until pg_isready -h db -U "${POSTGRES_USER:-pos_user}" -d "${POSTGRES_DB:-restaurant}"
+until pg_isready \
+  -h db \
+  -U "${POSTGRES_USER:-pos_user}" \
+  -d "${POSTGRES_DB:-restaurant}" \
+  >/dev/null 2>&1
 do
   sleep 2
 done
 
 echo "Postgres listo"
 
-if [ -f /backups/restore.pending ]; then
 
-  BACKUP=$(cat /backups/restore.pending)
+if [ -f /backups/restore.pending ]; then
+  BACKUP="$(cat /backups/restore.pending)"
 
   echo "========================================="
   echo " Restaurando base de datos"
@@ -22,15 +26,20 @@ if [ -f /backups/restore.pending ]; then
   python -m app.restore_pending
 
   echo "========================================="
-  echo " Restauración finalizada"
+  echo " Restauracion finalizada"
   echo "========================================="
 fi
 
-echo "Corriendo migrations..."
+
+echo "Corriendo migraciones..."
 alembic upgrade head
+
 
 echo "Corriendo seed..."
 python -m app.seed
 
+
 echo "Iniciando backend..."
-exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+exec uvicorn app.main:app \
+  --host 0.0.0.0 \
+  --port 8000

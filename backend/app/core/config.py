@@ -44,6 +44,8 @@ def _get_required_env(name: str) -> str:
 
 SECRET_KEY = _get_required_env("SECRET_KEY")
 
+ENCRYPTION_KEY = _get_required_env("ENCRYPTION_KEY")
+
 ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 
 DATABASE_URL = _get_required_env("DATABASE_URL")

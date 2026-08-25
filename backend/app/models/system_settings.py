@@ -16,8 +16,12 @@ from sqlalchemy.orm import relationship
 
 from app.models.enums import BackupFrequency
 
+from cryptography.fernet import Fernet
+from app.core.config import ENCRYPTION_KEY 
+
 from app.db.base_class import Base
 
+fernet = Fernet(ENCRYPTION_KEY.encode("utf-8"))
 
 class SystemSettings(Base):
     __tablename__ = "system_settings"
@@ -45,7 +49,8 @@ class SystemSettings(Base):
         nullable=True
     )
 
-    smtp_password = Column(
+    _smtp_password = Column(
+        "smtp_password",
         String,
         nullable=True
     )
@@ -159,3 +164,30 @@ class SystemSettings(Base):
         "Restaurant",
         back_populates="settings"
     )
+
+    @property
+    def smtp_password(self) -> str | None:
+        if self._smtp_password:
+            return (
+                fernet
+                .decrypt(self._smtp_password.encode())
+                .decode()
+            )
+
+        return None
+
+
+    @smtp_password.setter
+    def smtp_password(
+        self,
+        value: str | None
+    ) -> None:
+
+        if value:
+            self._smtp_password = (
+                fernet
+                .encrypt(value.encode())
+                .decode()
+            )
+        else:
+            self._smtp_password = None

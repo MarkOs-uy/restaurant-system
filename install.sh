@@ -7,6 +7,8 @@ HOSTNAME_LOCAL="pos"
 FRONTEND_PORT="80"
 BACKEND_PORT="8000"
 COMPOSE_FILE="docker-compose.prod.yml"
+INSTALL_STATE_DIR="/var/lib/pos-restaurant"
+INSTALL_STATE_FILE="${INSTALL_STATE_DIR}/install.conf"
 
 if [ -t 1 ]; then
   RED=$'\033[31m'
@@ -255,7 +257,19 @@ fi
 section "Configurando mDNS: ${HOSTNAME_LOCAL}.local"
 AVAHI_CONF="/etc/avahi/avahi-daemon.conf"
 AVAHI_BACKUP="/etc/avahi/avahi-daemon.conf.pos-backup.$(date +%Y%m%d%H%M%S)"
+
+install -d -m 0700 "$INSTALL_STATE_DIR"
+
+ORIGINAL_HOSTNAME="$(hostnamectl --static)"
+
 cp "$AVAHI_CONF" "$AVAHI_BACKUP"
+
+cat > "$INSTALL_STATE_FILE" << EOF
+ORIGINAL_HOSTNAME=${ORIGINAL_HOSTNAME}
+AVAHI_BACKUP=${AVAHI_BACKUP}
+EOF
+
+chmod 600 "$INSTALL_STATE_FILE"
 
 if grep -q "^#\?host-name=" "$AVAHI_CONF"; then
   sed -i "s/^#\?host-name=.*/host-name=${HOSTNAME_LOCAL}/" "$AVAHI_CONF"
@@ -280,9 +294,25 @@ fi
 [ -n "$LOCAL_IP" ] || fail "No pude detectar la IP local del servidor."
 
 if [ ! -f "$ENV_FILE" ]; then
-  POSTGRES_PASSWORD="$(python3 -c "import secrets; print(secrets.token_hex(16))")"
-  SECRET_KEY="$(python3 -c "import secrets; print(secrets.token_hex(32))")"
-  ADMIN_PASSWORD="$(python3 -c "import secrets; print(secrets.token_urlsafe(12))")"
+  POSTGRES_PASSWORD="$(
+    python3 -c \
+      "import secrets; print(secrets.token_hex(16))"
+  )"
+
+  SECRET_KEY="$(
+    python3 -c \
+      "import secrets; print(secrets.token_hex(32))"
+  )"
+
+  ENCRYPTION_KEY="$(
+    python3 -c \
+      "import os, base64; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"
+  )"
+
+  ADMIN_PASSWORD="$(
+    python3 -c \
+      "import secrets; print(secrets.token_urlsafe(12))"
+  )"
 
   cat > "$ENV_FILE" << EOF
 POSTGRES_USER=pos_user
@@ -291,6 +321,7 @@ POSTGRES_DB=restaurant
 DATABASE_URL=postgresql://pos_user:${POSTGRES_PASSWORD}@db:5432/restaurant
 
 SECRET_KEY=${SECRET_KEY}
+ENCRYPTION_KEY=${ENCRYPTION_KEY}
 JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=480
 
@@ -306,10 +337,26 @@ LOG_LEVEL=INFO
 EOF
 
   chmod 600 "$ENV_FILE"
+
   ENV_CREATED=1
+
   success "Configuracion creada en backend/.env"
 else
   warn "backend/.env ya existe; no se sobreescribe."
+fi
+
+if ! grep -q '^ENCRYPTION_KEY=' "$ENV_FILE"; then
+  ENCRYPTION_KEY="$(
+    python3 -c \
+      "import os, base64; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"
+  )"
+
+  printf '\nENCRYPTION_KEY=%s\n' \
+    "$ENCRYPTION_KEY" >> "$ENV_FILE"
+
+  chmod 600 "$ENV_FILE"
+
+  warn "Se agrego ENCRYPTION_KEY a backend/.env"
 fi
 
 POSTGRES_USER_VALUE="$(env_value POSTGRES_USER)"

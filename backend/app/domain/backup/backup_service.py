@@ -71,27 +71,19 @@ class BackupService:
 #-------------------------------------------------------------------
 # CREAR BACKUP (MANUAL, AUTOMÁTICO O ANTES DE RESTAURAR)
 #-------------------------------------------------------------------
-    def _create_backup(
-        self,
-        restaurant_id: int,
-        backup_type: str
-    ):
+    def _create_backup(self, restaurant_id: int, backup_type: str) -> BackupInfoOut:
         backup_path = self._build_backup_path(
             restaurant_id,
             backup_type,
             datetime.now(timezone.utc)
         )
-        self._backup_database(
-            backup_path
-        )
-        return self._backup_info(
-            backup_path
-        )
+        self._backup_database(backup_path)
+        return self._backup_info(backup_path, backup_type)
 
 #-------------------------------------------------------------------
 # CREAR BACKUP ANTES DE RESTAURAR
 #-------------------------------------------------------------------
-    def _backup_before_restore(self, restaurant_id) -> BackupInfoOut:
+    def _backup_before_restore(self, restaurant_id) -> None:
         self._create_backup(
             restaurant_id,
             "before_restore"
@@ -126,20 +118,19 @@ class BackupService:
 #-------------------------------------------------------------------
 # DEVOLVER INFORMACIÓN DEL BACKUP
 #-------------------------------------------------------------------
-    def _backup_info(self, backup_path: Path):
+    def _backup_info(self, backup_path: Path, backup_type: str) -> BackupInfoOut:
+
         stat = backup_path.stat()
 
-        return {
-            "last_backup_at": datetime.fromtimestamp(
+        return BackupInfoOut(
+            last_backup_at=datetime.fromtimestamp(
                 stat.st_mtime,
                 tz=timezone.utc
             ),
-            "last_backup_file": str(
-                backup_path.relative_to(self.backup_dir)
-            ),
-            "last_backup_size": stat.st_size,
-            "type": backup_path.parent.name
-        }
+            last_backup_file=str(backup_path.relative_to(self.backup_dir)),
+            last_backup_size=stat.st_size,
+            type=backup_type
+        )
 
 #-------------------------------------------------------------------
 # DEVOLVER EL PATH DEL BACKUP SI EXISTE, O LANZAR ERROR SI NO EXISTE
@@ -175,13 +166,33 @@ class BackupService:
         restaurant_id: int,
         backup_type: str,
         created_at: datetime,
-    ):
+    ) -> Path:
+
         suffix = (
             ".sqlite3"
             if DATABASE_URL.startswith("sqlite")
             else ".dump"
         )
-        directory = self._restaurant_backup_directory(restaurant_id)
+
+        restaurant_dir = (
+            self._restaurant_backup_directory(
+                restaurant_id
+            )
+        )
+
+        if backup_type == "manual":
+            directory = restaurant_dir
+        else:
+            directory = (
+                restaurant_dir /
+                backup_type
+            )
+
+            directory.mkdir(
+                parents=True,
+                exist_ok=True
+            )
+
         return (
             directory /
             f"backup-{created_at:%Y%m%d-%H%M%S}{suffix}"
@@ -257,7 +268,7 @@ class BackupService:
 #-------------------------------------------------------------------
 # ENVIAR BACKUP POR EMAIL
 #-------------------------------------------------------------------
-    def _send_backup_email(self, recipient_email: str, backup_path: Path, created_at: str, restaurant_id: int):
+    def _send_backup_email(self, recipient_email: str, backup_path: Path, created_at: datetime, restaurant_id: int) -> None:
         settings = self._get_settings(
             restaurant_id
         )
@@ -280,8 +291,10 @@ class BackupService:
         message["From"] = smtp_from
         message["To"] = recipient_email
         message.set_content(
-            f"Adjunto backup generado el {created_at}.\n\n"
-            "Este correo fue generado automaticamente por el sistema."
+            "Adjunto backup generado el "
+            f"{created_at:%Y-%m-%d %H:%M:%S UTC}.\n\n"
+            "Este correo fue generado automaticamente "
+            "por el sistema."
         )
         message.add_attachment(
             backup_path.read_bytes(),
@@ -511,11 +524,8 @@ class BackupService:
 #-------------------------------------------------------------------
 # CREAR BACKUP AUTOMÁTICO
 #-------------------------------------------------------------------
-    def create_automatic_backup(self, restaurant_id, frequency) -> BackupInfoOut:
-        return self._create_backup(
-            restaurant_id,
-            frequency
-        )
+    def create_automatic_backup(self, restaurant_id: int, frequency: str) -> BackupInfoOut:
+        return self._create_backup(restaurant_id, frequency)
 
 #-------------------------------------------------------------------
 # CREAR BACKUP Y ENVIAR POR EMAIL
@@ -619,12 +629,7 @@ class BackupService:
 # RESTORE BACKUP
 #-------------------------------------------------------------------
     def restore_backup(self, restaurant_id: int, filename: str) -> BackupRestoreOut:
-        print(">>> 1")
-
-        backup = self._find_backup(
-            restaurant_id,
-            filename
-        )
+        backup = self._find_backup(restaurant_id, filename)
         self._backup_before_restore(restaurant_id)
         self._create_restore_pending(backup)
         RestartManager.request_restart()
@@ -662,6 +667,12 @@ class BackupService:
 #-------------------------------------------------------------------
     def run_scheduled_backup(self, restaurant_id: int):
         settings = self._get_settings(restaurant_id)
+        if not settings:
+            raise DomainError(
+                "Backup settings not found",
+                ErrorCode.NOT_FOUND
+            )
+
         try:
             backup = self.create_automatic_backup(
                 restaurant_id,
@@ -673,12 +684,12 @@ class BackupService:
             if settings.backup_send_email and settings.backup_email:
                 backup_path = (
                     self.backup_dir /
-                    backup["last_backup_file"]
+                    backup.last_backup_file
                 )
                 self._send_backup_email(
                     settings.backup_email,
                     backup_path,
-                    backup["last_backup_at"],
+                    backup.last_backup_at,
                     restaurant_id
                 )
             settings.last_backup_result = "OK"
