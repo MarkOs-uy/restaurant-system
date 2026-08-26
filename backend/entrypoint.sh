@@ -30,16 +30,14 @@ if [ -f /backups/restore.pending ]; then
   echo "========================================="
 fi
 
-
-echo "Corriendo migraciones..."
+echo "Corriendo migrations..."
 alembic upgrade head
 
+echo "Verificando licencia..."
+python -m app.infrastructure.licensing.validate_license
 
 echo "Corriendo seed..."
 python -m app.seed
 
-
 echo "Iniciando backend..."
-exec uvicorn app.main:app \
-  --host 0.0.0.0 \
-  --port 8000
+exec uvicorn app.main:app --host 0.0.0.0 --port 8000
