@@ -23,7 +23,7 @@ from app.domain.errors.error_codes import ErrorCode
 
 from app.db.session import DATABASE_URL
 
-from app.infraestructure.restart.restart_manager import RestartManager
+from app.infrastructure.restart.restart_manager import RestartManager
 
 from app.models.system_settings import SystemSettings
 

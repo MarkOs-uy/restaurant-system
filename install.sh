@@ -9,6 +9,9 @@ BACKEND_PORT="8000"
 COMPOSE_FILE="docker-compose.prod.yml"
 INSTALL_STATE_DIR="/var/lib/pos-restaurant"
 INSTALL_STATE_FILE="${INSTALL_STATE_DIR}/install.conf"
+LICENSE_DIR="/var/lib/pos-restaurant"
+MACHINE_ID_FILE="${LICENSE_DIR}/machine-id"
+LICENSE_FILE="${LICENSE_DIR}/license.json"
 
 if [ -t 1 ]; then
   RED=$'\033[31m'
@@ -53,6 +56,37 @@ env_value() {
 
 compose() {
   docker compose -f "$COMPOSE_FILE" "$@"
+}
+
+generate_machine_fingerprint() {
+  local system_id=""
+  local product_uuid=""
+
+  if [ -f /etc/machine-id ]; then
+    system_id="$(
+      tr -d '\n' < /etc/machine-id \
+        | tr '[:upper:]' '[:lower:]'
+    )"
+  fi
+
+  if [ -f /sys/class/dmi/id/product_uuid ]; then
+    product_uuid="$(
+      tr -d '\n' < /sys/class/dmi/id/product_uuid \
+        | tr '[:upper:]' '[:lower:]'
+    )"
+  fi
+
+  if [ -z "$system_id" ] \
+    && [ -z "$product_uuid" ]
+  then
+    fail "No pude obtener una identidad estable de esta maquina."
+  fi
+
+  printf '%s|%s' \
+    "$system_id" \
+    "$product_uuid" \
+    | sha256sum \
+    | awk '{print $1}'
 }
 
 desktop_dir_for_user() {
@@ -285,6 +319,7 @@ success "mDNS activo como ${HOSTNAME_LOCAL}.local"
 section "Generando configuracion"
 ENV_CREATED=0
 ADMIN_PASSWORD=""
+MACHINE_FINGERPRINT="$(generate_machine_fingerprint)"
 LOCAL_IP="$(get_local_ip)"
 
 if [ -z "$LOCAL_IP" ]; then
@@ -454,6 +489,17 @@ if [ "$ENV_CREATED" -eq 1 ]; then
 else
   printf "  Contrasena: ya configurada anteriormente en backend/.env\n"
 fi
+
+MACHINE_ID="$(cat "$MACHINE_ID_FILE")"
+
+printf "  Importante!!!! Este es el código de licencia.\n"
+printf "Codigo de instalacion:\n"
+printf "  %s-%s-%s-%s\n" \
+  "${MACHINE_ID:0:8}" \
+  "${MACHINE_ID:8:8}" \
+  "${MACHINE_ID:16:8}" \
+  "${MACHINE_ID:24:8}"
+
 
 printf "\n%sComandos utiles:%s\n" "$BOLD" "$RESET"
 printf "  Logs:       cd %s && docker compose -f %s logs -f\n" "$APP_DIR" "$COMPOSE_FILE"

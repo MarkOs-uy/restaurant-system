@@ -18,6 +18,8 @@ services:
       - ./backend/.env
     volumes:
       - ./backups:/backups
+      - /etc/machine-id:/host/etc/machine-id:ro
+      - /sys/class/dmi/id/product_uuid:/host/product_uuid:ro
     environment:
       BACKUP_DIR: /backups
 
