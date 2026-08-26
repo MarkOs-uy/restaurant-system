@@ -23,7 +23,7 @@ jobs:
     # obligatorios, sin default, según vimos en el proyecto).
     env:
       SECRET_KEY: "ci-dummy-secret-key-nunca-usar-en-produccion"
-      ENCRYPTION_KEY: "otra-clave-secreta-nunca-usar-en"
+      ENCRYPTION_KEY: "YwP_iegb6QCWyw16uOq-s7HXrBi9Nx6DIurH9FQOUJU="
       DATABASE_URL: "sqlite:///./ci_dummy.db"
       CORS_ORIGINS: "http://localhost:3000"
 
