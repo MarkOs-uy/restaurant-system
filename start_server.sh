@@ -33,6 +33,24 @@ get_local_ip() {
       }'
 }
 
+wait_for_backend() {
+  local ready=0
+
+  for _ in {1..30}; do
+    if compose exec -T backend \
+      python -c \
+      "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)" \
+      >/dev/null 2>&1
+    then
+      ready=1
+      break
+    fi
+
+    sleep 2
+  done
+
+  [ "$ready" -eq 1 ]
+}
 
 wait_for_frontend() {
   local ready=0
@@ -73,8 +91,25 @@ else
   compose up -d
 fi
 
+echo "Esperando al backend..."
 
-echo "Esperando al servidor..."
+if ! wait_for_backend; then
+  echo
+  echo "ERROR: el backend no pudo iniciar."
+  echo
+  echo "Posibles causas:"
+  echo "  - Licencia inexistente o invalida"
+  echo "  - Error de base de datos"
+  echo "  - Error durante migraciones"
+  echo
+  echo "Revisa:"
+  echo "  docker compose -f ${COMPOSE_FILE} logs backend"
+  echo
+
+  exit 1
+fi
+
+echo "Esperando al frontend..."
 
 if ! wait_for_frontend; then
   echo "AVISO: el servidor fue iniciado, pero el frontend no respondió."
