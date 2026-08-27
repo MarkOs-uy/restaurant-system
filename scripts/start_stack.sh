@@ -13,6 +13,14 @@ compose() {
 
 echo "Iniciando contenedores..."
 
+LICENSE_FILE="/var/lib/pos-restaurant/license.json"
+
+if [ ! -f "$LICENSE_FILE" ]; then
+  echo "ERROR: no se encontro el archivo de licencia:" >&2
+  echo "  $LICENSE_FILE" >&2
+  exit 1
+fi
+
 compose up -d
 
 
