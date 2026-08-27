@@ -37,4 +37,6 @@ echo "ERROR: backend no pudo iniciar." >&2
 
 compose logs --tail=30 backend >&2 || true
 
+compose down || true
+
 exit 1

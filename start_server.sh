@@ -33,6 +33,7 @@ get_local_ip() {
       }'
 }
 
+
 wait_for_backend() {
   local ready=0
 
@@ -51,6 +52,7 @@ wait_for_backend() {
 
   [ "$ready" -eq 1 ]
 }
+
 
 wait_for_frontend() {
   local ready=0
@@ -81,15 +83,27 @@ if command -v systemctl >/dev/null 2>&1 \
 then
 
   run_privileged systemctl start docker
-  run_privileged systemctl restart "$SERVICE_NAME"
+
+  if ! run_privileged systemctl restart "$SERVICE_NAME"; then
+    echo
+    echo "ERROR: POS Restaurant no pudo iniciar."
+    echo
+    echo "Revisa:"
+    echo "  systemctl status ${SERVICE_NAME}"
+    echo "  docker compose -f ${COMPOSE_FILE} logs backend"
+    exit 1
+  fi
 
   if systemctl cat "$ZEROCONF_SERVICE" >/dev/null 2>&1; then
     run_privileged systemctl restart "$ZEROCONF_SERVICE"
   fi
 
 else
+
   compose up -d
+
 fi
+
 
 echo "Esperando al backend..."
 
@@ -106,20 +120,27 @@ if ! wait_for_backend; then
   echo "  docker compose -f ${COMPOSE_FILE} logs backend"
   echo
 
+  compose down || true
+
   exit 1
 fi
+
 
 echo "Esperando al frontend..."
 
 if ! wait_for_frontend; then
-  echo "AVISO: el servidor fue iniciado, pero el frontend no respondió."
   echo
-  echo "Revisa los logs con:"
-  echo "  cd ${APP_DIR}"
-  echo "  docker compose -f ${COMPOSE_FILE} logs"
-else
-  echo "Servidor iniciado correctamente."
+  echo "ERROR: el backend inicio, pero el frontend no responde."
+  echo
+  echo "Revisa:"
+  echo "  docker compose -f ${COMPOSE_FILE} logs frontend"
+  echo
+
+  exit 1
 fi
+
+
+echo "Servidor iniciado correctamente."
 
 
 LOCAL_IP="$(get_local_ip)"
