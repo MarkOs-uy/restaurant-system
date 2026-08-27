@@ -559,10 +559,29 @@ hr {
     var(--shadow-glass);
 }
 
+.login-logo-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  width: 100%;
+  margin-bottom: 24px;
+}
+
+.login-logo {
+  display: block;
+
+  width: min(100%, 360px);
+  height: auto;
+
+  object-fit: contain;
+}
+
 .login-title {
   margin: 0 0 6px;
 
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
   gap: 10px;

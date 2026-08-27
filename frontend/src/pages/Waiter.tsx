@@ -8,7 +8,9 @@ import { WSEvent } from "../types/webSocketEvents"
 import type { WSEventParsed } from "../ws"
 import type { Order } from "../types/order"
 
-const bell = new Audio("/bell.mp3")
+import bellSound from "../assets/sounds/bell.mp3"
+
+const bell = new Audio(bellSound)
 
 const playSound = () => {
   bell.currentTime = 0

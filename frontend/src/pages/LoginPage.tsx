@@ -20,6 +20,7 @@ import {
 
 import { showToast } from "../utils/showToast"
 
+import logoMarcha from "../assets/images/logo_marcha.jpeg"
 
 export default function LoginPage() {
   const [username, setUsername] =
@@ -158,15 +159,13 @@ export default function LoginPage() {
           void login()
         }}
       >
-        <h1 className="login-title">
-          <span className="login-icon">
-            🍳
-          </span>
-
-          <span>
-            Marcha
-          </span>
-        </h1>
+        <div className="login-logo-wrapper">
+          <img
+            src={logoMarcha}
+            alt="Marcha - Un aliado en tu Restaurant"
+            className="login-logo"
+          />
+        </div>
 
         <div className="login-fields">
           <input
@@ -175,9 +174,7 @@ export default function LoginPage() {
             autoComplete="username"
             value={username}
             onChange={event =>
-              setUsername(
-                event.target.value
-              )
+              setUsername(event.target.value)
             }
           />
 
@@ -187,9 +184,7 @@ export default function LoginPage() {
             autoComplete="current-password"
             value={password}
             onChange={event =>
-              setPassword(
-                event.target.value
-              )
+              setPassword(event.target.value)
             }
           />
         </div>
