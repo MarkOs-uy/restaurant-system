@@ -72,5 +72,5 @@ htmlcov/
 # Misc
 # -----------------------------------------------------------------------------
 
-./PROJECT_SUMMARY.md
-./analyze_project.py
+PROJECT_SUMMARY.md
+analyze_project.py
