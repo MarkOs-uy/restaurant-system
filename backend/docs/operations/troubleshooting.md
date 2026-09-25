@@ -892,3 +892,11 @@ corregir
 ```
 
 y solo después considerar acciones destructivas.
+
+## Administrador perdió su contraseña
+
+Desde el servidor:
+
+```bash
+docker compose -f docker-compose.prod.yml exec backend \
+    python -m app.cli.reset_password
