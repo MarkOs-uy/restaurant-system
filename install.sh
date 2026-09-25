@@ -676,7 +676,7 @@ if [ ! -f "$ENV_FILE" ]; then
 POSTGRES_USER=pos_user
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 POSTGRES_DB=restaurant
-DATABASE_URL=postgresql://pos_user:${POSTGRES_PASSWORD}@db:5432/restaurant
+DATABASE_URL=postgresql+psycopg2://pos_user:${POSTGRES_PASSWORD}@db:5432/restaurant
 
 SECRET_KEY=${SECRET_KEY}
 ENCRYPTION_KEY=${ENCRYPTION_KEY}
