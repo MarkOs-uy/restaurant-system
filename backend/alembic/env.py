@@ -4,15 +4,23 @@ from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
+
 from app.db.base_class import Base
+from app.core.config import DATABASE_URL
 from app import models
 
-from dotenv import load_dotenv
-import os
 
-load_dotenv()
+config = context.config
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+config.set_main_option(
+    "sqlalchemy.url",
+    DATABASE_URL
+)
+
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
+
+target_metadata = Base.metadata
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
