@@ -181,6 +181,30 @@ solo funciona cuando el proceso que la utiliza participa en la red Docker corres
 
 ---
 
+## Driver PostgreSQL
+
+Marcha utiliza `psycopg2` como driver PostgreSQL.
+
+La variable debe declararlo explícitamente:
+
+```text
+DATABASE_URL=postgresql+psycopg2://usuario:password@db:5432/restaurant
+```
+
+---
+
+## Dependencias reproducibles
+
+Las dependencias de producción deben mantenerse controladas.
+
+Actualmente SQLAlchemy se limita a:
+
+```text
+sqlalchemy>=2.0,<2.1
+```
+
+---
+
 # Migraciones
 
 Marcha utiliza Alembic como única autoridad para evolucionar el esquema.
@@ -226,6 +250,8 @@ Base.metadata.create_all()
 para evolucionar una base de datos de desarrollo o producción existente.
 
 Su uso puede existir únicamente en contextos controlados como tests aislados.
+
+> Alembic utiliza `DATABASE_URL` desde `app.core.config`, igual que la aplicación, para mantener una única fuente de configuración.
 
 ---
 

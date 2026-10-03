@@ -5,12 +5,64 @@ APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_FILE="docker-compose.prod.yml"
 LICENSE_FILE="/var/lib/pos-restaurant/license.json"
 
+LOG_DIR="/var/log/marcha"
+FAIL_LOG="$LOG_DIR/last_start_failure.log"
+
 
 cd "$APP_DIR"
 
 
 compose() {
   docker compose -f "$COMPOSE_FILE" "$@"
+}
+
+
+# -----------------------------------------------------------------------------
+# Guardar informacion de diagnostico antes de eliminar los contenedores.
+# -----------------------------------------------------------------------------
+
+save_failure_logs() {
+
+  mkdir -p "$LOG_DIR"
+
+  {
+    echo "============================================================"
+    echo "Marcha - fallo durante el arranque"
+    echo "Fecha: $(date '+%Y-%m-%d %H:%M:%S %z')"
+    echo "============================================================"
+    echo
+
+    echo "=== docker compose ps -a ==="
+    echo
+
+    compose ps -a || true
+
+    echo
+    echo
+    echo "=== Ultimos 100 mensajes del backend ==="
+    echo
+
+    compose logs \
+      --no-color \
+      --tail=100 \
+      backend \
+      || true
+
+    echo
+    echo
+    echo "=== Logs completos del stack ==="
+    echo
+
+    compose logs \
+      --no-color \
+      || true
+
+    echo
+    echo "============================================================"
+    echo "Fin del diagnostico"
+    echo "============================================================"
+
+  } > "$FAIL_LOG" 2>&1
 }
 
 
@@ -93,6 +145,14 @@ for _ in {1..45}; do
         >&2 || true
 
       echo
+      echo "Guardando diagnostico..." >&2
+
+      save_failure_logs
+
+      echo "Diagnostico guardado en:" >&2
+      echo "  $FAIL_LOG" >&2
+
+      echo
       echo "Deteniendo contenedores..." >&2
 
       compose down || true
@@ -118,6 +178,15 @@ compose logs \
   --tail=30 \
   backend \
   >&2 || true
+
+
+echo
+echo "Guardando diagnostico..." >&2
+
+save_failure_logs
+
+echo "Diagnostico guardado en:" >&2
+echo "  $FAIL_LOG" >&2
 
 
 compose down || true
