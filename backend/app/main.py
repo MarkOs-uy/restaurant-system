@@ -1,6 +1,8 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
+from sqlalchemy import text
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,6 +15,7 @@ from pathlib import Path
 from app import models
 from app.services.event_worker import EventWorker
 from app.services.event_cleanup import EventCleanup
+from app.db.session import engine
 from app.events.redis_listener import redis_event_listener
 
 from app.scheduler.scheduler import scheduler
@@ -25,6 +28,7 @@ from app.routers import layout, system_settings, stations, auth, users, kitchen,
 from app.domain.errors.base import DomainError
 from app.websocket import ws
 from app.core.config import CORS_ORIGINS
+from app.core.redis import redis_client
 
 logging.basicConfig(
     level=logging.INFO,
@@ -135,12 +139,53 @@ def root() -> dict[str, str]:
 
 @app.get("/health")
 @app.get("/api/health")
-def health() -> dict[str, str]:
-    return {
-        "status": "ok",
+async def health():
+    database_ok = False
+    redis_ok = False
+
+    # -------------------------------------------------------------------------
+    # PostgreSQL
+    # -------------------------------------------------------------------------
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+
+        database_ok = True
+
+    except Exception:
+        database_ok = False
+
+    # -------------------------------------------------------------------------
+    # Redis
+    # -------------------------------------------------------------------------
+    try:
+        await redis_client.ping()
+        redis_ok = True
+
+    except Exception:
+        redis_ok = False
+
+    # -------------------------------------------------------------------------
+    # Estado general
+    # -------------------------------------------------------------------------
+    healthy = database_ok and redis_ok
+
+    payload = {
+        "status": "ok" if healthy else "error",
         "service": "restaurant-pos",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "database": {
+            "status": "ok" if database_ok else "error",
+        },
+        "redis": {
+            "status": "ok" if redis_ok else "error",
+        },
     }
+
+    return JSONResponse(
+        status_code=200 if healthy else 503,
+        content=payload,
+    )
 
 # --------------------------------------------------------------------------------------
 # Manejadores globales de excepciones.
