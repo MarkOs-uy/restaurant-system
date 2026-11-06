@@ -10,7 +10,10 @@ from fastapi.staticfiles import StaticFiles
 
 import asyncio
 import logging
+import os
 from pathlib import Path
+from datetime import datetime, timezone
+
 
 from app import models
 from app.services.event_worker import EventWorker
@@ -137,6 +140,53 @@ def root() -> dict[str, str]:
     return {"status": "running"}
 
 
+BACKUP_DIR = Path(
+    os.getenv("BACKUP_DIR", "/backups")
+)
+
+
+def get_latest_backup() -> dict:
+    try:
+        if not BACKUP_DIR.exists():
+            return {
+                "status": "missing",
+                "last_backup_at": None,
+            }
+
+        backup_files = [
+            path
+            for path in BACKUP_DIR.iterdir()
+            if path.is_file()
+        ]
+
+        if not backup_files:
+            return {
+                "status": "missing",
+                "last_backup_at": None,
+            }
+
+        latest = max(
+            backup_files,
+            key=lambda path: path.stat().st_mtime,
+        )
+
+        modified_at = datetime.fromtimestamp(
+            latest.stat().st_mtime,
+            tz=timezone.utc,
+        )
+
+        return {
+            "status": "ok",
+            "last_backup_at": modified_at.isoformat(),
+        }
+
+    except Exception:
+        return {
+            "status": "error",
+            "last_backup_at": None,
+        }
+
+
 @app.get("/health")
 @app.get("/api/health")
 async def health():
@@ -166,7 +216,12 @@ async def health():
         redis_ok = False
 
     # -------------------------------------------------------------------------
-    # Estado general
+    # Backups
+    # -------------------------------------------------------------------------
+    backup = get_latest_backup()
+
+    # -------------------------------------------------------------------------
+    # Estado general del servicio
     # -------------------------------------------------------------------------
     healthy = database_ok and redis_ok
 
@@ -180,6 +235,7 @@ async def health():
         "redis": {
             "status": "ok" if redis_ok else "error",
         },
+        "backup": backup,
     }
 
     return JSONResponse(
