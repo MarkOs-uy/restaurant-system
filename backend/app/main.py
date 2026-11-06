@@ -155,7 +155,7 @@ def get_latest_backup() -> dict:
 
         backup_files = [
             path
-            for path in BACKUP_DIR.iterdir()
+            for path in BACKUP_DIR.rglob("*")
             if path.is_file()
         ]
 
