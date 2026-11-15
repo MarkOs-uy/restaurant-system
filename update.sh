@@ -732,4 +732,3 @@ if [ -t 0 ]; then
   read -r _
 
 fi
-```
