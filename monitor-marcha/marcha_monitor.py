@@ -25,7 +25,7 @@ class MarchaMonitor(tk.Tk):
         super().__init__()
 
         self.title(APP_NAME)
-        self.geometry("560x460")
+        self.geometry("520x500")
         self.resizable(False, False)
 
         self.status_vars = {}
