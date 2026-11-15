@@ -14,6 +14,9 @@ INSTALL_STATE_DIR="/var/lib/pos-restaurant"
 INSTALL_STATE_FILE="${INSTALL_STATE_DIR}/install.conf"
 LICENSE_FILE="${INSTALL_STATE_DIR}/license.json"
 
+MONITOR_DIR="${APP_DIR}/monitor-marcha"
+MONITOR_VENV="${MONITOR_DIR}/venv"
+
 
 # -----------------------------------------------------------------------------
 # Colores
@@ -103,6 +106,139 @@ desktop_dir_for_user() {
 
     printf "%s/Desktop" \
       "$home_dir"
+
+  fi
+}
+
+
+# -----------------------------------------------------------------------------
+# Detener Marcha Monitor
+# -----------------------------------------------------------------------------
+
+stop_monitor() {
+
+  if pgrep \
+    -f \
+    "${MONITOR_DIR}/marcha_monitor.py" \
+    >/dev/null 2>&1
+  then
+
+    pkill \
+      -f \
+      "${MONITOR_DIR}/marcha_monitor.py" \
+      >/dev/null 2>&1 || true
+
+    sleep 1
+
+    success "Marcha Monitor detenido"
+
+  else
+
+    warn "Marcha Monitor no estaba ejecutandose"
+
+  fi
+}
+
+
+# -----------------------------------------------------------------------------
+# Quitar Marcha Monitor del usuario gráfico
+# -----------------------------------------------------------------------------
+
+remove_monitor_user_integration() {
+  local target_user="$1"
+  local home_dir
+  local desktop_dir
+  local autostart_file
+  local shortcut_file
+
+
+  if [ -z "$target_user" ]; then
+
+    warn "No pude detectar el usuario grafico; no puedo quitar autostart ni acceso directo de Marcha Monitor."
+
+    return
+
+  fi
+
+
+  home_dir="$(
+    getent passwd "$target_user" \
+      | cut -d: -f6
+  )"
+
+
+  if [ -z "$home_dir" ]; then
+
+    warn "No pude detectar HOME de ${target_user}; no puedo quitar autostart de Marcha Monitor."
+
+    return
+
+  fi
+
+
+  # ---------------------------------------------------------------------------
+  # Autostart
+  # ---------------------------------------------------------------------------
+
+  autostart_file="${home_dir}/.config/autostart/marcha-monitor.desktop"
+
+
+  if [ -f "$autostart_file" ]; then
+
+    rm -f \
+      "$autostart_file"
+
+    success "Autostart de Marcha Monitor quitado"
+
+  fi
+
+
+  # ---------------------------------------------------------------------------
+  # Acceso directo del escritorio
+  # ---------------------------------------------------------------------------
+
+  desktop_dir="$(
+    desktop_dir_for_user "$target_user" || true
+  )"
+
+
+  if [ -n "${desktop_dir:-}" ]; then
+
+    shortcut_file="${desktop_dir}/Marcha Monitor.desktop"
+
+
+    if [ -f "$shortcut_file" ]; then
+
+      rm -f \
+        "$shortcut_file"
+
+      success "Acceso directo de Marcha Monitor quitado"
+
+    fi
+
+  fi
+}
+
+
+# -----------------------------------------------------------------------------
+# Quitar entorno virtual del monitor
+#
+# El entorno virtual es generado por install.sh y puede reconstruirse.
+# No contiene datos del usuario ni configuracion persistente.
+# -----------------------------------------------------------------------------
+
+remove_monitor_venv() {
+
+  if [ -d "$MONITOR_VENV" ]; then
+
+    rm -rf \
+      "$MONITOR_VENV"
+
+    success "Entorno virtual de Marcha Monitor eliminado"
+
+  else
+
+    warn "No existe entorno virtual de Marcha Monitor"
 
   fi
 }
@@ -244,6 +380,16 @@ fi
 
 
 # -----------------------------------------------------------------------------
+# Detener Marcha Monitor
+# -----------------------------------------------------------------------------
+
+section "Deteniendo Marcha Monitor"
+
+
+stop_monitor
+
+
+# -----------------------------------------------------------------------------
 # Detener servicios
 # -----------------------------------------------------------------------------
 
@@ -337,7 +483,7 @@ restore_network_configuration
 
 
 # -----------------------------------------------------------------------------
-# Quitar accesos directos
+# Quitar accesos directos de Marcha
 # -----------------------------------------------------------------------------
 
 section "Quitando accesos directos"
@@ -371,6 +517,23 @@ else
   warn "No pude detectar el usuario de escritorio"
 
 fi
+
+
+# -----------------------------------------------------------------------------
+# Quitar integración de Marcha Monitor
+# -----------------------------------------------------------------------------
+
+section "Quitando Marcha Monitor"
+
+
+remove_monitor_user_integration \
+  "$TARGET_USER"
+
+
+remove_monitor_venv
+
+
+success "Marcha Monitor desinstalado"
 
 
 # -----------------------------------------------------------------------------
@@ -420,6 +583,7 @@ printf "\nLos backups en %s/backups se conservan incluso si se elimina el volume
 
 
 printf "\nLa licencia tambien se conserva en:\n"
+
 printf "  %s\n" \
   "$LICENSE_FILE"
 
@@ -429,10 +593,24 @@ printf "\n%sDesinstalacion completada.%s\n" \
 
 
 printf "El codigo de la aplicacion sigue en:\n"
+
 printf "  %s\n" \
   "$APP_DIR"
 
 
+printf "\nMarcha Monitor:\n"
+
+printf "  Autostart eliminado\n"
+
+printf "  Acceso directo eliminado\n"
+
+printf "  Entorno virtual eliminado\n"
+
+printf "  Codigo conservado en: %s\n" \
+  "$MONITOR_DIR"
+
+
 printf "\nHostname mDNS utilizado por Marcha:\n"
+
 printf "  %s.local\n" \
   "$HOSTNAME_LOCAL"

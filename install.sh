@@ -17,6 +17,9 @@ INSTALL_STATE_FILE="${INSTALL_STATE_DIR}/install.conf"
 LICENSE_DIR="/var/lib/pos-restaurant"
 LICENSE_FILE="${LICENSE_DIR}/license.json"
 
+MONITOR_DIR="${APP_DIR}/monitor-marcha"
+MONITOR_VENV="${MONITOR_DIR}/venv"
+
 
 # -----------------------------------------------------------------------------
 # Colores
@@ -309,6 +312,164 @@ EOF
 
 
 # -----------------------------------------------------------------------------
+# Instalar Marcha Monitor
+# -----------------------------------------------------------------------------
+
+install_marcha_monitor() {
+  local target_user="${SUDO_USER:-}"
+  local target_group=""
+  local home_dir=""
+  local desktop_dir=""
+  local autostart_dir=""
+  local monitor_shortcut=""
+  local monitor_autostart=""
+
+  if [ ! -f "${MONITOR_DIR}/marcha_monitor.py" ]; then
+    fail "No se encontro ${MONITOR_DIR}/marcha_monitor.py"
+  fi
+
+  if [ ! -f "${MONITOR_DIR}/requirements.txt" ]; then
+    fail "No se encontro ${MONITOR_DIR}/requirements.txt"
+  fi
+
+  if [ ! -d "$MONITOR_VENV" ]; then
+    python3 -m venv "$MONITOR_VENV"
+  fi
+
+  "$MONITOR_VENV/bin/python" -m pip install \
+    --disable-pip-version-check \
+    -r "${MONITOR_DIR}/requirements.txt"
+
+  if ! "$MONITOR_VENV/bin/python" -c \
+    "import tkinter, requests" \
+    >/dev/null 2>&1
+  then
+    fail "Marcha Monitor no pudo cargar tkinter/requests correctamente."
+  fi
+
+  success "Entorno de Marcha Monitor preparado"
+
+  # ---------------------------------------------------------------------------
+  # Detectar el usuario que utiliza el escritorio.
+  # El instalador corre como root, pero el monitor debe ejecutarse como usuario.
+  # ---------------------------------------------------------------------------
+
+  if [ -z "$target_user" ] || [ "$target_user" = "root" ]; then
+    target_user="$(
+      logname 2>/dev/null || true
+    )"
+  fi
+
+  if [ -z "$target_user" ]; then
+    warn "No pude detectar el usuario de escritorio; Marcha Monitor quedo instalado, pero sin autoinicio."
+    return
+  fi
+
+  target_group="$(
+    id -gn "$target_user" 2>/dev/null || true
+  )"
+
+  if [ -z "$target_group" ]; then
+    warn "No pude detectar el grupo de ${target_user}; Marcha Monitor quedo instalado, pero sin autoinicio."
+    return
+  fi
+
+  home_dir="$(
+    getent passwd "$target_user" \
+      | cut -d: -f6
+  )"
+
+  if [ -z "$home_dir" ]; then
+    warn "No pude detectar el HOME de ${target_user}; Marcha Monitor quedo instalado, pero sin autoinicio."
+    return
+  fi
+
+  autostart_dir="${home_dir}/.config/autostart"
+
+  install \
+    -d \
+    -m 0755 \
+    -o "$target_user" \
+    -g "$target_group" \
+    "$autostart_dir"
+
+  monitor_autostart="${autostart_dir}/marcha-monitor.desktop"
+
+  cat > "$monitor_autostart" << EOF
+[Desktop Entry]
+Type=Application
+Name=Marcha Monitor
+Comment=Monitor de estado del servidor Marcha
+Exec="${MONITOR_VENV}/bin/python" "${MONITOR_DIR}/marcha_monitor.py"
+Path=${MONITOR_DIR}
+Icon=utilities-system-monitor
+Terminal=false
+X-GNOME-Autostart-enabled=true
+StartupNotify=false
+EOF
+
+  chown "$target_user:$target_group" \
+    "$monitor_autostart"
+
+  chmod 0644 \
+    "$monitor_autostart"
+
+  # ---------------------------------------------------------------------------
+  # Crear tambien un acceso directo manual en el escritorio.
+  # ---------------------------------------------------------------------------
+
+  desktop_dir="$(
+    desktop_dir_for_user "$target_user" || true
+  )"
+
+  if [ -n "$desktop_dir" ]; then
+
+    install \
+      -d \
+      -m 0755 \
+      -o "$target_user" \
+      -g "$target_group" \
+      "$desktop_dir"
+
+    monitor_shortcut="${desktop_dir}/Marcha Monitor.desktop"
+
+    cat > "$monitor_shortcut" << EOF
+[Desktop Entry]
+Type=Application
+Name=Marcha Monitor
+Comment=Ver el estado del servidor Marcha
+Exec="${MONITOR_VENV}/bin/python" "${MONITOR_DIR}/marcha_monitor.py"
+Path=${MONITOR_DIR}
+Icon=utilities-system-monitor
+Terminal=false
+Categories=Utility;System;
+StartupNotify=false
+EOF
+
+    chown "$target_user:$target_group" \
+      "$monitor_shortcut"
+
+    chmod +x \
+      "$monitor_shortcut"
+
+    if command -v gio >/dev/null 2>&1; then
+      sudo -u "$target_user" \
+        gio set \
+        "$monitor_shortcut" \
+        metadata::trusted true \
+        >/dev/null 2>&1 || true
+    fi
+
+  else
+    warn "No pude detectar el escritorio de ${target_user}; omito el acceso directo de Marcha Monitor."
+  fi
+
+  success "Marcha Monitor instalado para ${target_user}"
+  success "Marcha Monitor se iniciara automaticamente en el proximo inicio de sesion grafico"
+}
+
+
+# -----------------------------------------------------------------------------
 # Esperar PostgreSQL
 # -----------------------------------------------------------------------------
 
@@ -467,6 +628,8 @@ apt-get install -y \
   iproute2 \
   libnss-mdns \
   python3 \
+  python3-tk \
+  python3-venv \
   python3-zeroconf
 
 success "Dependencias base instaladas"
@@ -884,6 +1047,15 @@ success "Servicios systemd registrados"
 
 
 # -----------------------------------------------------------------------------
+# Marcha Monitor
+# -----------------------------------------------------------------------------
+
+section "Instalando Marcha Monitor"
+
+install_marcha_monitor
+
+
+# -----------------------------------------------------------------------------
 # Accesos directos
 # -----------------------------------------------------------------------------
 
@@ -976,6 +1148,9 @@ printf "  Actualizar:  %s/update.sh\n" \
 printf "  Reiniciar:   systemctl restart pos-restaurant\n"
 
 printf "  Estado:      systemctl status pos-restaurant\n"
+
+printf "  Monitor:     %s/bin/python %s/marcha_monitor.py\n" \
+  "$MONITOR_VENV" "$MONITOR_DIR"
 
 printf "  Desinstalar: sudo bash %s/uninstall.sh\n" \
   "$APP_DIR"
